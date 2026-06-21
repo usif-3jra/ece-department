@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ECE Department — Academic Portal</title>
+  <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -53,7 +54,7 @@
       clip-path: ellipse(54% 100% at 50% 100%);
     }
     .header-logo {
-      height: 72px; width: auto;
+      height: 58px; width: auto;
       margin-bottom: 14px;
       filter: drop-shadow(0 4px 14px rgba(0,0,0,.35));
       animation: fadeDown .55s ease both;
@@ -250,25 +251,23 @@
       0%,100% { box-shadow: 0 2px 6px rgba(10,31,68,.06); }
       50%      { box-shadow: 0 4px 20px rgba(10,31,68,.12); }
     }
-    .card.live:hover { animation: none; }
+    .card.live:hover { animation-play-state: paused; opacity: 1; }
   </style>
 </head>
 <body>
 
   <header class="header">
-    <img src="/logo_w.png" alt="BAU" class="header-logo" onerror="this.style.display='none'">
-    <p class="header-uni">Beirut Arab University</p>
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="header-logo" onerror="this.style.display='none'">
     <h1 class="header-title">ECE Department</h1>
   </header>
 
   <main class="body">
-    <div style="text-align:center;margin-bottom:18px;">
+    <div style="text-align:center;margin-bottom:24px;">
       <span class="header-chip">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Academic Systems Portal
+        Academic Systems Portal &mdash; Select a System to Continue
       </span>
     </div>
-    <p class="section-label">Select a System to Continue</p>
 
     <div class="grid">
 
@@ -319,7 +318,7 @@
           </svg>
         </div>
         <p class="card-title">ECE Department Resources</p>
-        <p class="card-desc">Study plans and course catalogs for all ECE programs — EPME, CCE, EEE, and BME</p>
+        <p class="card-desc">Study plans and course catalogs for all ECE programs — EPME, CEE, CE, and BME</p>
         <span class="card-cta">
           Open Resources
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
