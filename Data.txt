@@ -1,0 +1,21 @@
+Vercel
+
+
+Neon
+postgresql://neondb_owner:npg_S0dkf6BlAXLj@ep-orange-resonance-aljnvpum.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require
+
+Brevo
+BREVO_USER: usif.3jra@gmail.com
+BREVO_SMTP_KEY: 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
+
+BREVO_SMTP_KEY: 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
+
+MailerSend
+MAILERSEND_API_KEY: mlsn.dec12ea2be4bae4420cc2b8a88d864ca10f6572ba748517f8c21e3071f9670d4
+SENDER_EMAIL: test-68zxl273jm54j905.mlsender.net
+
+MAILERSEND_API_KEY: mlsn.b21c45f409bcc8276634d6404e87ed2a78440fd7f9a353dbd2251a005f5e97d2
+SENDER_EMAIL: fyp.grading@mirror-logic.com
+
+Mailtrap
+API: 4474bcb9d155c5e5220d4e8ed0a7672a

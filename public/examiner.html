@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Examiner Grading Portal — FYP System</title>
+  <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    :root { --navy:#1e3a5f; --blue:#2563eb; --blue-lt:#dbeafe; --green:#16a34a; --red:#dc2626; }
+    body   { font-family:'Inter',sans-serif; background:#f0f4f8; min-height:100vh; margin:0; }
+
+    .page-header {
+      background: linear-gradient(135deg, var(--navy) 0%, #2a4f80 100%);
+      color: #fff; padding: 20px 0; text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,.2);
+    }
+    .page-header h1 { font-size: 20px; font-weight: 700; margin: 0; }
+    .page-header p  { font-size: 13px; opacity: .8; margin: 4px 0 0; }
+
+    .portal-wrap { max-width: 900px; margin: 36px auto 60px; padding: 0 20px; }
+
+    /* Project Info Banner */
+    .project-info {
+      background: #fff; border-radius: 10px; padding: 20px 24px;
+      border-left: 5px solid var(--blue);
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .project-info .pi-icon { font-size: 28px; color: var(--blue); }
+    .project-info .pi-title { font-size: 17px; font-weight: 700; color: var(--navy); }
+    .project-info .pi-meta  { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+    /* Sub-tabs */
+    .portal-tabs { border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; }
+    .portal-tabs .nav-link {
+      border: none; border-bottom: 3px solid transparent; border-radius: 0;
+      padding: 12px 20px; font-weight: 600; font-size: 14px; color: #6b7280;
+      background: none; transition: all .15s;
+    }
+    .portal-tabs .nav-link.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .portal-tabs .nav-link:hover  { color: var(--navy); }
+    .portal-tabs .nav-link.disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+
+    /* Section card */
+    .section-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      margin-bottom: 20px; overflow: hidden;
+    }
+    .section-card-header {
+      background: var(--navy); color: #fff; padding: 12px 20px;
+      font-weight: 600; font-size: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-card-body { padding: 20px; }
+
+    /* Criterion row */
+    .criterion-row {
+      display: grid; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .criterion-row:last-child { border-bottom: none; }
+    .criterion-row .crit-name { font-weight: 500; font-size: 13px; }
+    .criterion-row .crit-meta { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .criterion-row input[type=number] {
+      width: 80px; text-align: center; border: 1px solid #d1d5db;
+      border-radius: 6px; padding: 6px; font-size: 15px; font-weight: 600;
+    }
+    .criterion-row input:focus { border-color: var(--blue); outline: none; box-shadow: 0 0 0 3px var(--blue-lt); }
+    .criterion-row .max-lbl { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+
+    /* State screens */
+    .state-screen { text-align: center; padding: 60px 20px; }
+    .icon-circle {
+      width: 80px; height: 80px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; margin: 0 auto 24px;
+    }
+    .icon-success { background: #d1fae5; color: var(--green); }
+    .icon-error   { background: #fee2e2; color: var(--red);   }
+    .icon-info    { background: var(--blue-lt); color: var(--blue); }
+
+    /* Submit bar */
+    .submit-bar {
+      background: #fff; border-top: 2px solid #e5e7eb;
+      padding: 20px; border-radius: 0 0 10px 10px;
+      display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .total-preview { font-size: 14px; font-weight: 600; color: var(--navy); }
+
+    /* Grading scale legend */
+    .grade-legend {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 18px; font-size: 12px;
+    }
+    .grade-legend strong { color: #374151; margin-right: 4px; }
+    .gl-badge {
+      padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; white-space: nowrap;
+    }
+    .gl-begin    { background: #fee2e2; color: #991b1b; }
+    .gl-dev      { background: #fef3c7; color: #92400e; }
+    .gl-accomp  { background: #dbeafe; color: #1e40af; }
+    .gl-exempl   { background: #d1fae5; color: #065f46; }
+
+    /* Presentation lock banner */
+    .pres-locked-banner {
+      background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px;
+      padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;
+    }
+    .pres-locked-banner i { font-size: 24px; color: #ea580c; flex-shrink: 0; }
+    .pres-locked-banner .lock-title { font-weight: 700; color: #9a3412; font-size: 14px; }
+    .pres-locked-banner .lock-sub   { font-size: 13px; color: #78350f; margin-top: 2px; }
+
+    /* Rubric button */
+    .rubric-ref-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; padding: 5px 12px;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      background: #f9fafb; color: #374151; text-decoration: none;
+      transition: background .15s;
+    }
+    .rubric-ref-btn:hover { background: #e5e7eb; color: #111827; }
+
+    @media (max-width: 576px) {
+      .portal-wrap { padding: 0 12px; margin-top: 20px; }
+      .criterion-row { grid-template-columns: 1fr !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="mb-2"><i class="fas fa-clipboard-check" style="font-size:28px;"></i></div>
+  <h1>Examiner Grading Portal</h1>
+  <p>Final Year Project — Secure Evaluation Interface</p>
+</div>
+
+<div class="portal-wrap">
+
+  <!-- Loading -->
+  <div id="state-loading" class="state-screen">
+    <div class="spinner-border text-primary mb-3" role="status"></div>
+    <p class="text-muted">Verifying access…</p>
+  </div>
+
+  <!-- Error -->
+  <div id="state-error" class="state-screen d-none">
+    <div class="icon-circle icon-error"><i class="fas fa-ban"></i></div>
+    <h4 class="fw-bold text-danger">Access Denied</h4>
+    <p class="text-muted" id="error-msg">Invalid or expired link.</p>
+  </div>
+
+  <!-- Success (Already submitted) -->
+  <div id="state-submitted" class="state-screen d-none">
+    <div class="icon-circle icon-success"><i class="fas fa-check-double"></i></div>
+    <h4 class="fw-bold text-success">Already Submitted</h4>
+    <p class="text-muted">Your grades for this project have already been recorded. A receipt was sent to your email.</p>
+  </div>
+
+  <!-- Main Portal (shown after validation) -->
+  <div id="state-portal" class="d-none">
+
+    <!-- Project Info -->
+    <div class="project-info">
+      <div class="pi-icon"><i class="fas fa-folder-open"></i></div>
+      <div>
+        <div class="pi-title" id="p-title">—</div>
+        <div class="pi-meta">
+          Examiner: <strong id="p-examiner-name">—</strong> &nbsp;|&nbsp;
+          Role: <strong id="p-examiner-type">—</strong> &nbsp;|&nbsp;
+          Type: <strong id="p-project-type">—</strong> &nbsp;|&nbsp;
+          Project ID: <code id="p-project-id">—</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Role Notice (Industry) -->
+    <div id="notice-industry" class="alert alert-info d-none">
+      <i class="fas fa-info-circle me-2"></i>
+      <strong>Industry Examiner:</strong> You are required to grade the <strong>Presentation</strong> only.
+    </div>
+    <div id="notice-other-univ" class="alert alert-info d-none">
+      <i class="fas fa-info-circle me-2"></i>
+      <strong>Other University Examiner:</strong> You are required to grade both the <strong>Report</strong> and <strong>Presentation</strong>.
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav portal-tabs" id="portalTabs">
+      <li class="nav-item"><button class="nav-link active" id="tab-report-btn" data-bs-toggle="pill" data-bs-target="#pane-report" type="button"><i class="fas fa-file-alt me-2"></i>Report Grading</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-pres-btn" data-bs-toggle="pill" data-bs-target="#pane-presentation" type="button"><i class="fas fa-chalkboard-teacher me-2"></i>Presentation Grading</button></li>
+    </ul>
+
+    <div class="tab-content">
+
+      <!-- Report Tab -->
+      <div class="tab-pane fade show active" id="pane-report">
+        <!-- Rubric reference + legend -->
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+          <div class="grade-legend flex-grow-1" style="margin-bottom:0;">
+            <strong>Scale:</strong>
+            <span class="gl-badge gl-begin">Beginning 45–59</span>
+            <span class="gl-badge gl-dev">Developing 60–75</span>
+            <span class="gl-badge gl-accomp">Accomplished 76–89</span>
+            <span class="gl-badge gl-exempl">Exemplary 90–100</span>
+          </div>
+          <a href="https://mirror-logic.github.io/fyp-grading/FYP_infographic_p3.png" target="_blank" class="rubric-ref-btn flex-shrink-0">
+            <i class="fas fa-image"></i>View Report Rubric
+          </a>
+        </div>
+        <div id="report-sections"></div>
+      </div>
+
+      <!-- Presentation Tab -->
+      <div class="tab-pane fade" id="pane-presentation">
+        <!-- Lock banner (shown when locked) -->
+        <div id="pres-lock-banner" class="pres-locked-banner d-none">
+          <i class="fas fa-lock"></i>
+          <div>
+            <div class="lock-title">Presentation Grading Not Yet Available</div>
+            <div class="lock-sub" id="pres-lock-msg">Presentation grading will be unlocked after the semester end date set by the administrator.</div>
+          </div>
+        </div>
+        <!-- Rubric reference + legend (shown when unlocked) -->
+        <div id="pres-rubric-header" class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+          <div class="grade-legend flex-grow-1" style="margin-bottom:0;">
+            <strong>Scale:</strong>
+            <span class="gl-badge gl-begin">Beginning 45–59</span>
+            <span class="gl-badge gl-dev">Developing 60–75</span>
+            <span class="gl-badge gl-accomp">Accomplished 76–89</span>
+            <span class="gl-badge gl-exempl">Exemplary 90–100</span>
+          </div>
+          <a href="https://mirror-logic.github.io/fyp-grading/FYP_infographic_p4.png" target="_blank" class="rubric-ref-btn flex-shrink-0">
+            <i class="fas fa-image"></i>View Presentation Rubric
+          </a>
+        </div>
+        <div id="presentation-sections"></div>
+      </div>
+
+    </div>
+
+    <!-- In-page error banner -->
+    <div id="portal-error" class="alert alert-danger d-none mt-2" role="alert"></div>
+
+    <!-- Submit Bar -->
+    <div class="submit-bar mt-2">
+      <span class="total-preview">Grades entered: <span id="grade-count">0</span></span>
+      <button class="btn btn-outline-secondary btn-lg" id="btn-save-draft" onclick="saveDraft()">
+        <i class="fas fa-save me-2"></i>Save Progress
+      </button>
+      <button class="btn btn-success btn-lg" id="btn-submit" onclick="submitGrades()">
+        <i class="fas fa-paper-plane me-2"></i>Submit All Grades
+      </button>
+    </div>
+
+  </div>
+  <!-- end state-portal -->
+
+  <!-- Done -->
+  <div id="state-done" class="state-screen d-none">
+    <div class="icon-circle icon-success"><i class="fas fa-check-circle"></i></div>
+    <h4 class="fw-bold text-success">Grades Submitted!</h4>
+    <p class="text-muted">Your evaluation has been recorded. A confirmation receipt has been sent to your email.</p>
+    <p class="text-muted small">You may now close this window.</p>
+  </div>
+
+</div><!-- end portal-wrap -->
+
+<!-- Confirmation modal -->
+<div class="modal fade" id="modalConfirmSubmit" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Confirm Submission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Submit your grades now? This action cannot be undone. A receipt will be sent to your email.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-success" id="btn-confirm-submit-yes" data-bs-dismiss="modal">
+          <i class="fas fa-paper-plane me-1"></i>Yes, Submit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// google.script.run compatibility shim — routes calls to the Vercel API backend
+const google = { script: { get run() {
+  let _s = null, _f = null;
+  const r = new Proxy({}, { get(_, prop) {
+    if (prop === 'withSuccessHandler') return fn => { _s = fn; return r; };
+    if (prop === 'withFailureHandler') return fn => { _f = fn; return r; };
+    return (...args) => fetch('/api', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: prop, args })
+    }).then(res => res.json()).then(d => _s && _s(d)).catch(e => _f && _f(e));
+  }});
+  return r;
+}}};
+</script>
+<script>
+'use strict';
+
+let _data   = null;
+let _token  = new URLSearchParams(window.location.search).get('token') || '';
+
+// Fallback if token is injected via template
+if (!_token) {
+  try { _token = '<?= token ?>'; } catch(e) {}
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function showError(msg) {
+  const el = document.getElementById('portal-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('d-none');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearError() {
+  const el = document.getElementById('portal-error');
+  if (el) el.classList.add('d-none');
+}
+
+function show(id) {
+  ['state-loading','state-error','state-submitted','state-portal','state-done'].forEach(s => {
+    document.getElementById(s).classList.add('d-none');
+  });
+  document.getElementById(id).classList.remove('d-none');
+}
+
+function init() {
+  google.script.run
+    .withSuccessHandler(res => {
+      if (!res.valid) {
+        if (res.message && res.message.includes('already submitted')) { show('state-submitted'); return; }
+        document.getElementById('error-msg').textContent = res.message || 'Invalid access link.';
+        show('state-error');
+        return;
+      }
+      _data = res;
+      renderPortal(res);
+      show('state-portal');
+    })
+    .withFailureHandler(e => {
+      document.getElementById('error-msg').textContent = 'Server error: ' + e.message;
+      show('state-error');
+    })
+    .getExaminerByToken(_token);
+}
+
+function renderPortal(data) {
+  document.getElementById('p-title').textContent        = data.project.title;
+  document.getElementById('p-examiner-name').textContent = data.assignment.name || data.assignment.email;
+  document.getElementById('p-examiner-type').textContent  = data.assignment.type;
+  document.getElementById('p-project-type').textContent   = data.project.type || '—';
+  document.getElementById('p-project-id').textContent     = data.project.id;
+
+  const type = data.assignment.type;
+
+  // Access control based on examiner type
+  const reportTab = document.getElementById('tab-report-btn');
+  const presTab   = document.getElementById('tab-pres-btn');
+
+  if (type === 'Industry') {
+    document.getElementById('notice-industry').classList.remove('d-none');
+    // Hide report tab entirely — industry examiners grade presentation only
+    reportTab.closest('li').classList.add('d-none');
+    presTab.click();
+
+    if (data.presentationLocked) {
+      document.getElementById('notice-industry').innerHTML =
+        '<i class="fas fa-clock me-2"></i><strong>Presentation Grading Not Yet Open:</strong> ' +
+        'You are assigned as an Industry examiner (Presentation only). ' +
+        'Presentation grading will be available after the semester end date set by the administrator. ' +
+        'Please return later or contact the project supervisor.';
+      document.getElementById('btn-submit').disabled = true;
+    }
+  } else if (type === 'Other University') {
+    document.getElementById('notice-other-univ').classList.remove('d-none');
+  }
+
+  const scopeOrder = c => (c.GradingScope || 'Individual') === 'Group' ? 0 : 1;
+  const reportCriteria = data.config.filter(c => c.Category === 'Report')
+                                    .sort((a, b) => scopeOrder(a) - scopeOrder(b));
+  const presCriteria   = data.config.filter(c => c.Category === 'Presentation')
+                                    .sort((a, b) => scopeOrder(a) - scopeOrder(b));
+
+  renderSection('report-sections',       reportCriteria, 'Report',       data.students);
+  renderSection('presentation-sections', presCriteria,   'Presentation', data.students);
+
+  // Presentation lock
+  if (data.presentationLocked) {
+    presTab.classList.add('disabled');
+    presTab.setAttribute('aria-disabled', 'true');
+    presTab.setAttribute('title', 'Presentation grading opens after the semester end date.');
+    document.getElementById('pres-lock-banner').classList.remove('d-none');
+    document.getElementById('pres-rubric-header').classList.add('d-none');
+    document.querySelectorAll('#pane-presentation .grade-inp').forEach(inp => { inp.disabled = true; });
+  }
+
+  // Option B: if examiner already submitted report and presentation is now open, go straight to it
+  if (data.reportSubmitted && !data.presentationLocked) {
+    presTab.click();
+  }
+
+  // Pre-fill saved draft grades
+  if (data.draftGrades && data.draftGrades.length) {
+    data.draftGrades.forEach(g => {
+      const sel = `[data-category="${g.category}"][data-criterion="${g.criterion}"][data-student="${g.studentId}"]`;
+      const inp = document.querySelector(`.grade-inp${sel}`);
+      if (inp && g.score !== undefined) inp.value = g.score;
+    });
+  }
+
+  // Save button: visible on Report tab only, hidden on Presentation tab and for Industry
+  const saveBtn = document.getElementById('btn-save-draft');
+  if (type === 'Industry') {
+    saveBtn.classList.add('d-none');
+  } else {
+    document.getElementById('tab-pres-btn').addEventListener('shown.bs.tab', () => saveBtn.classList.add('d-none'));
+    document.getElementById('tab-report-btn').addEventListener('shown.bs.tab', () => saveBtn.classList.remove('d-none'));
+    // If landing on presentation tab on load (reportSubmitted + unlocked), hide immediately
+    if (data.reportSubmitted && !data.presentationLocked) saveBtn.classList.add('d-none');
+  }
+
+  document.addEventListener('input', updateGradeCount);
+
+  document.addEventListener('change', e => {
+    const inp = e.target;
+    if (!inp.classList.contains('grade-inp') || inp.disabled) return;
+    const v = parseFloat(inp.value), max = parseFloat(inp.dataset.max);
+    if (isNaN(v) || inp.value === '') return;
+    const minAllowed = max * 0.45;
+    if (v < minAllowed) {
+      inp.value = minAllowed;
+      inp.style.borderColor = '';
+      showToast(`Grade automatically set to minimum ${minAllowed} (Beginning level, 45% of ${max}) — values below this are not accepted.`);
+    } else if (v > max) {
+      inp.value = max;
+      inp.style.borderColor = '';
+      showToast(`Grade automatically capped to maximum ${max}.`);
+    } else {
+      inp.style.borderColor = '';
+    }
+  });
+
+  updateGradeCount();
+}
+
+function renderSection(containerId, criteria, category, students) {
+  const container = document.getElementById(containerId);
+  if (!criteria.length) { container.innerHTML = '<p class="text-muted p-3">No criteria configured for this category.</p>'; return; }
+
+  const cards = criteria.map(c => {
+    const isGroup = (c.GradingScope || 'Individual') === 'Group';
+    const scopeLabel = isGroup ? 'Graded as a group' : 'Graded per student';
+    const scopeBadge = isGroup
+      ? `<span style="background:#dbeafe;color:#1e40af;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;">Group</span>`
+      : `<span style="background:#d1fae5;color:#065f46;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;">Per Student</span>`;
+
+    let bodyHtml;
+    if (isGroup) {
+      bodyHtml = `
+        <div class="criterion-row" style="grid-template-columns:1fr 120px 30px;">
+          <div>
+            <div class="crit-name">${escHtml(c.CriterionName)}</div>
+            <div class="crit-meta">One grade for the entire group &nbsp;·&nbsp; Max: ${c.MaxGrade} &nbsp;·&nbsp; Weight: ${c.Weight}%</div>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <input type="number" class="grade-inp" min="0" max="${c.MaxGrade}" step="0.5" placeholder="0"
+              data-category="${escHtml(category)}" data-criterion="${escHtml(c.CriterionName)}"
+              data-student="GROUP" data-max="${c.MaxGrade}"/>
+            <span class="max-lbl">/ ${c.MaxGrade}</span>
+          </div>
+        </div>`;
+    } else {
+      bodyHtml = students.map(s => `
+        <div class="criterion-row" style="grid-template-columns:1fr 120px 30px;">
+          <div>
+            <div class="crit-name">${escHtml(c.CriterionName)}</div>
+            <div class="crit-meta">Student: ${escHtml(s.name)} (${escHtml(s.id)}) &nbsp;·&nbsp; Max: ${c.MaxGrade} &nbsp;·&nbsp; Weight: ${c.Weight}%</div>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <input type="number" class="grade-inp" min="0" max="${c.MaxGrade}" step="0.5" placeholder="0"
+              data-category="${escHtml(category)}" data-criterion="${escHtml(c.CriterionName)}"
+              data-student="${escHtml(s.id)}" data-max="${c.MaxGrade}"/>
+            <span class="max-lbl">/ ${c.MaxGrade}</span>
+          </div>
+        </div>`).join('');
+    }
+
+    return `
+      <div class="section-card">
+        <div class="section-card-header">
+          <i class="fas fa-star"></i> ${escHtml(c.CriterionName)}
+          <span class="ms-2">${scopeBadge}</span>
+          <span class="ms-auto opacity-75" style="font-weight:400;font-size:12px;">Weight: ${c.Weight}% &nbsp;|&nbsp; Max: ${c.MaxGrade}</span>
+        </div>
+        <div class="section-card-body">${bodyHtml}</div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = cards;
+}
+
+function updateGradeCount() {
+  const type       = _data ? _data.assignment.type : null;
+  const presLocked = _data ? _data.presentationLocked : false;
+  const inputSel   = type === 'Industry'   ? '#pane-presentation .grade-inp'
+                   : presLocked            ? '#pane-report .grade-inp'
+                   :                         '.grade-inp';
+  let filled = 0, total = 0;
+  document.querySelectorAll(inputSel).forEach(inp => {
+    total++;
+    if (inp.value !== '') filled++;
+  });
+  document.getElementById('grade-count').textContent = `${filled}/${total}`;
+}
+
+function saveDraft() {
+  const type = _data.assignment.type;
+  const grades = [];
+
+  document.querySelectorAll('.grade-inp').forEach(inp => {
+    if (type === 'Industry' && inp.dataset.category === 'Report') return;
+    if (inp.value === '' || isNaN(parseFloat(inp.value))) return;
+    grades.push({
+      category:  inp.dataset.category,
+      criterion: inp.dataset.criterion,
+      studentId: inp.dataset.student,
+      score:     parseFloat(inp.value),
+    });
+  });
+
+  const btn = document.getElementById('btn-save-draft');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-save me-2"></i>Save Progress';
+      if (!res.success) { showError('Save error: ' + res.message); return; }
+      clearError();
+      btn.innerHTML = '<i class="fas fa-check me-2"></i>Saved!';
+      setTimeout(() => { btn.innerHTML = '<i class="fas fa-save me-2"></i>Save Progress'; }, 2000);
+    })
+    .withFailureHandler(e => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-save me-2"></i>Save Progress';
+      showError('Server error: ' + e.message);
+    })
+    .saveExaminerDraft(_token, grades);
+}
+
+function submitGrades() {
+  const type      = _data.assignment.type;
+  const presLocked = _data.presentationLocked;
+  const grades    = [];
+  let valid = true;
+  let firstInvalid = null;
+  clearError();
+
+  // Target only the inputs this examiner is required to fill
+  const inputSel = type === 'Industry'   ? '#pane-presentation .grade-inp'
+                 : presLocked            ? '#pane-report .grade-inp'
+                 :                         '.grade-inp';
+
+  // First pass: auto-correct below-minimum grades
+  document.querySelectorAll(inputSel).forEach(inp => {
+    const val = parseFloat(inp.value), max = parseFloat(inp.dataset.max);
+    if (!isNaN(val) && val >= 0 && val < max * 0.45) inp.value = String(max * 0.45);
+  });
+
+  // Second pass: validate and collect
+  document.querySelectorAll(inputSel).forEach(inp => {
+    const val = parseFloat(inp.value);
+    const max = parseFloat(inp.dataset.max);
+    if (inp.value === '' || isNaN(val) || val < 0 || val > max) {
+      inp.style.borderColor = '#dc2626';
+      valid = false;
+      if (!firstInvalid) firstInvalid = inp;
+    } else {
+      inp.style.borderColor = '';
+      grades.push({
+        category:  inp.dataset.category,
+        criterion: inp.dataset.criterion,
+        studentId: inp.dataset.student,
+        score:     val,
+      });
+    }
+  });
+
+  if (!valid) {
+    showError('Please fill all required grade fields with valid values before submitting.');
+    if (firstInvalid) firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  if (!grades.length) { showError('No grades to submit. All grading fields may be locked.'); return; }
+
+  const confirmModal = document.getElementById('modalConfirmSubmit');
+  const yesBtn = document.getElementById('btn-confirm-submit-yes');
+  const handler = () => {
+    confirmModal.removeEventListener('hidden.bs.modal', cancelHandler);
+    _doSubmit(grades);
+  };
+  const cancelHandler = () => { yesBtn.removeEventListener('click', handler); };
+  yesBtn.addEventListener('click', handler, { once: true });
+  confirmModal.addEventListener('hidden.bs.modal', cancelHandler, { once: true });
+  bootstrap.Modal.getOrCreateInstance(confirmModal).show();
+}
+
+function _doSubmit(grades) {
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting…';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if (!res.success) {
+        showError('Submission error: ' + res.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit All Grades';
+        return;
+      }
+      if (res.partial) {
+        // Report-only submission — presentation still locked
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>Report Grades Saved';
+        clearError();
+        const banner = document.createElement('div');
+        banner.className = 'alert alert-success mt-3';
+        banner.innerHTML = '<i class="fas fa-check-circle me-2"></i><strong>Report grades recorded.</strong> A confirmation email has been sent. Please return using this same link after the semester end date to submit your Presentation grades.';
+        document.getElementById('portal-error').insertAdjacentElement('afterend', banner);
+        return;
+      }
+      show('state-done');
+    })
+    .withFailureHandler(e => {
+      showError('Server error: ' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit All Grades';
+    })
+    .submitExaminerGrades(_token, { grades });
+}
+
+function showToast(msg) {
+  const el = document.getElementById('exam-grade-toast');
+  document.getElementById('exam-grade-toast-body').textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.style.display = 'none'; }, 4500);
+}
+
+window.addEventListener('load', () => {
+  if (!_token) {
+    document.getElementById('error-msg').textContent = 'No access token found in the URL. Please use the link provided in your invitation email.';
+    show('state-error');
+    return;
+  }
+  init();
+});
+</script>
+<div id="exam-grade-toast" style="position:fixed;bottom:24px;right:24px;z-index:9999;pointer-events:none;display:none;">
+  <div class="d-flex align-items-center gap-2 bg-warning text-dark rounded shadow px-3 py-2" style="font-size:14px;max-width:380px;">
+    <i class="fas fa-exclamation-triangle flex-shrink-0"></i>
+    <span id="exam-grade-toast-body"></span>
+  </div>
+</div>
+</body>
+</html>

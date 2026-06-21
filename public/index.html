@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FYP Management System</title>
+  <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN OVERLAY ═══════════════════ -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-logo-wrap">
+      <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png"
+           alt="University Logo" class="login-logo"/>
+    </div>
+    <div class="login-title">FYP Management System</div>
+    <div class="login-subtitle">Supervisor Portal — Please sign in to continue</div>
+
+    <div class="mb-3">
+      <label class="form-label fw-medium">Supervisor ID</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="fas fa-id-badge"></i></span>
+        <input type="text" id="login-id" class="form-control" placeholder="e.g. F20170170" autocomplete="username"/>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-medium">Password</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+        <input type="password" id="login-pwd" class="form-control" placeholder="Enter your password" autocomplete="current-password"/>
+        <button class="btn btn-outline-secondary" type="button" onclick="Auth.togglePwd('login-pwd', this)">
+          <i class="fas fa-eye"></i>
+        </button>
+      </div>
+    </div>
+    <div id="login-err" class="alert alert-danger py-2 d-none"></div>
+    <button class="btn btn-primary w-100 btn-lg mt-1" id="btn-login" onclick="Auth.login()">
+      <i class="fas fa-sign-in-alt me-2"></i>Sign In
+    </button>
+    <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+      <a href="/guidelines.html" target="_blank"
+         style="font-size:13px;color:#6b7280;text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;transition:all .15s;"
+         onmouseover="this.style.background='#f0f4ff';this.style.borderColor='#93c5fd';this.style.color='#1d4ed8';"
+         onmouseout="this.style.background='#f9fafb';this.style.borderColor='#e5e7eb';this.style.color='#6b7280';">
+        <i class="fas fa-book-open"></i> User Guidelines
+      </a>
+      <a href="https://mirror-logic.github.io/fyp-grading/FYP%20Grading%20and%20Rubrics.pdf" target="_blank"
+         style="font-size:13px;color:#6b7280;text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;transition:all .15s;"
+         onmouseover="this.style.background='#fff7ed';this.style.borderColor='#fb923c';this.style.color='#c2410c';"
+         onmouseout="this.style.background='#f9fafb';this.style.borderColor='#e5e7eb';this.style.color='#6b7280';">
+        <i class="fas fa-file-pdf"></i> Grading Rubric
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN APP (hidden until login) ═══════════════════ -->
+<div id="app-body" class="d-none">
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header class="app-header">
+  <div class="header-inner">
+    <div class="logo-wrap">
+      <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png"
+           alt="University Logo" class="header-logo"/>
+      <div class="header-sep"></div>
+      <div>
+        <div class="logo-univ">Beirut Arab University</div>
+        <div class="logo-title">Final Year Project Management &amp; Grading System</div>
+      </div>
+    </div>
+    <div class="header-actions d-flex align-items-center gap-2">
+      <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#modalFeedback" title="Send feedback or report an issue">
+        <i class="fas fa-comment-dots me-1"></i>Feedback
+      </button>
+      <button class="btn btn-sm btn-outline-light d-none admin-only-field" data-bs-toggle="modal" data-bs-target="#modalPublishSettings" title="Grade Publishing Settings" onclick="Publish.load()">
+        <i class="fas fa-lock-open me-1"></i>Publish
+      </button>
+      <button class="btn btn-sm btn-outline-light d-none admin-only-field position-relative" id="btn-view-feedback" data-bs-toggle="modal" data-bs-target="#modalFeedbackInbox" title="View user feedback" onclick="FeedbackInbox.load()">
+        <i class="fas fa-inbox me-1"></i>Inbox
+        <span id="feedback-unread-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" style="font-size:9px;"></span>
+      </button>
+      <button class="btn btn-sm btn-warning d-none" id="btn-manage-users" data-bs-toggle="modal" data-bs-target="#modalManageUsers" title="Manage Supervisor Credentials (Admin)">
+        <i class="fas fa-users-cog me-1"></i>Manage Users
+      </button>
+      <span id="header-countdown" class="d-none btn btn-sm btn-outline-light" style="pointer-events:none;cursor:default;white-space:nowrap;"><i class="fas fa-clock me-1"></i><span id="header-countdown-text"></span></span>
+      <!-- User Menu -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-light dropdown-toggle user-menu-btn" data-bs-toggle="dropdown">
+          <i class="fas fa-user-circle me-1"></i><span id="header-sup-name">Supervisor</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><span class="dropdown-item-text text-muted small" id="header-sup-prog"></span></li>
+          <li><hr class="dropdown-divider"/></li>
+          <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalChangePwd">
+            <i class="fas fa-key me-2 text-primary"></i>Change Password
+          </a></li>
+          <li><hr class="dropdown-divider"/></li>
+          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.21-06-26 R04</span></li>
+        </ul>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="Auth.logout()" title="Logout">
+        <i class="fas fa-sign-out-alt me-1"></i>Logout
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════ KPI BANNER ═══════════════════ -->
+<div class="kpi-banner">
+  <div class="kpi-card" style="cursor:pointer;" onclick="App.showProjects('FYP1')" title="Click to view FYP1 projects">
+    <div class="kpi-icon-wrap"><i class="fas fa-folder-open kpi-icon"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-val" id="val-fyp1">—</div>
+      <div class="kpi-lbl">Active FYP1 Projects</div>
+    </div>
+  </div>
+  <div class="kpi-card" style="cursor:pointer;" onclick="App.showProjects('FYP2')" title="Click to view FYP2 projects">
+    <div class="kpi-icon-wrap"><i class="fas fa-folder-open kpi-icon"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-val" id="val-fyp2">—</div>
+      <div class="kpi-lbl">Active FYP2 Projects</div>
+    </div>
+  </div>
+  <div class="kpi-card" style="cursor:pointer;" onclick="App.showStudents()" title="Click to view all students">
+    <div class="kpi-icon-wrap"><i class="fas fa-users kpi-icon"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-val" id="val-stu">—</div>
+      <div class="kpi-lbl">Total Active Students</div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap"><i class="fas fa-project-diagram kpi-icon"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-val" id="val-proj">—</div>
+      <div class="kpi-lbl">Total Projects</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+<div class="main-wrap">
+
+  <!-- Tab Nav -->
+  <ul class="nav app-tabs mb-0" id="mainTabs" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-reg"  type="button"><i class="fas fa-plus-circle me-2"></i>Registration</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-tw"    type="button"><i class="fas fa-users-cog me-2"></i>Teamwork &amp; Peer Eval</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-ex"    type="button"><i class="fas fa-user-tie me-2"></i>Examiner Assignment</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-tasks" type="button"><i class="fas fa-check-circle me-2" id="tasks-tab-icon" style="color:#22c55e;"></i>My Tasks</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-res"   type="button"><i class="fas fa-chart-bar me-2"></i>Final Results</button></li>
+  </ul>
+
+  <div class="tab-content tab-body">
+
+    <!-- ══════════ TAB 1: REGISTRATION ══════════ -->
+    <div class="tab-pane fade show active" id="tab-reg">
+      <div class="section-hdr">
+        <h5><i class="fas fa-plus-circle me-2 text-primary"></i>Register New Project</h5>
+        <button class="btn btn-sm btn-secondary admin-only-field" data-bs-toggle="modal" data-bs-target="#modalAddSupervisor">
+          <i class="fas fa-user-plus me-1"></i>Add Supervisor to System
+        </button>
+      </div>
+
+      <form id="formRegister" novalidate>
+
+        <!-- Row 1: Project Details -->
+        <div class="form-section-label">Project Details</div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label class="form-label">Project Title <span class="req">*</span></label>
+            <input type="text" id="f-title" class="form-control" placeholder="Enter project title" required/>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Type <span class="req">*</span></label>
+            <select id="f-type" class="form-select" required>
+              <option value="">Select…</option>
+              <option>FYP1</option>
+              <option>FYP2</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Semester <span class="req">*</span></label>
+            <input type="text" id="f-semester" class="form-control" readonly style="background:#f8fafc;color:#1e3a5f;font-weight:600;cursor:default;" required/>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Academic Year <span class="req">*</span></label>
+            <select id="f-year" class="form-select" required></select>
+          </div>
+        </div>
+
+        <!-- Row 2: Supervisors -->
+        <div class="form-section-label">Supervisor(s)</div>
+        <div id="supervisorRows">
+          <div class="sup-row row g-2 mb-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label">Program Type <span class="req">*</span></label>
+              <select class="form-select prog-select" required>
+                <option value="">Select program…</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Supervisor Name <span class="req">*</span></label>
+              <select class="form-select sup-select" required>
+                <option value="">Select supervisor…</option>
+              </select>
+            </div>
+            <div class="col-auto">
+              <button type="button" class="btn btn-outline-danger btn-sm d-none" onclick="Reg.removeSupRow(this)"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm mb-4" onclick="Reg.addSupRow()">
+          <i class="fas fa-plus me-1"></i>Add Co-Supervisor
+        </button>
+
+        <!-- Row 3: Students -->
+        <div class="form-section-label">Student(s)</div>
+        <div id="studentRows"></div>
+        <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="Reg.addStudentRow()">
+          <i class="fas fa-user-plus me-1"></i>Add Student
+        </button>
+
+        <!-- Notifications -->
+        <div class="d-flex align-items-center mb-4 mt-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="f-enableNotif"/>
+            <label class="form-check-label" for="f-enableNotif">
+              Enable Automatic Email Notifications (sent on week 13)
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" id="btnRegister">
+          <i class="fas fa-save me-2"></i>Register Project
+        </button>
+      </form>
+
+      <!-- Registered Projects Table -->
+      <div class="mt-5">
+        <div class="section-hdr">
+          <h5><i class="fas fa-list me-2 text-primary"></i>Registered Projects</h5>
+          <button class="btn btn-sm btn-outline-secondary" onclick="Reg.loadProjects()"><i class="fas fa-sync me-1"></i>Refresh</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover table-sm">
+            <thead><tr><th>Title</th><th>Type</th><th>Semester</th><th>Year</th><th>Program(s)</th><th>Supervisor(s)</th><th>Students</th><th style="width:80px"></th></tr></thead>
+            <tbody id="tbProjects"><tr><td colspan="8" class="text-center text-muted py-4">No projects yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- end Tab 1 -->
+
+    <!-- ══════════ TAB 2: TEAMWORK & PEER EVAL ══════════ -->
+    <div class="tab-pane fade" id="tab-tw">
+
+      <ul class="nav nav-pills sub-tabs mb-4" id="twSubTabs">
+        <li class="nav-item" id="tw-config-nav-item"><button class="nav-link active" id="tw-config-tab-btn" data-bs-toggle="pill" data-bs-target="#tw-config">Config</button></li>
+        <li class="nav-item"><button class="nav-link" id="tw-grade-tab-btn" data-bs-toggle="pill" data-bs-target="#tw-grade" onclick="TW.refreshProjectList()">Supervisor Grading</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tw-peer" onclick="TW.onPeerTabShown()">Peer Evaluation QR</button></li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- Config sub-tab -->
+        <div class="tab-pane fade show active" id="tw-config">
+          <div class="row g-4">
+            <div class="col-md-5">
+              <div class="card card-section">
+                <div class="card-body">
+                  <h6 class="card-title fw-bold mb-3"><i class="fas fa-sliders-h me-2 text-primary"></i>Grade Weights (%)</h6>
+                  <div style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;padding:14px;" class="mb-3">
+                    <div class="fw-semibold small mb-3" style="color:#1e40af;"><i class="fas fa-chart-pie me-1"></i>Main Grade Distribution</div>
+                    <div class="mb-2">
+                      <label class="form-label form-label-sm mb-1">Teamwork (% of final grade)</label>
+                      <input type="number" id="cfg-tw-weight" class="form-control form-control-sm" min="0" max="100"/>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label form-label-sm mb-1">Report (% of final grade)</label>
+                      <input type="number" id="cfg-report-weight" class="form-control form-control-sm" min="0" max="100"/>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label form-label-sm mb-1">Presentation (% of final grade)</label>
+                      <input type="number" id="cfg-pres-weight" class="form-control form-control-sm" min="0" max="100"/>
+                    </div>
+                    <div id="main-weight-total" class="small mt-2"></div>
+                  </div>
+                  <p class="small fw-semibold text-secondary mb-2 mt-1"><i class="fas fa-sitemap me-1"></i>Teamwork Sub-weights</p>
+                  <div class="mb-2">
+                    <label class="form-label form-label-sm mb-1">Peer Evaluation Portion (% of teamwork grade)</label>
+                    <input type="number" id="cfg-peer-weight" class="form-control form-control-sm" min="0" max="100"/>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label form-label-sm mb-1">Supervisor Portion (% of teamwork grade)</label>
+                    <input type="number" id="cfg-sup-weight" class="form-control form-control-sm" min="0" max="100"/>
+                  </div>
+                  <button class="btn btn-primary btn-sm" onclick="TW.saveConfig()"><i class="fas fa-save me-1"></i>Save Weights</button>
+
+                  <!-- Admin-only: Semester End Date & Week 14 Lock -->
+                  <hr class="admin-only-field"/>
+                  <div class="admin-only-field">
+                    <label class="form-label fw-semibold">
+                      <i class="fas fa-calendar-check me-1 text-danger"></i>Semester End Date
+                    </label>
+                    <input type="date" id="cfg-semester-end" class="form-control mb-2"/>
+                    <div class="form-text mb-2">Examiners cannot grade Presentation until this date passes.</div>
+                    <button class="btn btn-outline-danger btn-sm mb-3" onclick="TW.saveSemesterEndDate()"><i class="fas fa-calendar-check me-1"></i>Save End Date</button>
+
+                    <label class="form-label fw-semibold">
+                      <i class="fas fa-lock me-1 text-warning"></i>Week 14 TW Grade Lock Date
+                    </label>
+                    <input type="date" id="cfg-week14-date" class="form-control mb-2"/>
+                    <div class="form-text mb-2">Supervisors cannot edit teamwork grades after this date. Saved grades are automatically finalized.</div>
+                    <button class="btn btn-outline-warning btn-sm mb-3" onclick="TW.saveWeek14Date()"><i class="fas fa-lock me-1"></i>Save Week 14 Date</button>
+
+                    <hr style="margin:4px 0 12px;"/>
+                    <div class="d-flex align-items-center gap-3">
+                      <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="cfg-tw-locked" role="switch" onchange="TW.setLock(this.checked)"/>
+                        <label class="form-check-label fw-semibold" for="cfg-tw-locked">Lock TW Grading Now</label>
+                      </div>
+                      <span id="tw-lock-badge" class="badge bg-success">Unlocked</span>
+                    </div>
+                    <div class="form-text mt-1">Manually lock or unlock supervisor teamwork grading at any time, regardless of the Week 14 date.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <div class="card card-section">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-title fw-bold mb-0"><i class="fas fa-list-ol me-2 text-primary"></i>Peer Evaluation Questions</h6>
+                    <button class="btn btn-outline-primary btn-sm" onclick="TW.addPeerQuestion()"><i class="fas fa-plus me-1"></i>Add</button>
+                  </div>
+                  <div class="peer-q-header">
+                    <span>Question Text</span><span class="text-center">Max</span><span class="text-center">Weight%</span><span class="text-center">ABET</span><span></span>
+                  </div>
+                  <div id="peerQsList"></div>
+                  <div id="peer-weight-total" class="small mt-2 mb-1"></div>
+                  <button class="btn btn-primary btn-sm mt-1" onclick="TW.savePeerConfig()"><i class="fas fa-save me-1"></i>Save Questions</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Individual Grading Rubric (editable) -->
+            <div class="col-12">
+              <div class="card card-section">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      <h6 class="card-title fw-bold mb-0"><i class="fas fa-user-check me-2 text-info"></i>Individual Grading Rubric</h6>
+                      <p class="text-muted small mb-0 mt-1">Criteria graded per student. Set max grade, weight, and optional ABET outcome (5a, 5b, 2a, 2b, 7a, 7b).</p>
+                    </div>
+                    <button class="btn btn-outline-info btn-sm ms-3 flex-shrink-0" onclick="TW.addTWRubricRow('individual')"><i class="fas fa-plus me-1"></i>Add Row</button>
+                  </div>
+                  <div class="tw-rubric-list">
+                    <div class="tw-rubric-hdr">
+                      <span style="flex:1;min-width:140px;">Criterion Name</span>
+                      <span style="width:72px;text-align:center;">Max</span>
+                      <span style="width:68px;text-align:center;">Weight%</span>
+                      <span style="width:110px;text-align:center;">ABET</span>
+                      <span style="width:32px;"></span>
+                    </div>
+                    <div id="twIndivRubricList"></div>
+                  </div>
+                  <div id="indiv-weight-total" class="small mt-2 mb-1"></div>
+                  <button class="btn btn-info btn-sm mt-1 text-white" id="btn-save-indiv-rubric" onclick="TW.saveTWRubric('individual')"><i class="fas fa-save me-1"></i>Save Individual Rubric</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Peer QR sub-tab -->
+        <div class="tab-pane fade" id="tw-peer">
+          <div class="row g-4">
+            <!-- QR Code side -->
+            <div class="col-md-5 text-center">
+              <h5 class="mb-1">Peer Evaluation QR Code</h5>
+              <p class="text-muted small mb-3">Display on presentation day. Students scan to submit peer grades.</p>
+              <div id="qrcode-container" class="d-inline-block p-3 border rounded bg-white shadow-sm mb-3">
+                <div id="qrcode"><div class="text-muted py-4 px-3 small">Click Generate to create QR</div></div>
+              </div>
+              <div class="mb-3">
+                <input type="text" id="peer-url" class="form-control form-control-sm text-center" readonly placeholder="QR URL will appear here…"/>
+              </div>
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-primary btn-sm" onclick="TW.generateQR()"><i class="fas fa-qrcode me-1"></i>Generate QR</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="TW.copyPeerURL()"><i class="fas fa-copy me-1"></i>Copy Link</button>
+              </div>
+            </div>
+
+            <!-- Peer Eval Status side -->
+            <div class="col-md-7">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2 text-primary"></i>Submission Status</h5>
+                <button class="btn btn-outline-primary btn-sm" onclick="TW.refreshPeerStatus()"><i class="fas fa-sync me-1"></i>Refresh Status</button>
+              </div>
+              <div id="peerStatusContainer">
+                <div class="text-muted small">Loading your project statuses…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Supervisor Grading sub-tab -->
+        <div class="tab-pane fade" id="tw-grade">
+          <!-- Logged-in supervisor info notice -->
+          <div class="alert alert-info py-2 mb-3">
+            <i class="fas fa-user-check me-2"></i>
+            Grading as: <strong id="tw-grading-as">—</strong>
+            <span class="ms-2 text-muted small">(only your supervised projects are listed)</span>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-medium">Select Your Project to Grade <span class="req">*</span></label>
+            <div class="d-flex align-items-center gap-2" style="max-width:600px;">
+              <select id="tw-project-sel" class="form-select" onchange="TW.loadGradingUI()">
+                <option value="">— choose a project —</option>
+              </select>
+              <button class="btn btn-outline-secondary btn-sm text-nowrap" onclick="TW.refreshProjectList()" title="Reload project list">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+            <div id="tw-debug-notice" class="alert alert-warning small mt-2 d-none" style="max-width:600px;"></div>
+          </div>
+
+          <div id="twGradingArea" class="d-none">
+            <!-- Week 14 lock notice (shown when locked) -->
+            <div id="tw-locked-notice" class="alert alert-danger d-none mb-3">
+              <i class="fas fa-lock me-2"></i><strong>Teamwork Grading Locked:</strong> The Week 14 deadline has passed. Grades are finalized and cannot be changed.
+            </div>
+
+            <!-- Individual Grading Matrix -->
+            <div class="card card-section mb-4">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <h6 class="card-title fw-bold mb-0"><i class="fas fa-user-check me-2 text-info"></i>Individual Grading Matrix</h6>
+                  <a href="https://mirror-logic.github.io/fyp-grading/FYP_infographic_p2.png" target="_blank" class="btn btn-outline-secondary btn-sm flex-shrink-0 ms-2">
+                    <i class="fas fa-image me-1"></i>View Rubric
+                  </a>
+                </div>
+                <p class="text-muted small mb-3">Enter each student's score per criterion. Criteria are rows; students are columns.</p>
+                <div class="table-responsive" id="indGradeMatrix"></div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary btn-lg" id="btn-tw-save-draft" onclick="TW.saveDraft()" style="min-width:180px;">
+                <i class="fas fa-save me-2"></i>Save Grades
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end tw tab-content -->
+    </div>
+    <!-- end Tab 2 -->
+
+    <!-- ══════════ TAB 3: EXAMINER ASSIGNMENT ══════════ -->
+    <div class="tab-pane fade" id="tab-ex">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="card card-section">
+            <div class="card-body">
+              <h6 class="card-title fw-bold mb-3"><i class="fas fa-user-tie me-2 text-primary"></i>Assign Examiners</h6>
+
+              <div class="mb-3">
+                <label class="form-label">Select Project <span class="req">*</span></label>
+                <select id="ex-project-sel" class="form-select" onchange="Ex.onProjectChange()">
+                  <option value="">— choose a project —</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">
+                  <i class="fab fa-microsoft me-1 text-primary"></i>Report Link (OneDrive)
+                  <small class="text-muted ms-1">— sent to Internal &amp; External examiners only</small>
+                </label>
+                <input type="url" id="ex-report-link" class="form-control" placeholder="https://onedrive.live.com/…"/>
+              </div>
+
+              <label class="form-label mb-2">Examiners</label>
+              <div class="alert alert-info py-2 px-3 mb-2" style="font-size:12.5px;">
+                <i class="fas fa-info-circle me-1"></i>
+                <strong>Note:</strong> It is recommended to assign at least three examiners, including at least one examiner from outside the program, from another university, or from industry. Additionally, at least one Internal examiner must always be assigned to ensure the Report component is graded.
+              </div>
+              <div id="examinerRows"></div>
+
+              <div class="d-flex flex-column gap-2 mt-3">
+                <button class="btn btn-outline-primary w-100" onclick="Ex.addRow()">
+                  <i class="fas fa-plus me-1"></i>Add Examiner
+                </button>
+                <button class="btn btn-primary w-100" id="btnAssign" onclick="Ex.assign()">
+                  <i class="fas fa-link me-2"></i>Assign
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-7">
+          <div class="card card-section">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="card-title fw-bold mb-0"><i class="fas fa-tasks me-2 text-primary"></i>Examiner Status</h6>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-success btn-sm d-none" id="btnSendAllEmails" onclick="Ex.sendAllEmails()">
+                    <i class="fas fa-envelope me-1"></i>Send All Pending Emails
+                  </button>
+                  <button class="btn btn-outline-secondary btn-sm" onclick="Ex.refreshStatus()" title="Refresh"><i class="fas fa-sync-alt"></i></button>
+                </div>
+              </div>
+              <div id="examinerStatusTable">
+                <p class="text-muted small">Select a project to see examiner status.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-section mt-3">
+            <div class="card-body">
+              <h6 class="card-title fw-bold mb-3"><i class="fas fa-clipboard-list me-2 text-primary"></i>Grading Rubric (per Project Type)</h6>
+
+              <!-- FYP1 Rubric -->
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-primary fs-6 px-3 py-2">FYP1 Rubric</span>
+                <button class="btn btn-outline-primary btn-sm" onclick="Ex.addRubricRow('FYP1')"><i class="fas fa-plus me-1"></i>Add Row</button>
+              </div>
+              <div id="rubricListFYP1" class="mb-3"></div>
+
+              <hr/>
+
+              <!-- FYP2 Rubric -->
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-success fs-6 px-3 py-2">FYP2 Rubric</span>
+                <button class="btn btn-outline-success btn-sm" onclick="Ex.addRubricRow('FYP2')"><i class="fas fa-plus me-1"></i>Add Row</button>
+              </div>
+              <div id="rubricListFYP2" class="mb-3"></div>
+
+              <div class="alert alert-info small py-2 mb-3">
+                <i class="fas fa-info-circle me-1"></i>
+                <strong>Industry</strong> examiners grade Presentation only. <strong>Inside University &amp; Outside the Program/University</strong> examiners grade both Report and Presentation. The rubric sent matches the project type (FYP1 or FYP2).
+              </div>
+              <div id="rubric-weight-totals" class="small mt-1 mb-2"></div>
+              <button class="btn btn-primary btn-sm" id="btn-save-rubric" onclick="Ex.saveRubric()"><i class="fas fa-save me-1"></i>Save All Rubrics</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <!-- end Tab 3 -->
+
+    <!-- ══════════ TAB: MY TASKS ══════════ -->
+    <div class="tab-pane fade" id="tab-tasks">
+      <!-- All-good state (default) -->
+      <div id="tasks-all-good" class="text-center py-5">
+        <div style="width:80px;height:80px;background:#dcfce7;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;">
+          <i class="fas fa-check" style="font-size:36px;color:#22c55e;"></i>
+        </div>
+        <h5 class="fw-bold mb-2" style="color:#15803d;">All Tasks Complete</h5>
+        <p class="text-muted mb-0">All grading responsibilities are up to date. Nothing pending at this time.</p>
+      </div>
+      <!-- Pending list (shown when there are pending tasks) -->
+      <div id="tasks-pending-list" class="d-none"></div>
+    </div>
+    <!-- end My Tasks Tab -->
+
+    <!-- ══════════ TAB 4: FINAL RESULTS ══════════ -->
+    <div class="tab-pane fade" id="tab-res">
+      <div class="section-hdr">
+        <h5><i class="fas fa-chart-bar me-2 text-primary"></i>Final Results</h5>
+        <div class="d-flex gap-2 align-items-center">
+          <select id="res-filter-type" class="form-select form-select-sm" style="width:auto;" onchange="Res.applyFilter()">
+            <option value="">All Types</option>
+            <option>FYP1</option>
+            <option>FYP2</option>
+          </select>
+          <select id="res-filter-program" class="form-select form-select-sm d-none" style="width:auto;" onchange="Res.applyFilter()">
+            <option value="">All Programs</option>
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="Res.load()"><i class="fas fa-sync me-1"></i>Load Results</button>
+          <button class="btn btn-sm btn-outline-danger" id="btn-export-pdf" disabled onclick="Res.exportPDF()"><i class="fas fa-file-pdf me-1"></i>Export PDF</button>
+          <button class="btn btn-sm btn-outline-info d-none" id="btn-export-distribution" onclick="Res.exportDistributionReport()"><i class="fas fa-chart-bar me-1"></i>Distribution Report</button>
+        </div>
+      </div>
+      <div id="res-incomplete-warning" class="d-none"></div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover table-sm results-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Student Name</th><th>Student ID</th><th>Project Title</th>
+              <th>Type</th><th>Teamwork %</th><th>Report %</th><th>Presentation %</th>
+              <th>Weighted %</th><th>Final Grade</th><th>Letter Grade</th>
+            </tr>
+          </thead>
+          <tbody id="tbResults">
+            <tr><td colspan="11" class="text-center text-muted py-5">Click "Load Results" to compute and display grades.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="resultsSummary" class="d-none mt-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-chart-line me-2 text-primary"></i>Program Summary by Project Type</h5>
+        <div id="summaryCards"></div>
+      </div>
+    </div>
+    <!-- end Tab 4 -->
+
+  </div><!-- end main tab-content -->
+</div><!-- end main-wrap -->
+
+</div><!-- end #app-body -->
+
+<!-- ═══════════ MODAL: Edit Project ═══════════ -->
+<div class="modal fade" id="modalEditProject" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Project</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-project-id"/>
+        <div class="mb-3">
+          <label class="form-label">Project Title <span class="req">*</span></label>
+          <input type="text" id="edit-title" class="form-control"/>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Type</label>
+            <select id="edit-type" class="form-select">
+              <option>FYP1</option>
+              <option>FYP2</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Semester</label>
+            <select id="edit-semester" class="form-select">
+              <option>Fall</option>
+              <option>Spring</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Academic Year</label>
+            <select id="edit-year" class="form-select"></select>
+          </div>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="edit-enableNotif"/>
+          <label class="form-check-label" for="edit-enableNotif">Enable Automatic Email Notifications (sent on week 13)</label>
+        </div>
+
+        <hr class="mt-3 mb-3"/>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-semibold" style="font-size:14px;"><i class="fas fa-users me-1 text-muted"></i>Students</span>
+          <button type="button" class="btn btn-outline-primary btn-sm" onclick="Reg.addEditStudentRow()">
+            <i class="fas fa-user-plus me-1"></i>Add Student
+          </button>
+        </div>
+        <div class="row g-1 mb-1 d-none d-md-flex px-1" style="font-size:11px;color:#9ca3af;">
+          <div class="col-md-4">Full Name</div>
+          <div class="col-md-3">Student ID</div>
+          <div class="col-md-4">Email</div>
+        </div>
+        <div id="edit-student-rows"></div>
+
+        <div id="edit-err" class="alert alert-danger py-2 mt-3 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="Reg.saveEditProject()"><i class="fas fa-save me-1"></i>Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Manage Users (Admin Only) ═══════════ -->
+<div class="modal fade" id="modalManageUsers" tabindex="-1" data-on-show="Admin.loadUsers()">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-users-cog me-2"></i>Manage Supervisor Credentials</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          <i class="fas fa-info-circle me-1 text-primary"></i>
+          Enter a new password for each supervisor you want to update. Leave blank to keep their existing password.
+          Check "Email" to send credentials to that supervisor.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle" id="manageUsersTable">
+            <thead class="table-dark">
+              <tr>
+                <th>ID</th><th>Name</th><th>Program</th><th>New Password</th><th class="text-center">Send Email</th>
+              </tr>
+            </thead>
+            <tbody id="manageUsersTbody">
+              <tr><td colspan="5" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="Admin.saveCredentials()">
+          <i class="fas fa-save me-1"></i>Save &amp; Send Selected Emails
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Change Password ═══════════ -->
+<div class="modal fade" id="modalChangePwd" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-key me-2"></i>Change Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Current Password</label>
+          <input type="password" id="pwd-current" class="form-control"/>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">New Password <small class="text-muted">(min. 6 chars)</small></label>
+          <input type="password" id="pwd-new" class="form-control"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" id="pwd-confirm" class="form-control"/>
+        </div>
+        <div id="pwd-err" class="alert alert-danger py-2 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="Auth.changePassword()"><i class="fas fa-save me-1"></i>Update</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Add Supervisor to System ═══════════ -->
+<div class="modal fade" id="modalAddSupervisor" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Add Supervisor to System</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Full Name <span class="req">*</span></label>
+          <input type="text" id="ms-name" class="form-control" placeholder="Dr. Full Name"/>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Program <span class="req">*</span></label>
+          <select id="ms-program" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="ms-email" class="form-control" placeholder="supervisor@university.edu"/>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Initial Password <small class="text-muted">(leave blank for default: fyp2025)</small></label>
+          <input type="text" id="ms-password" class="form-control" placeholder="fyp2025"/>
+        </div>
+        <div class="alert alert-info py-2 small">
+          <i class="fas fa-info-circle me-1"></i>Supervisor can change their password after first login. Use "Manage Users" to reset passwords and email credentials.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="Reg.saveSupervisorToSystem()"><i class="fas fa-save me-1"></i>Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Grade Publishing Settings (Admin) ═══════════ -->
+<div class="modal fade" id="modalPublishSettings" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-lock-open me-2 text-success"></i>Grade Publishing Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info py-2 small mb-3">
+          <i class="fas fa-info-circle me-1"></i>
+          <strong>Locked (default):</strong> Results are only visible when <em>all</em> projects of the same type in a program are fully graded.<br>
+          <strong>Unlocked:</strong> Supervisors can see results for each individual project as soon as that project's grades are complete — without waiting for the whole cohort.
+          For <strong>co-supervised projects</strong>, each supervisor's visibility is controlled by their own program's unlock status.
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle" id="publishTable">
+            <thead class="table-dark">
+              <tr>
+                <th>Program</th>
+                <th class="text-center" style="width:130px;">FYP 1</th>
+                <th class="text-center" style="width:130px;">FYP 2</th>
+              </tr>
+            </thead>
+            <tbody id="publishTbody">
+              <tr><td colspan="3" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="publish-status" class="small text-muted mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Feedback Inbox (Admin) ═══════════ -->
+<div class="modal fade" id="modalFeedbackInbox" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-inbox me-2 text-primary"></i>Feedback Inbox</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div id="feedback-inbox-list" style="min-height:120px;">
+          <div class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Feedback ═══════════ -->
+<div class="modal fade" id="modalFeedback" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-comment-dots me-2 text-primary"></i>Send Feedback / Report an Issue</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">Share comments, suggestions, or report any issue with the FYP system. Your message will be sent directly to the admin.</p>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Your Message <span class="text-danger">*</span></label>
+          <textarea id="feedback-message" class="form-control" rows="5" placeholder="Describe your issue or suggestion…"></textarea>
+        </div>
+        <div id="feedback-err" class="alert alert-danger py-2 d-none"></div>
+        <div id="feedback-ok" class="alert alert-success py-2 d-none"><i class="fas fa-check-circle me-1"></i>Your feedback has been sent. Thank you!</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="btn-send-feedback" style="min-width:150px;" onclick="Feedback.send()">
+          <i class="fas fa-paper-plane me-1"></i>Send Feedback
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Confirm TW Grade Submission ═══════════ -->
+<div class="modal fade" id="modalConfirmTWSubmit" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Confirm Submission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Are you sure you want to submit teamwork grades? Any previously submitted grades for this project will be replaced.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="btn-confirm-tw-yes" data-bs-dismiss="modal">
+          <i class="fas fa-check me-1"></i>Yes, Submit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: Inactivity Warning ═══════════ -->
+<div class="modal fade" id="modalInactivity" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title text-dark"><i class="fas fa-clock me-2"></i>Session Expiring</h5>
+      </div>
+      <div class="modal-body text-center py-4">
+        <p class="mb-2">No activity detected. Your session will close in:</p>
+        <div id="inactivity-countdown" style="font-size:2.5rem;font-weight:700;letter-spacing:.05em;color:#1e3a5f;">05:00</div>
+        <p class="text-muted small mt-2 mb-0">Move your mouse or click below to stay logged in.</p>
+      </div>
+      <div class="modal-footer justify-content-center gap-2">
+        <button class="btn btn-primary" onclick="InactivityTimer.stayLoggedIn()"><i class="fas fa-check me-1"></i>Stay Logged In</button>
+        <button class="btn btn-outline-danger" onclick="Auth.logout()"><i class="fas fa-sign-out-alt me-1"></i>Logout Now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
+  <div id="appToast" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg">Message</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Spinner overlay -->
+<div id="spinner-overlay" class="d-none">
+  <div class="spinner-box">
+    <div class="spinner-border text-light" role="status"></div>
+    <div class="mt-2 text-white small">Processing…</div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: KPI — Project List ═══════════ -->
+<div class="modal fade" id="modalKPIProjects" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="kpiProjectsTitle"><i class="fas fa-folder-open me-2"></i>Projects</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th style="width:2.5rem;" class="ps-3">#</th>
+              <th>Project Title</th>
+              <th>Supervisor(s)</th>
+              <th class="text-center" style="width:6rem;">Students</th>
+              <th>Program</th>
+            </tr>
+          </thead>
+          <tbody id="kpiProjectsList"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: KPI — Student List ═══════════ -->
+<div class="modal fade" id="modalKPIStudents" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="kpiStudentsTitle"><i class="fas fa-users me-2"></i>Active Students</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th style="width:2.5rem;" class="ps-3">#</th>
+              <th>Student Name</th>
+              <th>Student ID</th>
+              <th>Project</th>
+            </tr>
+          </thead>
+          <tbody id="kpiStudentsList"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

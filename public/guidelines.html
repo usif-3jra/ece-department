@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FYP Grading System — User Guidelines</title>
+  <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --navy:   #1e3a5f;
+      --blue:   #2563eb;
+      --teal:   #0891b2;
+      --green:  #16a34a;
+      --amber:  #d97706;
+      --red:    #dc2626;
+      --purple: #7c3aed;
+      --gray:   #6b7280;
+      --light:  #f0f4f8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: #f0f4f8; color: #1f2937; line-height: 1.65; }
+
+    /* ── COVER ── */
+    .cover {
+      background: linear-gradient(135deg, #0d2141 0%, #1e3a5f 50%, #1a4f8a 100%);
+      color: #fff; padding: 72px 40px 60px; text-align: center; position: relative; overflow: hidden;
+    }
+    .cover::before {
+      content: ''; position: absolute; top: -80px; right: -80px;
+      width: 320px; height: 320px; background: rgba(255,255,255,.04);
+      border-radius: 50%;
+    }
+    .cover::after {
+      content: ''; position: absolute; bottom: -100px; left: -60px;
+      width: 260px; height: 260px; background: rgba(255,255,255,.03);
+      border-radius: 50%;
+    }
+    .cover-logo {
+      height: 72px; width: auto;
+      margin-bottom: 24px; display: block; margin-left: auto; margin-right: auto;
+    }
+    .cover h1 { font-size: 38px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 12px; }
+    .cover p  { font-size: 17px; opacity: .8; max-width: 520px; margin: 0 auto 32px; }
+    .cover-badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .cover-badge {
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+      padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    }
+    .cover-badge i { margin-right: 6px; opacity: .8; }
+
+    /* ── TOC ── */
+    .toc-bar {
+      background: var(--navy); color: #fff; padding: 0;
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 0; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,.3);
+    }
+    .toc-bar a {
+      color: rgba(255,255,255,.75); text-decoration: none;
+      padding: 14px 18px; font-size: 13px; font-weight: 600;
+      transition: all .15s; white-space: nowrap;
+    }
+    .toc-bar a:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .toc-bar a i    { margin-right: 6px; font-size: 12px; }
+
+    /* ── SECTION LAYOUT ── */
+    .section { padding: 60px 24px; max-width: 1100px; margin: 0 auto; }
+    .section-title {
+      font-size: 28px; font-weight: 800; color: var(--navy);
+      margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
+    }
+    .section-title .icon-bubble {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff; flex-shrink: 0;
+    }
+    .section-sub { color: var(--gray); font-size: 15px; margin-bottom: 36px; max-width: 680px; }
+    hr.section-rule { border: none; border-top: 2px solid #e5e7eb; margin: 60px 0; }
+
+    /* ── ROLE CARDS ── */
+    .role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
+    .role-card {
+      background: #fff; border-radius: 16px; padding: 28px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07); border-top: 4px solid transparent;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .role-card:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+    .role-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; color: #fff; margin-bottom: 16px;
+    }
+    .role-card h3   { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .role-card p    { font-size: 13px; color: var(--gray); line-height: 1.55; }
+    .role-admin     { border-top-color: var(--navy);   } .role-admin  .role-icon { background: var(--navy);   }
+    .role-sup       { border-top-color: var(--blue);   } .role-sup    .role-icon { background: var(--blue);   }
+    .role-examiner  { border-top-color: var(--teal);   } .role-examiner .role-icon { background: var(--teal); }
+    .role-student   { border-top-color: var(--green);  } .role-student  .role-icon { background: var(--green); }
+
+    /* ── FLOWCHART ── */
+    .flowchart-wrap {
+      background: #fff; border-radius: 20px; padding: 40px 24px;
+      box-shadow: 0 2px 20px rgba(0,0,0,.08); overflow-x: auto;
+    }
+    .flowchart-wrap svg { display: block; margin: 0 auto; min-width: 320px; max-width: 100%; }
+
+    /* ── STEPS ── */
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: flex; gap: 20px; position: relative;
+    }
+    .step:not(:last-child)::before {
+      content: ''; position: absolute; left: 19px; top: 48px;
+      width: 2px; height: calc(100% + 0px); background: #e5e7eb;
+    }
+    .step-num {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+      flex-shrink: 0; margin-top: 4px; z-index: 1;
+    }
+    .step-body { padding: 4px 0 32px; flex: 1; }
+    .step-body h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .step-body p  { font-size: 14px; color: var(--gray); }
+    .step-body .tip {
+      margin-top: 8px; background: #eff6ff; border-left: 3px solid var(--blue);
+      padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 13px; color: #1e40af;
+    }
+    .step-body .warn {
+      margin-top: 8px; background: #fffbeb; border-left: 3px solid var(--amber);
+      padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 13px; color: #92400e;
+    }
+
+    /* ── GRADE TABLE ── */
+    .grade-formula {
+      background: #fff; border-radius: 16px; padding: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .formula-row {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 0; border-bottom: 1px solid #f3f4f6; flex-wrap: wrap;
+    }
+    .formula-row:last-child { border-bottom: none; }
+    .formula-pct {
+      width: 64px; height: 64px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: #fff; flex-shrink: 0;
+    }
+    .formula-label h4 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .formula-label p  { font-size: 13px; color: var(--gray); }
+    .formula-eq {
+      font-size: 13px; color: var(--gray); font-style: italic;
+      background: #f9fafb; padding: 6px 12px; border-radius: 8px; flex: 1; min-width: 180px;
+    }
+
+    .grade-scale {
+      display: flex; flex-direction: row; flex-wrap: nowrap;
+      gap: 6px; margin-top: 20px; overflow-x: auto;
+    }
+    .grade-chip {
+      text-align: center; padding: 10px 6px; border-radius: 10px; font-weight: 700;
+      flex: 1; min-width: 52px;
+    }
+    .grade-chip .letter { font-size: 18px; display: block; }
+    .grade-chip .range  { font-size: 10px; margin-top: 2px; opacity: .85; white-space: nowrap; }
+
+    /* ── INFO CARDS ── */
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .info-card {
+      background: #fff; border-radius: 14px; padding: 22px;
+      box-shadow: 0 1px 8px rgba(0,0,0,.06);
+    }
+    .info-card-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .info-card-hdr .ico {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: #fff; flex-shrink: 0;
+    }
+    .info-card-hdr h4 { font-size: 14px; font-weight: 700; }
+    .info-card ul { list-style: none; padding: 0; }
+    .info-card ul li {
+      font-size: 13px; color: #374151; padding: 5px 0;
+      border-bottom: 1px solid #f3f4f6; display: flex; gap: 8px; align-items: flex-start;
+    }
+    .info-card ul li:last-child { border-bottom: none; }
+    .info-card ul li i { color: var(--blue); margin-top: 2px; flex-shrink: 0; }
+
+    /* ── RUBRIC BAND ── */
+    .rubric-band { display: flex; border-radius: 12px; overflow: hidden; margin-top: 16px; }
+    .rubric-seg {
+      flex: 1; padding: 14px 10px; text-align: center; color: #fff;
+    }
+    .rubric-seg .rb-label { font-size: 13px; font-weight: 700; }
+    .rubric-seg .rb-range { font-size: 11px; opacity: .85; margin-top: 2px; }
+
+    /* ── CONDITION CHECKLIST ── */
+    .checklist {
+      background: #fff; border-radius: 16px; padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .check-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 12px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .check-item:last-child { border-bottom: none; }
+    .check-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff; flex-shrink: 0;
+    }
+    .check-text h5 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .check-text p  { font-size: 13px; color: var(--gray); }
+
+    /* ── EXAMINER TABLE ── */
+    .ex-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,.06); }
+    .ex-table th { background: var(--navy); color: #fff; padding: 12px 16px; font-size: 13px; text-align: left; }
+    .ex-table td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+    .ex-table tr:last-child td { border-bottom: none; }
+    .ex-table tr:hover td { background: #f9fafb; }
+    .badge-pill {
+      display: inline-block; padding: 3px 10px; border-radius: 12px;
+      font-size: 11px; font-weight: 700;
+    }
+    .bp-yes { background: #dcfce7; color: #166534; }
+    .bp-no  { background: #fee2e2; color: #991b1b; }
+    .bp-pres{ background: #dbeafe; color: #1e40af; }
+
+    /* ── FOOTER ── */
+    .guide-footer {
+      background: var(--navy); color: rgba(255,255,255,.6);
+      text-align: center; padding: 32px 24px; font-size: 13px;
+    }
+    .guide-footer strong { color: #fff; }
+
+    @media (max-width: 640px) {
+      .cover h1 { font-size: 26px; }
+      .section { padding: 40px 16px; }
+      .toc-bar a { padding: 10px 12px; font-size: 12px; }
+      .toc-bar a span { display: none; }
+      .rubric-band { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ COVER ═══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <img class="cover-logo" src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="University Logo"/>
+  <h1>FYP Grading System</h1>
+  <p>Complete User Guidelines — Final Year Project Management &amp; Grading Platform for Engineering Programs</p>
+  <div class="cover-badges">
+    <span class="cover-badge"><i class="fas fa-users"></i>4 User Roles</span>
+    <span class="cover-badge"><i class="fas fa-layer-group"></i>FYP 1 &amp; FYP 2</span>
+    <span class="cover-badge"><i class="fas fa-shield-alt"></i>ABET-Aligned</span>
+    <span class="cover-badge"><i class="fas fa-file-pdf"></i>PDF Export</span>
+  </div>
+</div>
+
+<!-- ═══ NAVIGATION ════════════════════════════════════════════════════════ -->
+<nav class="toc-bar">
+  <a href="#roles"><i class="fas fa-users"></i><span>Roles</span></a>
+  <a href="#flow"><i class="fas fa-project-diagram"></i><span>Workflow</span></a>
+  <a href="#admin"><i class="fas fa-user-shield"></i><span>Admin</span></a>
+  <a href="#supervisor"><i class="fas fa-chalkboard-teacher"></i><span>Supervisor</span></a>
+  <a href="#examiner"><i class="fas fa-user-tie"></i><span>Examiner</span></a>
+  <a href="#student"><i class="fas fa-user-graduate"></i><span>Student</span></a>
+  <a href="#grading"><i class="fas fa-chart-bar"></i><span>Grading</span></a>
+  <a href="#results"><i class="fas fa-poll"></i><span>Results</span></a>
+</nav>
+
+<!-- ═══ ROLES ═════════════════════════════════════════════════════════════ -->
+<div class="section" id="roles">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--navy)"><i class="fas fa-users"></i></div>
+    User Roles
+  </div>
+  <p class="section-sub">The system has four distinct roles, each with its own responsibilities and access level.</p>
+
+  <div class="role-grid">
+    <div class="role-card role-admin">
+      <div class="role-icon"><i class="fas fa-user-shield"></i></div>
+      <h3>Administrator</h3>
+      <p>Full system access. Creates supervisor accounts, configures rubrics and weights, manages the TW lock, and exports the final PDF report.</p>
+    </div>
+    <div class="role-card role-sup">
+      <div class="role-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+      <h3>Supervisor</h3>
+      <p>Registers FYP projects and students, submits individual teamwork grades, and assigns examiners who receive email invitations.</p>
+    </div>
+    <div class="role-card role-examiner">
+      <div class="role-icon"><i class="fas fa-user-tie"></i></div>
+      <h3>Examiner</h3>
+      <p>External grader invited by email. Accesses a secure grading portal to evaluate the Report and/or Presentation based on their type.</p>
+    </div>
+    <div class="role-card role-student">
+      <div class="role-icon"><i class="fas fa-user-graduate"></i></div>
+      <h3>Student</h3>
+      <p>Evaluates teammates anonymously through the Peer Evaluation portal using a secure link generated by the system.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ WORKFLOW FLOWCHART ═════════════════════════════════════════════════ -->
+<div class="section" id="flow">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--blue)"><i class="fas fa-project-diagram"></i></div>
+    Overall Process Flowchart
+  </div>
+  <p class="section-sub">The complete grading lifecycle, from account creation to final PDF export.</p>
+
+  <div class="flowchart-wrap">
+    <svg viewBox="0 0 860 870" width="860" height="870" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M1,1 L7,4 L1,7 Z" fill="#64748b"/>
+        </marker>
+        <marker id="arr-r" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M1,1 L7,4 L1,7 Z" fill="#dc2626"/>
+        </marker>
+        <marker id="arr-g" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M1,1 L7,4 L1,7 Z" fill="#16a34a"/>
+        </marker>
+        <marker id="arr-t" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M1,1 L7,4 L1,7 Z" fill="#0891b2"/>
+        </marker>
+        <filter id="shadow" x="-8%" y="-10%" width="120%" height="130%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000015"/>
+        </filter>
+      </defs>
+
+      <!-- ══ VERTICAL MAIN-FLOW ARROWS (all at x=350) ══ -->
+      <line x1="350" y1="103" x2="350" y2="137" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <line x1="350" y1="183" x2="350" y2="217" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <line x1="350" y1="263" x2="350" y2="297" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <line x1="350" y1="343" x2="350" y2="377" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <line x1="350" y1="423" x2="350" y2="455" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- join bar → diamond top -->
+      <line x1="350" y1="518" x2="350" y2="544" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- YES arrow -->
+      <line x1="350" y1="600" x2="350" y2="634" stroke="#16a34a" stroke-width="2" marker-end="url(#arr-g)"/>
+      <text x="362" y="622" fill="#16a34a" font-size="10" font-weight="700">YES</text>
+      <!-- Load → Export -->
+      <line x1="350" y1="680" x2="350" y2="714" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- ══ FORK BAR (thick, above parallel boxes) ══ -->
+      <line x1="100" y1="457" x2="600" y2="457" stroke="#334155" stroke-width="3.5" stroke-linecap="round"/>
+      <!-- fork → Box1 center -->
+      <line x1="185" y1="457" x2="185" y2="465" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- fork → Box2 center (same as main flow) -->
+      <!-- (main arrow already goes to 455, touches fork bar at 457 — no extra line needed) -->
+      <!-- fork → Box3 center -->
+      <line x1="515" y1="457" x2="515" y2="465" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- ══ JOIN BAR (thick, below parallel boxes) ══ -->
+      <line x1="100" y1="516" x2="600" y2="516" stroke="#334155" stroke-width="3.5" stroke-linecap="round"/>
+      <!-- Box1 → join bar -->
+      <line x1="185" y1="511" x2="185" y2="516" stroke="#64748b" stroke-width="1.5"/>
+      <!-- Box2 → join bar -->
+      <line x1="350" y1="511" x2="350" y2="516" stroke="#64748b" stroke-width="1.5"/>
+      <!-- Box3 → join bar -->
+      <line x1="515" y1="511" x2="515" y2="516" stroke="#64748b" stroke-width="1.5"/>
+
+      <!-- ══ EMAIL TRIGGER ARROWS (dashed, right side) ══ -->
+      <!-- S1 → credentials email -->
+      <line x1="485" y1="80" x2="502" y2="80" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <!-- S4 → examiner invitation email -->
+      <line x1="485" y1="400" x2="502" y2="400" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+      <!-- ══ NO PATH: right of diamond → Incomplete box ══ -->
+      <line x1="432" y1="572" x2="450" y2="572" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arr-r)"/>
+      <text x="434" y="566" fill="#dc2626" font-size="10" font-weight="700">NO</text>
+      <!-- Incomplete box retry loop (far right, no overlaps) -->
+      <polyline points="568,572 648,572 648,457 603,457" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-r)"/>
+      <text x="652" y="519" fill="#dc2626" font-size="9.5" font-weight="600">Re-check</text>
+
+      <!-- ══ STEP BOXES ══ -->
+
+      <!-- S1: Create Supervisor Accounts (Admin) -->
+      <rect x="215" y="57" width="270" height="46" rx="10" fill="#1e3a5f" filter="url(#shadow)"/>
+      <text x="350" y="76" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Create Supervisor Accounts</text>
+      <text x="350" y="92" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Admin</text>
+
+      <!-- S2: Configure System (Admin) -->
+      <rect x="215" y="137" width="270" height="46" rx="10" fill="#1e3a5f" filter="url(#shadow)"/>
+      <text x="350" y="156" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Configure Rubrics, Weights &amp; TW Lock</text>
+      <text x="350" y="172" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Admin · Before semester begins</text>
+
+      <!-- S3: Supervisor Logs In -->
+      <rect x="215" y="217" width="270" height="46" rx="10" fill="#2563eb" filter="url(#shadow)"/>
+      <text x="350" y="236" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Supervisor Logs In</text>
+      <text x="350" y="252" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Supervisor · Uses emailed credentials</text>
+
+      <!-- My Tasks annotation (left of S3) -->
+      <line x1="215" y1="240" x2="137" y2="240" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-t)"/>
+      <rect x="18" y="219" width="117" height="44" rx="8" fill="#e0f2fe" stroke="#0891b2" stroke-width="1.5"/>
+      <text x="77" y="234" text-anchor="middle" fill="#075985" font-size="9" font-weight="700">📋 My Tasks Tab</text>
+      <text x="77" y="247" text-anchor="middle" fill="#075985" font-size="8.5">Pending tasks visible</text>
+      <text x="77" y="259" text-anchor="middle" fill="#075985" font-size="8.5">after login · all users</text>
+
+      <!-- S4: Register Projects & Students -->
+      <rect x="215" y="297" width="270" height="46" rx="10" fill="#2563eb" filter="url(#shadow)"/>
+      <text x="350" y="316" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Register FYP Projects &amp; Students</text>
+      <text x="350" y="332" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Supervisor · Title, type, student IDs</text>
+
+      <!-- S5: Assign Examiners & Send Invitations -->
+      <rect x="215" y="377" width="270" height="46" rx="10" fill="#2563eb" filter="url(#shadow)"/>
+      <text x="350" y="396" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Assign Examiners &amp; Send Invitations</text>
+      <text x="350" y="412" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Supervisor · ≥1 Internal · No self-assign</text>
+
+      <!-- PARALLEL SECTION LABEL -->
+      <text x="350" y="447" text-anchor="middle" fill="#475569" font-size="10" font-style="italic" font-weight="600">— Parallel activities (happen simultaneously) —</text>
+
+      <!-- Parallel Box 1: TW Grades -->
+      <rect x="100" y="465" width="165" height="46" rx="9" fill="#2563eb" filter="url(#shadow)"/>
+      <text x="183" y="484" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">Submit TW Grades</text>
+      <text x="183" y="499" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9">Supervisor</text>
+
+      <!-- Parallel Box 2: Examiner Grades -->
+      <rect x="268" y="465" width="164" height="46" rx="9" fill="#0891b2" filter="url(#shadow)"/>
+      <text x="350" y="484" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">Grade Report &amp; Pres.</text>
+      <text x="350" y="499" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9">Examiners</text>
+
+      <!-- Parallel Box 3: Peer Eval -->
+      <rect x="435" y="465" width="165" height="46" rx="9" fill="#16a34a" filter="url(#shadow)"/>
+      <text x="518" y="484" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">Submit Peer Eval.</text>
+      <text x="518" y="499" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9">Students</text>
+
+      <!-- DECISION DIAMOND: All Complete? -->
+      <polygon points="350,544 432,572 350,600 268,572" fill="#7c3aed" filter="url(#shadow)"/>
+      <text x="350" y="568" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">All Grades</text>
+      <text x="350" y="582" text-anchor="middle" fill="#fff" font-size="10">Complete?</text>
+
+      <!-- Incomplete Warning Box (NO path) -->
+      <rect x="452" y="554" width="114" height="36" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5" filter="url(#shadow)"/>
+      <text x="509" y="568" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="700">⚠ Incomplete</text>
+      <text x="509" y="582" text-anchor="middle" fill="#dc2626" font-size="9">Address missing items</text>
+
+      <!-- S6: Load Final Results (Admin) -->
+      <rect x="215" y="634" width="270" height="46" rx="10" fill="#1e3a5f" filter="url(#shadow)"/>
+      <text x="350" y="653" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Load Final Results</text>
+      <text x="350" y="669" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Admin · All conditions must pass</text>
+
+      <!-- S7: Export PDF (Admin) -->
+      <rect x="215" y="714" width="270" height="46" rx="10" fill="#dc2626" filter="url(#shadow)"/>
+      <text x="350" y="733" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">Export PDF Report</text>
+      <text x="350" y="749" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">Admin · Per program &amp; FYP type</text>
+
+      <!-- ══ EMAIL ANNOTATION BOXES (right side, no overlap with main flow) ══ -->
+      <!-- Credentials email (aligns with S1 center y=80) -->
+      <rect x="504" y="63" width="112" height="34" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="560" y="77" text-anchor="middle" fill="#92400e" font-size="9" font-weight="700">📧 Credentials Email</text>
+      <text x="560" y="90" text-anchor="middle" fill="#92400e" font-size="8.5">Sent to supervisors</text>
+
+      <!-- Examiner invitation (aligns with S5 center y=400) -->
+      <rect x="504" y="383" width="112" height="34" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="560" y="397" text-anchor="middle" fill="#92400e" font-size="9" font-weight="700">📧 Invitation Email</text>
+      <text x="560" y="410" text-anchor="middle" fill="#92400e" font-size="8.5">Sent to each examiner</text>
+
+      <!-- Examiner grade submission → confirmation email
+           Route: up from examiner left-edge center (clear of fork bar) → left above parallel section → down to annotation level on left side -->
+      <polyline points="268,488 268,452 74,452 74,552"
+        fill="none" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <rect x="16" y="554" width="118" height="36" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+      <text x="75" y="568" text-anchor="middle" fill="#92400e" font-size="9" font-weight="700">📧 Confirmation Email</text>
+      <text x="75" y="581" text-anchor="middle" fill="#92400e" font-size="8.5">Sent to each examiner</text>
+
+      <!-- ══ EXPORT FEATURE ANNOTATIONS (right of S6 / Load Final Results) ══ -->
+      <!-- Distribution Report: Admin only — arrow from S6 right edge -->
+      <line x1="485" y1="650" x2="494" y2="650" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <rect x="496" y="634" width="152" height="32" rx="8" fill="#eff6ff" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="572" y="647" text-anchor="middle" fill="#1e3a5f" font-size="9" font-weight="700">📊 Distribution Report</text>
+      <text x="572" y="660" text-anchor="middle" fill="#1e3a5f" font-size="8.5">Admin only</text>
+
+      <!-- Export Excel: All users — floating, no single-step source -->
+      <rect x="496" y="670" width="152" height="32" rx="8" fill="#f0fdf4" stroke="#166534" stroke-width="1.5"/>
+      <text x="572" y="683" text-anchor="middle" fill="#166534" font-size="9" font-weight="700">📥 Export Excel</text>
+      <text x="572" y="696" text-anchor="middle" fill="#166534" font-size="8.5">All users</text>
+
+      <!-- ══ LEGEND ══ -->
+      <rect x="20" y="790" width="820" height="66" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+      <text x="430" y="807" text-anchor="middle" fill="#64748b" font-size="10" font-weight="700">LEGEND</text>
+
+      <rect x="36"  y="816" width="11" height="11" rx="3" fill="#1e3a5f"/>
+      <text x="52"  y="826" fill="#374151" font-size="10">Admin</text>
+      <rect x="104" y="816" width="11" height="11" rx="3" fill="#2563eb"/>
+      <text x="120" y="826" fill="#374151" font-size="10">Supervisor</text>
+      <rect x="194" y="816" width="11" height="11" rx="3" fill="#0891b2"/>
+      <text x="210" y="826" fill="#374151" font-size="10">Examiner</text>
+      <rect x="278" y="816" width="11" height="11" rx="3" fill="#16a34a"/>
+      <text x="294" y="826" fill="#374151" font-size="10">Student</text>
+      <rect x="352" y="816" width="11" height="11" rx="3" fill="#7c3aed"/>
+      <text x="368" y="826" fill="#374151" font-size="10">Decision</text>
+      <rect x="424" y="816" width="11" height="11" rx="3" fill="#dc2626"/>
+      <text x="440" y="826" fill="#374151" font-size="10">Export / Error</text>
+      <rect x="528" y="816" width="11" height="11" rx="3" fill="#fef3c7" stroke="#d97706" stroke-width="1"/>
+      <text x="544" y="826" fill="#374151" font-size="10">Email notification</text>
+      <rect x="646" y="816" width="11" height="11" rx="3" fill="#e0f2fe" stroke="#0891b2" stroke-width="1"/>
+      <text x="662" y="826" fill="#374151" font-size="10">System feature</text>
+
+      <line x1="36"  y1="848" x2="52"  y2="848" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="58"  y="852" fill="#374151" font-size="10">Normal flow</text>
+      <line x1="136" y1="848" x2="152" y2="848" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <text x="158" y="852" fill="#374151" font-size="10">Email trigger</text>
+      <line x1="248" y1="848" x2="264" y2="848" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-r)"/>
+      <text x="270" y="852" fill="#374151" font-size="10">Incomplete — retry loop</text>
+      <line x1="410" y1="848" x2="420" y2="848" stroke="#334155" stroke-width="3.5" stroke-linecap="round"/>
+      <text x="426" y="852" fill="#374151" font-size="10">Fork / Join (parallel)</text>
+      <line x1="560" y1="848" x2="572" y2="848" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-t)"/>
+      <text x="578" y="852" fill="#374151" font-size="10">Feature tab access</text>
+    </svg>
+  </div>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ ADMIN GUIDE ════════════════════════════════════════════════════════ -->
+<div class="section" id="admin">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--navy)"><i class="fas fa-user-shield"></i></div>
+    Admin Guide
+  </div>
+  <p class="section-sub">The administrator has full control over the system. Follow these steps at the start of each semester.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num" style="background:var(--navy)">1</div>
+      <div class="step-body">
+        <h4>Create Supervisor Accounts</h4>
+        <p>Go to <strong>Admin Tools → Supervisor Credentials</strong>. Enter each supervisor's name, program, email, and password, then click <em>Add Supervisor</em>. Use <em>Send Credentials</em> to email login details to all new accounts at once.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>The credential email includes a direct link to the system and a link to the FYP Rubrics document.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--navy)">2</div>
+      <div class="step-body">
+        <h4>Configure Grading Weights</h4>
+        <p>In <strong>Admin Tools → Grading Weights</strong>, set the percentage contribution for Teamwork, Report, and Presentation. Defaults are: Teamwork 35%, Report 35%, Presentation 30%. Within Teamwork: Supervisor Individual 80%, Peer Evaluation 20%.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--navy)">3</div>
+      <div class="step-body">
+        <h4>Set Up the Examiner Rubric</h4>
+        <p>Go to <strong>Assign Examiners → Grading Rubric</strong>. Add criteria for FYP1 and FYP2 separately for both Report and Presentation categories. Assign each criterion a max grade, weight, scope (Individual or Group), and an ABET outcome tag.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>Each criterion can be linked to one ABET outcome (e.g. 1a, 3a, 5a). Outcomes appear in the results and PDF only for FYP types that have at least one criterion mapped to them — outcomes with no linked criteria are automatically hidden for that type. Outcome 2b (Feasibility Study) is always shown as <em>Not measured for this year</em> until its rubric criterion is added.</div>
+        <div class="warn"><i class="fas fa-exclamation-triangle me-1"></i>All criterion grades must be at least 45% of the maximum. The system enforces this automatically.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--navy)">4</div>
+      <div class="step-body">
+        <h4>Configure TW Lock &amp; Week 14 Date</h4>
+        <p>In the Teamwork config panel, set the <strong>Week 14 deadline</strong> date. The system locks TW grading automatically when this date passes. You can also toggle the lock manually at any time using the <em>TW Locked / Unlocked</em> switch.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>When the lock engages, any missing grades are automatically filled with the minimum value (45% of max grade).</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--navy)">5</div>
+      <div class="step-body">
+        <h4>Load &amp; Export Final Results</h4>
+        <p>Once all grading is complete, go to the <strong>Final Results</strong> tab and click <em>Load Results</em>. The system validates all conditions. When everything passes, <em>Export PDF</em> becomes active. The PDF is generated per program and per FYP type.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--navy)">6</div>
+      <div class="step-body">
+        <h4>Feedback Inbox</h4>
+        <p>Supervisors can send feedback or remarks through the <em>Feedback</em> button. An <strong>Inbox</strong> button appears in the admin header with an unread badge. Open it to read all messages.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ SUPERVISOR GUIDE ═══════════════════════════════════════════════════ -->
+<div class="section" id="supervisor">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--blue)"><i class="fas fa-chalkboard-teacher"></i></div>
+    Supervisor Guide
+  </div>
+  <p class="section-sub">Supervisors manage their own projects, grade teamwork, and assign examiners.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num" style="background:var(--blue)">1</div>
+      <div class="step-body">
+        <h4>Log In</h4>
+        <p>Use the Supervisor ID and password sent to your email by the admin. Visit the system URL and enter your credentials on the login screen.</p>
+        <div class="tip"><i class="fas fa-tasks me-1"></i>After logging in, check the <strong>My Tasks</strong> tab to see all pending actions — unsubmitted TW grades, pending examiner assignments, and direct links to any open grading portals.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--blue)">2</div>
+      <div class="step-body">
+        <h4>Register Your FYP Projects</h4>
+        <p>Go to the <strong>Registered Projects</strong> tab. Click <em>Add New Project</em>, enter the project title, select the type (FYP1 or FYP2), and add all student names and IDs.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>Student IDs are used for peer evaluation login. Double-check them before saving.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--blue)">3</div>
+      <div class="step-body">
+        <h4>Submit Teamwork Individual Grades</h4>
+        <p>In the <strong>Teamwork Grading</strong> tab, select your project. Grade each student across all criteria using the Individual Assessment Matrix. Click <em>Save Grades</em>. The table is locked at Week 14 or by admin toggle — missing grades are auto-filled at 45%.</p>
+        <div class="warn"><i class="fas fa-exclamation-triangle me-1"></i>No grade can be lower than 45% of the criterion's maximum. The system will flag violations before saving.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--blue)">4</div>
+      <div class="step-body">
+        <h4>Assign Examiners</h4>
+        <p>Go to the <strong>Assign Examiners</strong> tab. Select your project, optionally add the OneDrive report link, then add examiner rows. For each examiner choose a type, then select from the supervisor list or enter the examiner's name and email.</p>
+        <div class="warn"><i class="fas fa-exclamation-triangle me-1"></i><strong>Rules:</strong> You cannot assign yourself as an examiner. At least one Internal examiner must be assigned. Industry-only assignments are not accepted because the Report grade would be missing.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--blue)">5</div>
+      <div class="step-body">
+        <h4>Send Examiner Emails</h4>
+        <p>After assigning, check the <strong>Examiner Status</strong> table. Click <em>Send All Pending Emails</em> to invite all new examiners at once, or use the individual email button per row. Examiners with "Email Sent" status have been notified.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>Results cannot be loaded if any assigned examiner has not received an invitation email.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--blue)">6</div>
+      <div class="step-body">
+        <h4>Send Feedback to Admin</h4>
+        <p>Use the <em>Feedback</em> button in the top navigation to send comments or remarks to the system administrator at any time.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Examiner assignment rules box -->
+  <div style="margin-top:32px;">
+    <h4 style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--navy);"><i class="fas fa-user-tie me-2 text-primary"></i>Examiner Types &amp; Responsibilities</h4>
+    <div style="overflow-x:auto;">
+      <table class="ex-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Who</th>
+            <th>Grades Report</th>
+            <th>Grades Presentation</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Inside University</strong> (Internal)</td>
+            <td>Another supervisor from the same university</td>
+            <td><span class="badge-pill bp-yes">Yes</span></td>
+            <td><span class="badge-pill bp-yes">Yes</span></td>
+            <td>Selected from the supervisor dropdown by program</td>
+          </tr>
+          <tr>
+            <td><strong>Outside the Program / University</strong> (External)</td>
+            <td>Academic from a different university or program</td>
+            <td><span class="badge-pill bp-yes">Yes</span></td>
+            <td><span class="badge-pill bp-yes">Yes</span></td>
+            <td>Enter name and email manually</td>
+          </tr>
+          <tr>
+            <td><strong>Industry</strong></td>
+            <td>Professional from industry</td>
+            <td><span class="badge-pill bp-no">No</span></td>
+            <td><span class="badge-pill bp-pres">Yes</span></td>
+            <td>Presentation only; report link not included in their email</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:12px;color:var(--gray);margin-top:8px;"><i class="fas fa-info-circle me-1"></i>It is recommended to assign at least 3 examiners, including at least one from outside the program, another university, or from industry.</p>
+  </div>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ EXAMINER GUIDE ═════════════════════════════════════════════════════ -->
+<div class="section" id="examiner">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--teal)"><i class="fas fa-user-tie"></i></div>
+    Examiner Guide
+  </div>
+  <p class="section-sub">Examiners receive an email invitation and access a private grading portal — no login account required.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num" style="background:var(--teal)">1</div>
+      <div class="step-body">
+        <h4>Receive Invitation Email</h4>
+        <p>You will receive an email containing the project title, your examiner type, and a secure personal link to the grading portal. Internal and External examiners also receive a link to the project report.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--teal)">2</div>
+      <div class="step-body">
+        <h4>Open the Grading Portal</h4>
+        <p>Click <em>Open Grading Portal</em> in the email. The link is unique to you and gives access only to your assigned project. No password is needed.</p>
+        <div class="warn"><i class="fas fa-exclamation-triangle me-1"></i>Keep your link private. Do not share it with others.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--teal)">3</div>
+      <div class="step-body">
+        <h4>Grade the Report (Internal &amp; External Only)</h4>
+        <p>Review the project report using the link provided, then complete all Report rubric criteria. Use the <em>View Report Rubric</em> reference image to understand grading bands. Click <em>Submit Report Grades</em>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--teal)">4</div>
+      <div class="step-body">
+        <h4>Grade the Presentation (All Examiner Types)</h4>
+        <p>After the student presentation, complete the Presentation rubric criteria. Use the <em>View Presentation Rubric</em> reference image. Click <em>Submit Presentation Grades</em>.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>Grades can be saved partially and submitted later. Each section is submitted independently.</div>
+        <div class="tip"><i class="fas fa-envelope me-1"></i>After each submission (Report and/or Presentation), a <strong>confirmation email</strong> is automatically sent to you confirming that your grades were recorded successfully.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rubric bands -->
+  <h4 style="font-size:15px;font-weight:700;margin:28px 0 12px;color:var(--navy);"><i class="fas fa-ruler me-2"></i>Grading Performance Bands</h4>
+  <div class="rubric-band">
+    <div class="rubric-seg" style="background:#ef4444;">
+      <div class="rb-label">Beginning</div>
+      <div class="rb-range">45 – 59</div>
+    </div>
+    <div class="rubric-seg" style="background:#f59e0b;">
+      <div class="rb-label">Developing</div>
+      <div class="rb-range">60 – 75</div>
+    </div>
+    <div class="rubric-seg" style="background:#3b82f6;">
+      <div class="rb-label">Accomplished</div>
+      <div class="rb-range">76 – 89</div>
+    </div>
+    <div class="rubric-seg" style="background:#16a34a;">
+      <div class="rb-label">Exemplary</div>
+      <div class="rb-range">90 – 100</div>
+    </div>
+  </div>
+  <p style="font-size:12px;color:var(--gray);margin-top:8px;"><i class="fas fa-exclamation-circle me-1 text-warning"></i>The minimum acceptable grade per criterion is <strong>45%</strong> of the maximum. A grade below this is flagged by the system.</p>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ STUDENT GUIDE ══════════════════════════════════════════════════════ -->
+<div class="section" id="student">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--green)"><i class="fas fa-user-graduate"></i></div>
+    Student Guide — Peer Evaluation
+  </div>
+  <p class="section-sub">Students evaluate their teammates anonymously. No account is needed — just your Student ID.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num" style="background:var(--green)">1</div>
+      <div class="step-body">
+        <h4>Access the Peer Evaluation Portal</h4>
+        <p>Open the Peer Evaluation link shared by your supervisor. The URL is: <strong>/peer.html</strong> on the system domain.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--green)">2</div>
+      <div class="step-body">
+        <h4>Enter Your Student ID</h4>
+        <p>Type your Student ID (as registered in the system by your supervisor) and click <em>Continue</em>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--green)">3</div>
+      <div class="step-body">
+        <h4>Rate Each Teammate</h4>
+        <p>You will see a section for each of your teammates (you do not evaluate yourself). For each teammate, select a score (0–10) for every question. All fields must be filled in before submitting.</p>
+        <div class="tip"><i class="fas fa-info-circle me-1"></i>Grades are confidential. Be honest and fair — peer evaluation is part of the final Teamwork grade.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num" style="background:var(--green)">4</div>
+      <div class="step-body">
+        <h4>Submit</h4>
+        <p>Click <em>Submit Peer Evaluation</em>. A confirmation screen confirms your submission was recorded. You can only submit once.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ GRADING FORMULA ════════════════════════════════════════════════════ -->
+<div class="section" id="grading">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--purple)"><i class="fas fa-chart-bar"></i></div>
+    Grading Formula &amp; Letter Grades
+  </div>
+  <p class="section-sub">The final grade is computed from three components. Each component is expressed as a percentage (0–100).</p>
+
+  <div class="grade-formula">
+    <!-- Both charts centered, legends below each chart in one line -->
+    <div style="display:flex;justify-content:center;gap:60px;flex-wrap:wrap;margin-bottom:20px;">
+
+      <!-- LEFT: Final Grade donut + legend below -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <!-- viewBox: x from -25 to 70, y from -12 to 50. Connectors end close to ring; labels within 10 units of endpoints. -->
+        <svg viewBox="-25 -12 95 62" width="320" style="display:block;">
+          <circle cx="22" cy="22" r="15.92" fill="#f8fafc"/>
+          <circle cx="22" cy="22" r="15.92" fill="none" stroke="#3b82f6" stroke-width="8"
+            stroke-dasharray="34.5 65.5" stroke-dashoffset="0" transform="rotate(-90 22 22)"/>
+          <circle cx="22" cy="22" r="15.92" fill="none" stroke="#16a34a" stroke-width="8"
+            stroke-dasharray="34.5 65.5" stroke-dashoffset="-35" transform="rotate(-90 22 22)"/>
+          <circle cx="22" cy="22" r="15.92" fill="none" stroke="#f59e0b" stroke-width="8"
+            stroke-dasharray="29.5 70.5" stroke-dashoffset="-70" transform="rotate(-90 22 22)"/>
+          <text x="22" y="20.5" text-anchor="middle" fill="#1e3a5f" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">Final</text>
+          <text x="22" y="26.5" text-anchor="middle" fill="#1e3a5f" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">Grade</text>
+          <!-- TW @63° → right, short connector (bend ≈155°) -->
+          <polyline points="39.82,12.92 44,11 52,11" fill="none" stroke="#3b82f6" stroke-width="0.5"/>
+          <rect x="52" y="10.1" width="1.8" height="1.8" fill="#3b82f6"/>
+          <text x="55" y="12.5" text-anchor="start" fill="#374151" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">35%</text>
+          <!-- Report @189° → left, short connector (bend ≈120°) -->
+          <polyline points="18.87,41.76 17,45 5,45" fill="none" stroke="#16a34a" stroke-width="0.5"/>
+          <rect x="3.2" y="44.1" width="1.8" height="1.8" fill="#16a34a"/>
+          <text x="2" y="46.5" text-anchor="end" fill="#374151" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">35%</text>
+          <!-- Pres @306° → left, short connector (bend ≈150°) -->
+          <polyline points="5.82,10.24 2,8 -8,8" fill="none" stroke="#f59e0b" stroke-width="0.5"/>
+          <rect x="-9.8" y="7.1" width="1.8" height="1.8" fill="#f59e0b"/>
+          <text x="-11" y="9.5" text-anchor="end" fill="#374151" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">30%</text>
+        </svg>
+        <div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#3b82f6;border-radius:2px;display:inline-block;flex-shrink:0;"></span>TW</span>
+          <span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#16a34a;border-radius:2px;display:inline-block;flex-shrink:0;"></span>Report</span>
+          <span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px;display:inline-block;flex-shrink:0;"></span>Presentation</span>
+        </div>
+      </div>
+
+      <!-- RIGHT: Grade Breakdown donut + legend below -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <svg viewBox="-25 -12 95 62" width="320" style="display:block;">
+          <circle cx="22" cy="22" r="15.92" fill="#f8fafc"/>
+          <circle cx="22" cy="22" r="15.92" fill="none" stroke="#3b82f6" stroke-width="8"
+            stroke-dasharray="42.5 57.5" stroke-dashoffset="0" transform="rotate(-90 22 22)"/>
+          <circle cx="22" cy="22" r="15.92" fill="none" stroke="#16a34a" stroke-width="8"
+            stroke-dasharray="49.5 50.5" stroke-dashoffset="-43" transform="rotate(-90 22 22)"/>
+          <circle cx="22" cy="22" r="15.92" fill="none" stroke="#f59e0b" stroke-width="8"
+            stroke-dasharray="6.5 93.5" stroke-dashoffset="-93" transform="rotate(-90 22 22)"/>
+          <text x="22" y="20.5" text-anchor="middle" fill="#1e3a5f" font-size="4" font-weight="700" font-family="Inter,sans-serif">Grade</text>
+          <text x="22" y="26.5" text-anchor="middle" fill="#1e3a5f" font-size="4" font-weight="700" font-family="Inter,sans-serif">Breakdown</text>
+          <!-- Individual @77.4° → right, short connector (bend ≈143°) -->
+          <polyline points="41.51,17.60 45,15 52,15" fill="none" stroke="#3b82f6" stroke-width="0.5"/>
+          <rect x="52" y="14.1" width="1.8" height="1.8" fill="#3b82f6"/>
+          <text x="55" y="16.5" text-anchor="start" fill="#374151" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">43%</text>
+          <!-- Per Group @244.8° → left, short connector (bend ≈163°) -->
+          <polyline points="3.88,30.50 -1,32 -8,32" fill="none" stroke="#16a34a" stroke-width="0.5"/>
+          <rect x="-9.8" y="31.1" width="1.8" height="1.8" fill="#16a34a"/>
+          <text x="-11" y="33.5" text-anchor="end" fill="#374151" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">50%</text>
+          <!-- Peer @347.4° → upper-left, short connector (bend ≈129°) -->
+          <polyline points="17.60,2.49 14,-2 6,-2" fill="none" stroke="#f59e0b" stroke-width="0.5"/>
+          <rect x="4.2" y="-2.9" width="1.8" height="1.8" fill="#f59e0b"/>
+          <text x="3" y="-0.5" text-anchor="end" fill="#374151" font-size="4.5" font-weight="700" font-family="Inter,sans-serif">7%</text>
+        </svg>
+        <div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#3b82f6;border-radius:2px;display:inline-block;flex-shrink:0;"></span>Individual</span>
+          <span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#16a34a;border-radius:2px;display:inline-block;flex-shrink:0;"></span>Per Group</span>
+          <span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px;display:inline-block;flex-shrink:0;"></span>Peer</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Formula list below charts -->
+    <ol style="font-size:13px;color:#374151;padding-left:20px;line-height:1.9;margin:0 0 20px 0;">
+      <li><strong style="color:#3b82f6;">TW</strong> = Individual × 80% + Peer Evaluation × 20%</li>
+      <li><strong style="color:#16a34a;">Report</strong> = Average of all Internal + External examiner grades (weighted by criterion)</li>
+      <li><strong style="color:#f59e0b;">Presentation</strong> = Average of Internal + External + Industry examiner grades (weighted by criterion)</li>
+    </ol>
+
+    <!-- Final Grade equation -->
+    <div style="padding:16px 20px;background:#f0f4ff;border-radius:12px;border-left:4px solid var(--blue);">
+      <strong style="font-size:14px;color:var(--navy);">Final Grade</strong>
+      <span style="margin-left:16px;font-size:14px;color:#374151;">= TW × 35% + Report × 35% + Presentation × 30%</span>
+    </div>
+  </div>
+
+  <h4 style="font-size:15px;font-weight:700;margin:32px 0 14px;color:var(--navy);"><i class="fas fa-graduation-cap me-2"></i>Letter Grade Scale</h4>
+  <div class="grade-scale">
+    <div class="grade-chip" style="background:#dc2626;color:#fff;"><span class="letter">F</span><span class="range">&lt; 60</span></div>
+    <div class="grade-chip" style="background:#f59e0b;color:#fff;"><span class="letter">D</span><span class="range">60 – 64</span></div>
+    <div class="grade-chip" style="background:#7c3aed;color:#fff;"><span class="letter">C−</span><span class="range">65 – 69</span></div>
+    <div class="grade-chip" style="background:#9333ea;color:#fff;"><span class="letter">C</span><span class="range">70 – 72</span></div>
+    <div class="grade-chip" style="background:#a855f7;color:#fff;"><span class="letter">C+</span><span class="range">73 – 75</span></div>
+    <div class="grade-chip" style="background:#1d4ed8;color:#fff;"><span class="letter">B−</span><span class="range">76 – 79</span></div>
+    <div class="grade-chip" style="background:#2563eb;color:#fff;"><span class="letter">B</span><span class="range">80 – 82</span></div>
+    <div class="grade-chip" style="background:#3b82f6;color:#fff;"><span class="letter">B+</span><span class="range">83 – 85</span></div>
+    <div class="grade-chip" style="background:#22c55e;color:#fff;"><span class="letter">A−</span><span class="range">86 – 89</span></div>
+    <div class="grade-chip" style="background:#16a34a;color:#fff;"><span class="letter">A</span><span class="range">90 – 94</span></div>
+    <div class="grade-chip" style="background:#166534;color:#fff;"><span class="letter">A+</span><span class="range">≥ 95</span></div>
+  </div>
+  <p style="font-size:12px;color:var(--gray);margin-top:12px;"><i class="fas fa-info-circle me-1"></i>Border adjustments apply at exact boundary values (e.g., 64, 69, 72...) to avoid rounding ambiguity.</p>
+</div>
+
+<hr class="section-rule" style="max-width:1100px;margin:0 auto;"/>
+
+<!-- ═══ RESULTS CONDITIONS ════════════════════════════════════════════════ -->
+<div class="section" id="results">
+  <div class="section-title">
+    <div class="icon-bubble" style="background:var(--amber)"><i class="fas fa-poll"></i></div>
+    Conditions to Load Final Results
+  </div>
+  <p class="section-sub">All of the following must be satisfied for every project before results can be loaded and the PDF exported.</p>
+
+  <div class="checklist">
+    <div class="check-item">
+      <div class="check-icon" style="background:var(--green)"><i class="fas fa-users"></i></div>
+      <div class="check-text">
+        <h5>All Students Submitted Peer Evaluations</h5>
+        <p>Every student registered in a project must have completed and submitted their peer evaluation through the portal.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-icon" style="background:var(--blue)"><i class="fas fa-chalkboard-teacher"></i></div>
+      <div class="check-text">
+        <h5>Supervisor Submitted Teamwork Grades</h5>
+        <p>The supervisor must have saved the individual teamwork assessment for the project. Missing grades are auto-filled at 45% once the TW lock is activated.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-icon" style="background:var(--teal)"><i class="fas fa-user-plus"></i></div>
+      <div class="check-text">
+        <h5>At Least One Examiner Assigned</h5>
+        <p>Every project must have at least one examiner assigned in the system. Projects with no examiners cannot proceed to final results.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-icon" style="background:var(--amber)"><i class="fas fa-envelope"></i></div>
+      <div class="check-text">
+        <h5>All Examiners Have Been Emailed</h5>
+        <p>Every assigned examiner must have received their invitation email (status shows "Email Sent"). Examiners with "Not Emailed" status block the results.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-icon" style="background:var(--purple)"><i class="fas fa-file-alt"></i></div>
+      <div class="check-text">
+        <h5>Internal / External Examiners Submitted Report Grades</h5>
+        <p>All Internal and External examiners must have completed and submitted Report grades through their grading portal.</p>
+      </div>
+    </div>
+    <div class="check-item">
+      <div class="check-icon" style="background:var(--red)"><i class="fas fa-presentation"></i></div>
+      <div class="check-text">
+        <h5>All Examiners Submitted Presentation Grades</h5>
+        <p>All examiner types (Internal, External, and Industry) must have submitted Presentation grades. Industry examiners are only required to submit Presentation grades.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:18px 22px;display:flex;gap:14px;align-items:flex-start;">
+    <div style="font-size:22px;color:var(--amber);flex-shrink:0;margin-top:2px;"><i class="fas fa-lock"></i></div>
+    <div>
+      <strong style="font-size:14px;color:#92400e;">Export PDF is locked until all conditions are met</strong>
+      <p style="font-size:13px;color:#78350f;margin-top:4px;">The <em>Export PDF</em> button remains disabled until <em>Load Results</em> succeeds without any incomplete warnings. A partially complete result (e.g., FYP1 ready but FYP2 not) will still block the export.</p>
+    </div>
+  </div>
+
+  <!-- ABET section -->
+  <div style="margin-top:24px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:16px;padding:24px 28px;">
+    <h5 style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;"><i class="fas fa-award me-2"></i>ABET Outcomes — Mapping &amp; Computation</h5>
+    <p style="font-size:13px;color:#374151;margin-bottom:18px;">Each rubric criterion (Teamwork, Report, or Presentation) can be tagged with one ABET outcome. The system computes attainment per outcome per FYP type by averaging the percentage of students who scored ≥ 70% of the criterion maximum across all criteria tagged with that outcome. <strong>An outcome is only shown in results and the PDF if at least one criterion is mapped to it for that FYP type</strong> — outcomes with no linked criteria are automatically hidden.</p>
+
+    <!-- Outcome mapping table -->
+    <div style="overflow-x:auto;margin-bottom:20px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:680px;">
+      <thead>
+        <tr style="background:var(--navy);color:#fff;">
+          <th rowspan="2" style="padding:10px 12px;text-align:center;vertical-align:middle;border-right:1px solid rgba(255,255,255,.15);white-space:nowrap;">Outcome</th>
+          <th rowspan="2" style="padding:10px 12px;text-align:left;vertical-align:middle;border-right:1px solid rgba(255,255,255,.15);">Definition</th>
+          <th colspan="3" style="padding:10px 12px;text-align:center;border-right:1px solid rgba(255,255,255,.15);border-bottom:1px solid rgba(255,255,255,.25);">Mapped Criteria (Source)</th>
+          <th rowspan="2" style="padding:10px 12px;text-align:center;vertical-align:middle;white-space:nowrap;">FYP Type</th>
+        </tr>
+        <tr style="background:#2a4f80;color:#e0e7ff;">
+          <th style="padding:7px 10px;text-align:center;border-right:1px solid rgba(255,255,255,.15);font-size:11px;font-weight:700;width:14%;">Teamwork</th>
+          <th style="padding:7px 10px;text-align:center;border-right:1px solid rgba(255,255,255,.15);font-size:11px;font-weight:700;width:14%;">Report</th>
+          <th style="padding:7px 10px;text-align:center;border-right:1px solid rgba(255,255,255,.15);font-size:11px;font-weight:700;width:14%;">Presentation</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- 1a -->
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">1a</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Identify and formulate a clear engineering problem, defining objectives, scope, and specifications.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div><span style="background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Problem Statement</span></div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 2a -->
+        <tr style="border-bottom:1px solid #e5e7eb;background:#f9fafb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">2a</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Identify and document the necessary resources, tools, software, and hardware required to execute the engineering project.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div><span style="background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">List of Resources Needed</span></div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 2b -->
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">2b</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Evaluate the technical and economic feasibility of the proposed engineering solution.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div style="margin-bottom:3px;"><span style="background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Feasibility Study</span></div>
+            <div><span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:5px;font-size:10px;font-style:italic;display:inline-block;">Not measured for this year</span></div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 3a -->
+        <tr style="border-bottom:1px solid #e5e7eb;background:#f9fafb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">3a</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Present and demonstrate the engineering project effectively, showcasing key design decisions, results, and their significance.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div><span style="background:#ede9fe;color:#5b21b6;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Presentation Total Grade</span></div>
+          </td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 3b -->
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">3b</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Communicate engineering solutions and findings clearly and professionally through oral presentation.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div><span style="background:#ede9fe;color:#5b21b6;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Oral Communication</span></div>
+          </td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 4a -->
+        <tr style="border-bottom:1px solid #e5e7eb;background:#f9fafb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">4a</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Apply engineering professional and ethical standards in dealing with a real engineering problem, considering the impact of social, environmental, and economic effects.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div><span style="background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Ethical Considerations</span></div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP2 only</span>
+          </td>
+        </tr>
+
+        <!-- 5a -->
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">5a</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Participate fully in a teamwork engineering project and contribute quality work. Develop teamwork plans and allocate resources and tasks.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div><span style="background:#fef9c3;color:#713f12;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">TW — PI.1</span></div>
+              <div><span style="background:#fef9c3;color:#713f12;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">TW — PI.2</span></div>
+              <div><span style="background:#fef9c3;color:#713f12;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">TW — PI.3</span></div>
+            </div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 5b -->
+        <tr style="border-bottom:1px solid #e5e7eb;background:#f9fafb;">
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">5b</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Communicate and function effectively in teamwork projects.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div><span style="background:#fef9c3;color:#713f12;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">TW — PI.4</span></div>
+              <div><span style="background:#fef9c3;color:#713f12;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">TW — PI.5</span></div>
+              <div><span style="background:#fef9c3;color:#713f12;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Peer Evaluation</span></div>
+            </div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+        <!-- 7a -->
+        <tr>
+          <td style="padding:10px 12px;text-align:center;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">7a</span>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;color:#374151;line-height:1.55;">
+            Demonstrate the ability to access, evaluate, and synthesize information from multiple external sources through systematic literature review and proper referencing.
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:top;">
+            <div style="margin-bottom:4px;"><span style="background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">Literature Review</span></div>
+            <div><span style="background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;display:inline-block;">References</span></div>
+          </td>
+          <td style="padding:10px 12px;border-right:1px solid #e5e7eb;vertical-align:middle;text-align:center;color:#9ca3af;font-size:12px;">—</td>
+          <td style="padding:10px 12px;text-align:center;vertical-align:top;white-space:nowrap;">
+            <span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;">FYP1 &amp; FYP2</span>
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+    </div>
+
+    <!-- PI Legend table -->
+    <div style="margin-bottom:20px;">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;"><i class="fas fa-list-ul me-1"></i>Performance Indicator (PI) Legend</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+        <thead>
+          <tr style="background:#334155;color:#fff;">
+            <th style="padding:8px 14px;text-align:center;width:80px;border-radius:8px 0 0 0;">Code</th>
+            <th style="padding:8px 14px;text-align:left;border-radius:0 8px 0 0;">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #e5e7eb;">
+            <td style="padding:8px 14px;text-align:center;"><span style="background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:5px;font-weight:700;font-size:11px;">PI.1</span></td>
+            <td style="padding:8px 14px;color:#374151;">Goals Establishment</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e5e7eb;background:#f9fafb;">
+            <td style="padding:8px 14px;text-align:center;"><span style="background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:5px;font-weight:700;font-size:11px;">PI.2</span></td>
+            <td style="padding:8px 14px;color:#374151;">Tasks are Planned by the Team</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e5e7eb;">
+            <td style="padding:8px 14px;text-align:center;"><span style="background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:5px;font-weight:700;font-size:11px;">PI.3</span></td>
+            <td style="padding:8px 14px;color:#374151;">Objectives are Met with Participation of the Team</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e5e7eb;background:#f9fafb;">
+            <td style="padding:8px 14px;text-align:center;"><span style="background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:5px;font-weight:700;font-size:11px;">PI.4</span></td>
+            <td style="padding:8px 14px;color:#374151;">Function Effectively in a Team Work, Providing Leadership</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 14px;text-align:center;"><span style="background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:5px;font-weight:700;font-size:11px;">PI.5</span></td>
+            <td style="padding:8px 14px;color:#374151;">Collaboration and Communication in an Inclusive Environment</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Attainment levels -->
+    <div style="margin-bottom:14px;">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Attainment Levels (% of students scoring ≥ 70% on mapped criteria)</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
+        <div style="background:#fee2e2;border-radius:10px;padding:10px 14px;">
+          <div style="font-size:12px;font-weight:700;color:#991b1b;">Level 1 — Beginning</div>
+          <div style="font-size:11px;color:#7f1d1d;margin-top:2px;">Attainment &lt; 60%</div>
+        </div>
+        <div style="background:#fef3c7;border-radius:10px;padding:10px 14px;">
+          <div style="font-size:12px;font-weight:700;color:#92400e;">Level 2 — Developing</div>
+          <div style="font-size:11px;color:#78350f;margin-top:2px;">Attainment 60–69%</div>
+        </div>
+        <div style="background:#dbeafe;border-radius:10px;padding:10px 14px;">
+          <div style="font-size:12px;font-weight:700;color:#1e40af;">Level 3 — Accomplished</div>
+          <div style="font-size:11px;color:#1e3a8a;margin-top:2px;">Attainment 70–84%</div>
+        </div>
+        <div style="background:#d1fae5;border-radius:10px;padding:10px 14px;">
+          <div style="font-size:12px;font-weight:700;color:#166534;">Level 4 — Exemplary</div>
+          <div style="font-size:11px;color:#14532d;margin-top:2px;">Attainment ≥ 85%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How to map -->
+    <div style="background:#fff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;">
+      <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px;"><i class="fas fa-sitemap me-1"></i>How to Map a Criterion to an ABET Outcome</p>
+      <ol style="font-size:13px;color:#374151;margin:0;padding-left:18px;line-height:1.8;">
+        <li>Go to <strong>Assign Examiners → Grading Rubric</strong> (for Report / Presentation criteria) or <strong>Teamwork → Rubric Config</strong> (for Individual criteria).</li>
+        <li>In each criterion row, find the <strong>ABET</strong> dropdown column.</li>
+        <li>Select the outcome tag (e.g. <code>1a</code>, <code>5a</code>, <code>3b</code>) that this criterion assesses. Leave it blank if the criterion is not mapped to any outcome.</li>
+        <li>Save the rubric. The system will compute attainment for all mapped outcomes when final results are loaded.</li>
+      </ol>
+      <p style="font-size:12px;color:#6b7280;margin-top:8px;margin-bottom:0;"><i class="fas fa-info-circle me-1"></i>The same outcome can be tagged on multiple criteria — attainment is averaged across all of them. Outcomes not tagged on any criterion for a given FYP type are hidden from results and the PDF for that type.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════════════════ -->
+<div class="guide-footer">
+  <p><strong>FYP Grading System</strong> — Engineering Program Management, BAU</p>
+  <p style="margin-top:6px;">For technical support, use the <strong>Feedback</strong> button inside the system to contact the administrator directly.</p>
+  <p style="margin-top:12px;opacity:.5;font-size:11px;">Guidelines document — EPM Engineering · BAU</p>
+</div>
+
+</body>
+</html>

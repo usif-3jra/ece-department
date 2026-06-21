@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EPME Program — BAU ECE Department</title>
+  <link rel="icon" type="image/png" href="/logo_w.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0B2447;
+      --navy-mid: #19376D;
+      --gold: #C9A84C;
+      --gold-light: #E8C97A;
+      --gold-pale: #F7EED3;
+      --white: #FFFFFF;
+      --off-white: #F9F7F3;
+      --text-primary: #0B2447;
+      --text-secondary: #4A5568;
+      --text-muted: #8896A5;
+      --border: rgba(11, 36, 71, 0.12);
+      --shadow-sm: 0 2px 8px rgba(11, 36, 71, 0.08);
+      --shadow-md: 0 8px 32px rgba(11, 36, 71, 0.12);
+      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: var(--off-white); color: var(--text-primary); min-height: 100vh; line-height: 1.6; }
+
+    .site-header { background: var(--navy); position: sticky; top: 0; z-index: 100; border-bottom: 3px solid var(--gold); }
+    .header-inner { max-width: 1100px; margin: 0 auto; padding: 0 2rem; height: 76px; display: flex; align-items: center; gap: 1.25rem; }
+    .header-logo { width: 104px; height: 104px; flex-shrink: 0; }
+    .header-logo img { width: 100%; height: 100%; object-fit: contain; }
+    .header-divider { width: 1px; height: 36px; background: rgba(201,168,76,0.4); flex-shrink: 0; }
+    .header-text { flex: 1; }
+    .header-uni { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 600; color: var(--white); letter-spacing: 0.01em; line-height: 1.2; }
+    .header-dept { font-size: 0.72rem; font-weight: 400; color: var(--gold-light); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 2px; }
+    .header-badge { font-size: 0.7rem; font-weight: 500; color: var(--navy); background: var(--gold); padding: 4px 10px; border-radius: 4px; letter-spacing: 0.08em; text-transform: uppercase; flex-shrink: 0; }
+
+    .page { display: none; min-height: calc(100vh - 76px); }
+    .page.active { display: block; }
+
+    .home-hero { background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 60%, #1a4a8a 100%); padding: 5rem 2rem 4rem; text-align: center; position: relative; overflow: hidden; }
+    .home-hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 50%, rgba(201,168,76,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(201,168,76,0.06) 0%, transparent 40%); pointer-events: none; }
+
+    .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 0.7rem; font-weight: 500; color: var(--gold-light); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1.5rem; }
+    .hero-eyebrow::before, .hero-eyebrow::after { content: ''; display: block; width: 28px; height: 1px; background: var(--gold); opacity: 0.6; }
+    .hero-title { font-family: 'Playfair Display', serif; font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 600; color: var(--white); line-height: 1.15; max-width: 680px; margin: 0 auto 1rem; }
+    .hero-title em { font-style: normal; color: var(--gold-light); }
+    .hero-subtitle { font-size: 1rem; color: rgba(255,255,255,0.65); max-width: 480px; margin: 0 auto 3.5rem; font-weight: 300; line-height: 1.7; }
+
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 740px; margin: 0 auto; position: relative; }
+    .nav-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(201,168,76,0.25); border-radius: 14px; padding: 2rem 1.75rem; cursor: pointer; transition: var(--transition); text-align: left; display: flex; flex-direction: column; gap: 1rem; backdrop-filter: blur(8px); }
+    .nav-card:hover { background: rgba(255,255,255,0.10); border-color: rgba(201,168,76,0.55); transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+    .nav-card:active { transform: translateY(-1px); }
+    .card-icon { width: 48px; height: 48px; background: rgba(201,168,76,0.15); border: 1px solid rgba(201,168,76,0.35); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+    .card-icon svg { width: 24px; height: 24px; stroke: var(--gold-light); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .card-label { font-size: 0.68rem; font-weight: 500; color: var(--gold); letter-spacing: 0.15em; text-transform: uppercase; }
+    .card-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 600; color: var(--white); line-height: 1.2; }
+    .card-desc { font-size: 0.85rem; color: rgba(255,255,255,0.55); line-height: 1.6; font-weight: 300; }
+    .card-arrow { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--gold-light); margin-top: auto; }
+    .card-arrow svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--transition); }
+    .nav-card:hover .card-arrow svg { transform: translateX(4px); }
+
+    .home-info { max-width: 1100px; margin: 0 auto; padding: 3.5rem 2rem 4rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
+    .info-cell { background: var(--off-white); padding: 2rem 1.5rem; text-align: center; }
+    .info-num { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 600; color: var(--navy); line-height: 1; margin-bottom: 0.4rem; }
+    .info-num span { color: var(--gold); }
+    .info-label { font-size: 0.78rem; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+
+    /* QR Section */
+    .qr-section { background: var(--white); border-top: 1px solid var(--border); padding: 3.5rem 2rem 4rem; text-align: center; }
+    .qr-eyebrow { font-size: 0.68rem; font-weight: 600; color: var(--gold); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .qr-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 600; color: var(--navy); margin-bottom: 0.5rem; }
+    .qr-desc { font-size: 0.875rem; color: var(--text-muted); margin: 0 auto 2rem; max-width: 380px; }
+    #qrcode { display: inline-block; padding: 18px; background: var(--white); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-md); margin-bottom: 1.5rem; }
+    #qrcode canvas, #qrcode img { display: block; }
+
+    .inner-header { background: var(--navy); padding: 2.5rem 2rem 2rem; }
+    .inner-header-inner { max-width: 1000px; margin: 0 auto; }
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--gold-light); background: none; border: none; cursor: pointer; padding: 0; letter-spacing: 0.05em; margin-bottom: 1.25rem; transition: color var(--transition); opacity: 0.8; }
+    .back-btn:hover { opacity: 1; color: var(--white); }
+    .back-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--transition); }
+    .back-btn:hover svg { transform: translateX(-3px); }
+    .inner-eyebrow { font-size: 0.68rem; font-weight: 500; color: var(--gold); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .inner-title { font-family: 'Playfair Display', serif; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 600; color: var(--white); line-height: 1.2; }
+    .inner-content { max-width: 1000px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+
+    .plan-notice { background: var(--gold-pale); border: 1px solid rgba(201,168,76,0.4); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 2rem; display: flex; align-items: flex-start; gap: 0.75rem; }
+    .plan-notice svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; margin-top: 1px; }
+    .plan-notice p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+    .plan-notice strong { color: var(--text-primary); font-weight: 600; }
+
+    .plan-image-wrap { background: var(--white); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-md); margin-bottom: 2rem; }
+    .plan-image-wrap img { width: 100%; display: block; height: auto; }
+    .plan-image-placeholder { width: 100%; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; background: #F5F7FA; padding: 3rem; text-align: center; }
+    .plan-image-placeholder svg { width: 56px; height: 56px; stroke: #CBD5E0; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .plan-image-placeholder p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; max-width: 360px; }
+    .plan-image-placeholder strong { display: block; font-size: 1rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem; }
+
+    .action-bar { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: var(--navy); color: var(--white); border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: var(--transition); letter-spacing: 0.02em; text-decoration: none; }
+    .btn-primary:hover { background: var(--navy-mid); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .btn-primary svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-outline { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1.5rem; font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: var(--transition); letter-spacing: 0.02em; }
+    .btn-outline:hover { border-color: var(--navy); color: var(--navy); background: rgba(11,36,71,0.04); }
+    .btn-outline svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .pdf-toolbar { background: var(--white); border: 1px solid var(--border); border-radius: 10px 10px 0 0; padding: 0.875rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .pdf-toolbar-title { display: flex; align-items: center; gap: 0.625rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
+    .pdf-toolbar-title svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .pdf-wrap { background: var(--white); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; box-shadow: var(--shadow-md); margin-bottom: 2rem; }
+    .pdf-wrap iframe { width: 100%; height: 680px; display: block; border: none; }
+    .pdf-placeholder { width: 100%; min-height: 600px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; background: #F5F7FA; padding: 3rem; text-align: center; }
+    .pdf-placeholder svg { width: 56px; height: 56px; stroke: #CBD5E0; fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+    .pdf-placeholder p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; max-width: 380px; }
+    .pdf-placeholder strong { display: block; font-size: 1rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem; }
+
+    .site-footer { background: var(--navy); border-top: 1px solid rgba(201,168,76,0.2); padding: 1.5rem 2rem; text-align: center; }
+    .footer-text { font-size: 0.75rem; color: rgba(255,255,255,0.35); letter-spacing: 0.04em; }
+    .footer-text span { color: var(--gold); opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .home-info { grid-template-columns: 1fr; }
+      .info-cell { padding: 1.25rem; }
+      .action-bar { flex-direction: column; }
+      .btn-primary, .btn-outline { justify-content: center; }
+      .pdf-wrap iframe { height: 480px; }
+      .pdf-toolbar { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+      .header-badge { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-logo"><img src="/logo_w.png" alt="BAU Logo" /></div>
+      <div class="header-divider"></div>
+      <div class="header-text">
+        <div class="header-uni">Beirut Arab University</div>
+        <div class="header-dept">ECE Department</div>
+      </div>
+      <div class="header-badge">EPME Program</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ═══ HOME ═══ -->
+    <section id="page-home" class="page active">
+      <div class="home-hero">
+        <div class="hero-eyebrow"><span></span>ECE Department — BAU<span></span></div>
+        <h1 class="hero-title">Electrical Power &amp; Machines<br /><em>Engineering (EPME)</em></h1>
+        <p class="hero-subtitle">Access the four-year study plan and the complete course catalog for the Electrical Power and Machines Engineering (EPME) program.</p>
+        <div class="card-grid">
+          <button class="nav-card" onclick="showPage('plan')">
+            <div class="card-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg></div>
+            <div><div class="card-label">Academic Planning</div><div class="card-title">EPME 4-Year Plan</div></div>
+            <p class="card-desc">View and download the complete four-year study plan — semester by semester course layout.</p>
+            <div class="card-arrow">View plan<svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+          </button>
+          <button class="nav-card" onclick="showPage('catalog')">
+            <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/></svg></div>
+            <div><div class="card-label">Program Resources</div><div class="card-title">EPME Course Catalog</div></div>
+            <p class="card-desc">Browse the full catalog of courses, descriptions, credit hours, and prerequisites.</p>
+            <div class="card-arrow">Open catalog<svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+          </button>
+        </div>
+      </div>
+      <div class="home-info">
+        <div class="info-cell"><div class="info-num">4<span>-Year</span></div><div class="info-label">Bachelor's Program</div></div>
+        <div class="info-cell"><div class="info-num">8<span> Sems</span></div><div class="info-label">8 Semesters + 3 Summers</div></div>
+        <div class="info-cell"><div class="info-num">ECE<span> Dept.</span></div><div class="info-label">Engineering Faculty</div></div>
+      </div>
+      <div class="qr-section">
+        <div class="qr-eyebrow">Share This Program</div>
+        <h2 class="qr-title">Quick Access QR Code</h2>
+        <p class="qr-desc">Students can scan this code to access the EPME program resources directly.</p>
+        <div id="qrcode"></div><br/>
+        <button class="btn-primary" onclick="downloadQR()">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download QR Code
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══ 4-YEAR PLAN ═══ -->
+    <section id="page-plan" class="page">
+      <div class="inner-header">
+        <div class="inner-header-inner">
+          <button class="back-btn" onclick="showPage('home')">
+            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to home
+          </button>
+          <div class="inner-eyebrow">Academic Planning</div>
+          <h1 class="inner-title">EPME 4-Year Study Plan</h1>
+        </div>
+      </div>
+      <div class="inner-content">
+        <div class="plan-notice">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p><strong>Study Plan:</strong> The official four-year plan for the EPME program. Download the PDF for offline access.</p>
+        </div>
+        <div class="plan-image-wrap">
+          <img id="plan-img" src="assets/study-plan.png" alt="EPME 4-Year Study Plan"
+            onerror="this.style.display='none'; document.getElementById('plan-placeholder').style.display='flex';" />
+          <div id="plan-placeholder" class="plan-image-placeholder" style="display:none;">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p><strong>Study plan image not yet added.</strong>Place study-plan.png in the assets/ folder to display it here.</p>
+          </div>
+        </div>
+        <div class="action-bar">
+          <a href="assets/study-plan.pdf" download="EPME_4Year_Plan.pdf" class="btn-primary">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PDF
+          </a>
+          <button class="btn-outline" onclick="showPage('home')">
+            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to home
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ COURSE CATALOG ═══ -->
+    <section id="page-catalog" class="page">
+      <div class="inner-header">
+        <div class="inner-header-inner">
+          <button class="back-btn" onclick="showPage('home')">
+            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to home
+          </button>
+          <div class="inner-eyebrow">Program Resources</div>
+          <h1 class="inner-title">EPME Course Catalog</h1>
+        </div>
+      </div>
+      <div class="inner-content">
+        <div class="pdf-toolbar">
+          <div class="pdf-toolbar-title">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            EPME_Course_Catalog.pdf
+          </div>
+          <a href="assets/course-catalog.pdf" download="EPME_Course_Catalog.pdf" class="btn-primary" style="padding:0.5rem 1rem;font-size:0.8rem;">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </a>
+        </div>
+        <div class="pdf-wrap">
+          <iframe id="catalog-iframe" src="assets/course-catalog.pdf" title="EPME Course Catalog PDF"></iframe>
+        </div>
+        <div id="catalog-fallback" style="display:none;" class="pdf-wrap">
+          <div class="pdf-placeholder">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p><strong>Course catalog not yet added.</strong>Place course-catalog.pdf in the assets/ folder.</p>
+          </div>
+        </div>
+        <div class="action-bar" style="margin-top:0.5rem;">
+          <button class="btn-outline" onclick="showPage('home')">
+            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to home
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-text">&copy; 2026 Beirut Arab University &mdash; <span>ECE Department</span> &mdash; EPME Program</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+  <script>
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const t = document.getElementById('page-' + id);
+      if (t) { t.classList.add('active'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    }
+
+    const iframe = document.getElementById('catalog-iframe');
+    if (iframe) iframe.addEventListener('error', () => {
+      iframe.closest('.pdf-wrap').style.display = 'none';
+      document.getElementById('catalog-fallback').style.display = 'block';
+    });
+
+    const qr = new QRCode(document.getElementById('qrcode'), {
+      text: window.location.href,
+      width: 200, height: 200,
+      colorDark: '#0B2447', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    function downloadQR() {
+      setTimeout(() => {
+        const canvas = document.querySelector('#qrcode canvas');
+        if (canvas) {
+          const a = document.createElement('a');
+          a.download = 'EPME-Program-QR.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+        }
+      }, 100);
+    }
+  </script>
+</body>
+</html>

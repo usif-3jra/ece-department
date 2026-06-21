@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECE Department Resources — BAU</title>
+  <link rel="icon" type="image/png" href="/logo_w.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0B2447;
+      --navy-mid: #19376D;
+      --gold: #C9A84C;
+      --gold-light: #E8C97A;
+      --gold-pale: #F7EED3;
+      --white: #FFFFFF;
+      --off-white: #F9F7F3;
+      --text-primary: #0B2447;
+      --text-secondary: #4A5568;
+      --text-muted: #8896A5;
+      --border: rgba(11, 36, 71, 0.12);
+      --shadow-sm: 0 2px 8px rgba(11, 36, 71, 0.08);
+      --shadow-md: 0 8px 32px rgba(11, 36, 71, 0.12);
+      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--off-white);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+    }
+
+    /* ─── HEADER ─── */
+    .site-header {
+      background: var(--navy);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 3px solid var(--gold);
+    }
+
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .header-logo {
+      width: 104px;
+      height: 104px;
+      flex-shrink: 0;
+    }
+
+    .header-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .header-divider {
+      width: 1px;
+      height: 36px;
+      background: rgba(201, 168, 76, 0.4);
+      flex-shrink: 0;
+    }
+
+    .header-text { flex: 1; }
+
+    .header-uni {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--white);
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+    }
+
+    .header-dept {
+      font-size: 0.72rem;
+      font-weight: 400;
+      color: var(--gold-light);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .header-badge {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--navy);
+      background: var(--gold);
+      padding: 4px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    /* ─── HERO ─── */
+    .home-hero {
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 60%, #1a4a8a 100%);
+      padding: 5rem 2rem 4.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .home-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(201, 168, 76, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(201, 168, 76, 0.06) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--gold-light);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-eyebrow::before,
+    .hero-eyebrow::after {
+      content: '';
+      display: block;
+      width: 28px;
+      height: 1px;
+      background: var(--gold);
+      opacity: 0.6;
+    }
+
+    .hero-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 600;
+      color: var(--white);
+      line-height: 1.15;
+      max-width: 640px;
+      margin: 0 auto 1rem;
+    }
+
+    .hero-title em {
+      font-style: normal;
+      color: var(--gold-light);
+    }
+
+    .hero-subtitle {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.65);
+      max-width: 480px;
+      margin: 0 auto 3.5rem;
+      font-weight: 300;
+      line-height: 1.7;
+    }
+
+    /* ─── PROGRAM GRID ─── */
+    .prog-grid {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 1.25rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .nav-card {
+      flex: 1 1 0;
+      min-width: 0;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(201, 168, 76, 0.25);
+      border-radius: 14px;
+      padding: 2rem 1.75rem;
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      backdrop-filter: blur(8px);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nav-card:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(201, 168, 76, 0.55);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    }
+
+    .nav-card:active { transform: translateY(-1px); }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(201, 168, 76, 0.15);
+      border: 1px solid rgba(201, 168, 76, 0.35);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--gold-light);
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .card-label {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--gold);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--white);
+      line-height: 1.2;
+    }
+
+    .card-desc {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    .card-arrow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--gold-light);
+      margin-top: auto;
+    }
+
+    .card-arrow svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform var(--transition);
+    }
+
+    .nav-card:hover .card-arrow svg { transform: translateX(4px); }
+
+    /* ─── QR SECTION ─── */
+    .qr-section {
+      background: var(--white);
+      border-top: 1px solid var(--border);
+      padding: 4rem 2rem;
+      text-align: center;
+      flex: 1;
+    }
+
+    .qr-eyebrow {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--gold);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .qr-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 0.5rem;
+    }
+
+    .qr-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      max-width: 380px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #qrcode {
+      display: inline-block;
+      padding: 18px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 1.5rem;
+    }
+
+    #qrcode canvas, #qrcode img { display: block; }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+
+    .btn-primary:hover {
+      background: var(--navy-mid);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-primary svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ─── FOOTER ─── */
+    .site-footer {
+      background: var(--navy);
+      border-top: 1px solid rgba(201, 168, 76, 0.2);
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.04em;
+    }
+
+    .footer-text span { color: var(--gold); opacity: 0.7; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 760px) {
+      .prog-grid { flex-wrap: wrap; }
+      .nav-card { flex: 0 1 280px; min-width: 220px; }
+      .header-badge { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── SITE HEADER ─── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-logo" aria-label="Beirut Arab University logo">
+        <img src="/logo_w.png" alt="BAU Logo" />
+      </div>
+      <div class="header-divider"></div>
+      <div class="header-text">
+        <div class="header-uni">Beirut Arab University</div>
+        <div class="header-dept">ECE Department</div>
+      </div>
+      <div class="header-badge">ECE Resources</div>
+    </div>
+  </header>
+
+  <!-- ─── HERO ─── -->
+  <div class="home-hero">
+    <div class="hero-eyebrow">
+      <span></span>ECE Department — BAU<span></span>
+    </div>
+    <h1 class="hero-title">
+      Department <em>Resources</em>
+    </h1>
+    <p class="hero-subtitle">
+      Select your program to access the four-year study plan and the complete course catalog.
+    </p>
+
+    <div class="prog-grid">
+
+      <!-- EPME -->
+      <a href="/ece-resources/epme" class="nav-card" target="_blank" rel="noopener noreferrer">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="card-label">EPME</div>
+          <div class="card-title">Electrical Power &amp; Machines Engineering</div>
+        </div>
+        <p class="card-desc">Study plan and course catalog for the EPME program.</p>
+        <div class="card-arrow">
+          View resources
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+      <!-- CEE -->
+      <a href="/ece-resources/cee" class="nav-card" target="_blank" rel="noopener noreferrer">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M1.5 8.5s4-5.5 10.5-5.5 10.5 5.5 10.5 5.5-4 5.5-10.5 5.5S1.5 8.5 1.5 8.5z"/>
+            <circle cx="12" cy="8.5" r="2.5"/>
+            <path d="M12 17v4M8 19l4-2 4 2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="card-label">CEE</div>
+          <div class="card-title">Communication &amp; Electronics Engineering</div>
+        </div>
+        <p class="card-desc">Study plan and course catalog for the CEE program.</p>
+        <div class="card-arrow">
+          View resources
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+      <!-- CE -->
+      <a href="/ece-resources/ce" class="nav-card" target="_blank" rel="noopener noreferrer">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 3H8"/>
+            <circle cx="8" cy="14" r="1"/>
+            <circle cx="16" cy="14" r="1"/>
+            <line x1="12" y1="11" x2="12" y2="17"/>
+          </svg>
+        </div>
+        <div>
+          <div class="card-label">CE</div>
+          <div class="card-title">Computer Engineering</div>
+        </div>
+        <p class="card-desc">Study plan and course catalog for the CE program.</p>
+        <div class="card-arrow">
+          View resources
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+      <!-- BE -->
+      <a href="/ece-resources/bme" class="nav-card" target="_blank" rel="noopener noreferrer">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            <polyline points="8 12 10 14 16 10" style="stroke-width:2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="card-label">BME</div>
+          <div class="card-title">Biomedical Engineering</div>
+        </div>
+        <p class="card-desc">Study plan and course catalog for the BME program.</p>
+        <div class="card-arrow">
+          View resources
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ─── QR CODE SECTION ─── -->
+  <div class="qr-section">
+    <div class="qr-eyebrow">Share Access</div>
+    <h2 class="qr-title">Quick Access QR Code</h2>
+    <p class="qr-desc">Students can scan this code to reach this page directly and select their program.</p>
+    <div id="qrcode"></div>
+    <br/>
+    <button class="btn-primary" onclick="downloadQR()">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download QR Code
+    </button>
+  </div>
+
+  <!-- ─── FOOTER ─── -->
+  <footer class="site-footer">
+    <p class="footer-text">
+      &copy; 2026 Beirut Arab University &mdash; <span>ECE Department</span> &mdash; Program Resources
+    </p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+  <script>
+    const qr = new QRCode(document.getElementById('qrcode'), {
+      text: window.location.href,
+      width: 200,
+      height: 200,
+      colorDark: '#0B2447',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    function downloadQR() {
+      setTimeout(() => {
+        const canvas = document.querySelector('#qrcode canvas');
+        if (canvas) {
+          const link = document.createElement('a');
+          link.download = 'ECE-Resources-QR.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        } else {
+          const img = document.querySelector('#qrcode img');
+          if (img) {
+            const link = document.createElement('a');
+            link.download = 'ECE-Resources-QR.png';
+            link.href = img.src;
+            link.click();
+          }
+        }
+      }, 100);
+    }
+  </script>
+
+</body>
+</html>
