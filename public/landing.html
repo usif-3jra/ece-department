@@ -220,6 +220,16 @@
       color: var(--muted);
       border-top: 1px solid var(--border);
       background: var(--card);
+      position: relative;
+    }
+    .footer-version {
+      position: absolute;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: monospace;
+      font-size: .65rem;
+      opacity: .65;
     }
 
     /* ── ANIMATIONS ───────────────────────────────── */
@@ -386,7 +396,8 @@
   </main>
 
   <footer class="footer">
-    Beirut Arab University &nbsp;·&nbsp; EPM Engineering Faculty &nbsp;·&nbsp; ECE Department &nbsp;·&nbsp; &copy; 2026
+    Beirut Arab University &nbsp;·&nbsp; Faculty of Engineering &nbsp;·&nbsp; ECE Department &nbsp;·&nbsp; &copy; 2026
+    <span class="footer-version">v3-22.06.2026 R09</span>
   </footer>
 
 </body>
