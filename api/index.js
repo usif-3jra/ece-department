@@ -1686,7 +1686,7 @@ module.exports = async function handler(req, res) {
           sql`SELECT * FROM examiner_grades`,
           sql`SELECT * FROM examiner_config ORDER BY id`,
           sql`SELECT * FROM peer_config ORDER BY question_no`,
-          sql`SELECT project_id FROM students`,
+          sql`SELECT * FROM students`,
           sql`SELECT assignment_id, project_id, examiner_type FROM examiners`,
         ]);
         const indRubric = await getIndividualRubric();
@@ -1750,25 +1750,80 @@ module.exports = async function handler(req, res) {
         const byProgram = {};
         programs.forEach(p => { const list = entries.filter(e => e.program === p); if (list.length) byProgram[p] = makeDist(list); });
 
-        // ── Average grade & std dev per program/FYP type ─────────────────
-        const computeStats = list => {
-          const pcts = list.map(e => e.pct);
-          const n = pcts.length;
+        // ── Per-student final grades (same algorithm as getFinalResults) ──
+        const twW   = parseFloat(cfg.teamwork_weight     || 35) / 100;
+        const peerW = parseFloat(cfg.peer_eval_weight    || 20) / 100;
+        const supW  = parseFloat(cfg.supervisor_weight   || 80) / 100;
+        const repW  = parseFloat(cfg.report_weight       || 35) / 100;
+        const presW = parseFloat(cfg.presentation_weight || 30) / 100;
+        const outlierRuleEnabled = cfg.outlier_rule_enabled !== '0';
+        const maxPeer  = peerCfg.reduce((s, q) => s + parseFloat(q.max_grade || 10), 0);
+        const peerQCnt = peerCfg.length || 1;
+        const indMax   = indRubric.reduce((s, r) => s + Number(r.maxGrade || 25), 0) || 100;
+        const repCfgMap  = c => ({ CriterionName: c.criterion_name, MaxGrade: c.max_grade, Weight: c.weight });
+
+        const studentGrades = allStudents.map(student => {
+          const project = projById[student.project_id];
+          if (!project) return null;
+          const pt = String(project.type || 'FYP1');
+          const prog = project.program_type || 'Unspecified';
+
+          const ind    = twGrades.filter(g => g.student_id === student.student_id && g.grade_type === 'Individual');
+          const indPct = pct(ind.reduce((s, g) => s + parseFloat(g.grade || 0), 0), indMax);
+
+          const peer    = peerEvals.filter(e => e.evaluated_id === student.student_id);
+          const peerPct = pct(peer.reduce((s, e) => s + parseFloat(e.grade || 0), 0), maxPeer * (peer.length / peerQCnt));
+
+          const projStudents = allStudents.filter(s => s.project_id === student.project_id);
+          const isSolo  = projStudents.length === 1;
+          const twScore = isSolo ? indPct : (indPct * supW) + (peerPct * peerW);
+
+          const projExCfg = exCfg.filter(c => !c.project_type || c.project_type === pt);
+          const repCfg    = projExCfg.filter(c => c.category === 'Report');
+          const presCfg   = projExCfg.filter(c => c.category === 'Presentation');
+
+          const rawRepG  = exGrades.filter(g => g.project_id === student.project_id && g.category === 'Report');
+          const rawPresG = exGrades.filter(g => g.project_id === student.project_id && g.category === 'Presentation');
+
+          const repExCount  = new Set(rawRepG.map(g => g.assignment_id)).size;
+          const presExCount = new Set(rawPresG.map(g => g.assignment_id)).size;
+          const { filteredGrades: repGClean }  = repExCount  >= 3 ? filterOutlierGrades(rawRepG)  : { filteredGrades: rawRepG  };
+          const { filteredGrades: presGClean } = presExCount >= 3 ? filterOutlierGrades(rawPresG) : { filteredGrades: rawPresG };
+
+          const repScope  = g => { const c = repCfg.find(cf => cf.criterion_name === g.criterion);  return c && c.grading_scope === 'Individual' ? g.student_id === student.student_id : (g.student_id === 'GROUP' || !g.student_id); };
+          const presScope = g => { const c = presCfg.find(cf => cf.criterion_name === g.criterion); return c && c.grading_scope === 'Individual' ? g.student_id === student.student_id : (g.student_id === 'GROUP' || !g.student_id); };
+
+          const repPct  = weightedPct(repGClean.filter(repScope).map(g => ({ Criterion: g.criterion, Score: g.score })),  repCfg.map(repCfgMap));
+          const rawRepPct = weightedPct(rawRepG.filter(repScope).map(g => ({ Criterion: g.criterion, Score: g.score })), repCfg.map(repCfgMap));
+          const presPct = weightedPct(presGClean.filter(presScope).map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(repCfgMap));
+          const rawPresPct = weightedPct(rawPresG.filter(presScope).map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(repCfgMap));
+
+          const filteredFinal = (twScore * twW) + (repPct  * repW) + (presPct  * presW);
+          const rawFinal      = (twScore * twW) + (rawRepPct * repW) + (rawPresPct * presW);
+          const finalGrade    = Math.round(outlierRuleEnabled ? filteredFinal : rawFinal);
+
+          return { finalGrade, prog, pt };
+        }).filter(Boolean);
+
+        // ── Average final grade & std dev per program/FYP type ────────────
+        const computeGradeStats = list => {
+          const grades = list.map(s => s.finalGrade);
+          const n = grades.length;
           if (!n) return { avg: 0, std: 0, n: 0 };
-          const avg = pcts.reduce((a, b) => a + b, 0) / n;
-          const variance = pcts.reduce((a, b) => a + (b - avg) ** 2, 0) / n;
+          const avg = grades.reduce((a, b) => a + b, 0) / n;
+          const variance = grades.reduce((a, b) => a + (b - avg) ** 2, 0) / n;
           return { avg: rnd(avg), std: rnd(Math.sqrt(variance)), n };
         };
         const avgByProgramType = {};
         programs.forEach(p => {
           avgByProgramType[p] = {
-            FYP1: computeStats(entries.filter(e => e.program === p && e.type === 'FYP1')),
-            FYP2: computeStats(entries.filter(e => e.program === p && e.type === 'FYP2')),
+            FYP1: computeGradeStats(studentGrades.filter(s => s.prog === p && s.pt === 'FYP1')),
+            FYP2: computeGradeStats(studentGrades.filter(s => s.prog === p && s.pt === 'FYP2')),
           };
         });
         const avgOverall = {
-          FYP1: computeStats(entries.filter(e => e.type === 'FYP1')),
-          FYP2: computeStats(entries.filter(e => e.type === 'FYP2')),
+          FYP1: computeGradeStats(studentGrades.filter(s => s.pt === 'FYP1')),
+          FYP2: computeGradeStats(studentGrades.filter(s => s.pt === 'FYP2')),
         };
 
         // ── Program summary (projects + students + examiners) ─────────────
@@ -2057,6 +2112,37 @@ module.exports = async function handler(req, res) {
           abetByType[pt] = { abet1a: computeABET('1a'), abet2a: computeABET('2a'), abet2b: computeABET('2b'), abet3a: computeABET('3a'), abet3b: computeABET('3b'), abet4a: computeABET('4a'), abet5a: computeABET('5a'), abet5b: computeABET('5b'), abet7a: computeABET('7a') };
         });
 
+        // ── Per-program ABET (for admin program filter in UI) ────────────
+        const abetByProgram = {};
+        const progNames = [...new Set(projects.map(p => p.program_type || 'Unspecified'))];
+        progNames.forEach(prog => {
+          abetByProgram[prog] = {};
+          ['FYP1','FYP2'].forEach(pt => {
+            const progProjs = projects.filter(p => String(p.type||'FYP1') === pt && (p.program_type||'Unspecified') === prog && showableProjectIds.has(p.project_id));
+            if (!progProjs.length) return;
+            const progIds = new Set(progProjs.map(p => p.project_id));
+            const tIndG   = twGrades.filter(g => progIds.has(g.project_id) && g.grade_type === 'Individual');
+            const tExG    = exGrades.filter(g => progIds.has(g.project_id));
+            function computeABETprog(tag) {
+              const cp = [];
+              indRubric.filter(r => String(r.abetOutcome||'') === tag).forEach(c => {
+                const gs = tIndG.filter(g => g.criterion === c.criterion);
+                if (!gs.length) return;
+                cp.push((gs.filter(g=>parseFloat(g.grade||0)>=0.7*c.maxGrade).length/gs.length)*100);
+              });
+              exCfg.filter(c => String(c.abet_outcome||'') === tag).forEach(c => {
+                const cg = tExG.filter(g => g.criterion === c.criterion_name);
+                if (!cg.length) return;
+                cp.push((cg.filter(g=>parseFloat(g.score||0)>=0.7*parseFloat(c.max_grade||100)).length/cg.length)*100);
+              });
+              if (!cp.length) return tag === '2b' ? { notMeasured: true } : null;
+              const avg2 = cp.reduce((a,b)=>a+b,0)/cp.length;
+              return { pct: rnd(avg2), level: avg2<60?1:avg2<70?2:avg2<85?3:4 };
+            }
+            abetByProgram[prog][pt] = { abet1a: computeABETprog('1a'), abet2a: computeABETprog('2a'), abet2b: computeABETprog('2b'), abet3a: computeABETprog('3a'), abet3b: computeABETprog('3b'), abet4a: computeABETprog('4a'), abet5a: computeABETprog('5a'), abet5b: computeABETprog('5b'), abet7a: computeABETprog('7a') };
+          });
+        });
+
         const statsByType = {};
         ['FYP1','FYP2'].forEach(pt => {
           const gr = results.filter(r => r.projectType === pt);
@@ -2066,7 +2152,7 @@ module.exports = async function handler(req, res) {
           statsByType[pt] = { count: gr.length, mean: rnd(mean), sd: rnd(sd) };
         });
 
-        return ok({ success: true, results, abetByType, statsByType, incompleteByType: incompleteOut, completeTypes, partialPendingByType, outlierRuleEnabled });
+        return ok({ success: true, results, abetByType, abetByProgram, statsByType, incompleteByType: incompleteOut, completeTypes, partialPendingByType, outlierRuleEnabled });
       }
 
       case 'updateProject': {

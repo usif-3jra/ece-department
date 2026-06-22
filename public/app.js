@@ -1916,9 +1916,10 @@ const Ex = {
 // ── Tab 4: Final Results ──────────────────────────────────────────────
 
 const Res = {
-  allResults:  [],
-  abetByType:  {},
-  statsByType: {},
+  allResults:   [],
+  abetByType:   {},
+  abetByProgram:{},
+  statsByType:  {},
 
   _setExportEnabled(enabled) {
     const btn = document.getElementById('btn-export-pdf');
@@ -1941,8 +1942,9 @@ const Res = {
         return;
       }
       this.allResults        = res.results;
-      this.abetByType        = res.abetByType  || {};
-      this.statsByType       = res.statsByType || {};
+      this.abetByType        = res.abetByType     || {};
+      this.abetByProgram     = res.abetByProgram  || {};
+      this.statsByType       = res.statsByType    || {};
       this.outlierRuleEnabled = res.outlierRuleEnabled !== false;
       this._populateProgramFilter();
       this.applyFilter();
@@ -1985,7 +1987,8 @@ const Res = {
       });
     });
     this._render(filtered);
-    this._renderSummary(this.abetByType, program ? this._computeStats(filtered) : this.statsByType);
+    const abetForView = program && this.abetByProgram[program] ? this.abetByProgram[program] : this.abetByType;
+    this._renderSummary(abetForView, program ? this._computeStats(filtered) : this.statsByType);
     this._setExportEnabled(filtered.length > 0);
   },
 
@@ -2958,7 +2961,7 @@ const Res = {
       y = drawHdr('Average Grade by Program & FYP Type');
 
       // Stats table — avg ± std dev
-      y = groupHeader(y, 'Average Grade & Standard Deviation per Program (all graded criteria scores, normalized to %)');
+      y = groupHeader(y, 'Average Final Grade & Standard Deviation per Program (weighted composite student grades)');
       const ov = res.avgOverall || {};
       const ovf1 = ov.FYP1 || { avg: 0, std: 0, n: 0 };
       const ovf2 = ov.FYP2 || { avg: 0, std: 0, n: 0 };
