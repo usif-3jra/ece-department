@@ -184,9 +184,11 @@
         <div class="page-heading">Meeting Sessions</div>
         <div class="page-sub">Click a session to add or view your agenda points</div>
       </div>
-      <button class="btn-primary" onclick="Dashboard.createSession()">
-        <i class="fas fa-plus me-1"></i> New Session
-      </button>
+      <div id="dash-actions" class="d-flex gap-2">
+        <button class="btn-primary" onclick="Dashboard.createSession()">
+          <i class="fas fa-plus me-1"></i> New Session
+        </button>
+      </div>
     </div>
     <div id="session-list">
       <div class="text-center py-5 text-secondary"><div class="spinner" style="border-top-color:var(--accent);border-color:#e2e8f0;border-top-color:var(--accent);width:28px;height:28px;"></div><p class="mt-3 small">Loading sessions…</p></div>
@@ -314,6 +316,21 @@
   </div>
 </div>
 
+<!-- ═══ DELEGATE MODAL ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="delegate-modal" onclick="if(event.target===this)Delegates.close()">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-user-shield me-2"></i>Manage Meeting Delegates</h3>
+      <button class="modal-close" onclick="Delegates.close()">×</button>
+    </div>
+    <div class="modal-body" id="delegate-body"><div class="text-center py-4"><div class="spinner" style="border-top-color:var(--accent);border-color:#e2e8f0;width:24px;height:24px;margin:auto;"></div></div></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="Delegates.close()">Close</button>
+      <button class="btn-primary" onclick="Delegates.save()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ ENTRY MODAL ══════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)Modal.close()">
   <div class="modal-box">
@@ -364,17 +381,50 @@ function fmtModified(ts) {
 
 function meetingDateStr(dateStr, timeStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr+'T00:00:00');
+  // Normalize: Neon may return a Date object or ISO string "2026-06-22T00:00:00.000Z"
+  const dateOnly = (dateStr instanceof Date)
+    ? dateStr.toISOString().split('T')[0]
+    : String(dateStr).split('T')[0];
+  const d = new Date(dateOnly + 'T12:00:00');
+  if (isNaN(d.getTime())) return '—';
   const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   let s = `${days[d.getDay()]}. ${months[d.getMonth()]} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
   if (timeStr) {
-    const [h,m] = timeStr.split(':');
+    const tStr = (timeStr instanceof Date) ? timeStr.toTimeString().substring(0,5) : String(timeStr).substring(0,5);
+    const [h,m] = tStr.split(':');
     const hr = parseInt(h), mn = m||'00';
     const ampm = hr>=12?'PM':'AM', h12 = hr%12||12;
     s += `, at ${h12}:${mn} ${ampm}`;
   }
   return s;
+}
+
+function arabicTextToImg(text) {
+  if (!text || !text.trim()) return null;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const px = 13;
+  ctx.font = `${px}px Arial,"Segoe UI",Tahoma,sans-serif`;
+  const w = Math.ceil(ctx.measureText(text).width) + 12;
+  const h = Math.ceil(px * 1.7);
+  canvas.width = Math.max(w, 10); canvas.height = h;
+  ctx.font = `${px}px Arial,"Segoe UI",Tahoma,sans-serif`;
+  ctx.fillStyle = '#1e1e1e';
+  ctx.textAlign = 'right';
+  ctx.direction = 'rtl';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width - 3, h / 2);
+  return { dataURL: canvas.toDataURL('image/png'), w: canvas.width, h };
+}
+
+function justifyTextLine(doc, line, x, y, maxW) {
+  const words = line.trim().split(/\s+/);
+  if (words.length <= 1) { doc.text(line, x, y); return; }
+  const totalW = words.reduce((s, w) => s + doc.getTextWidth(w), 0);
+  const spaceW = (maxW - totalW) / (words.length - 1);
+  let xPos = x;
+  words.forEach(word => { doc.text(word, xPos, y); xPos += doc.getTextWidth(word) + spaceW; });
 }
 
 async function api(action, ...args) {
@@ -412,6 +462,8 @@ async function translateToArabic(text) {
 const Auth = {
   token: sessionStorage.getItem('mtg_token'),
   supervisor: JSON.parse(sessionStorage.getItem('mtg_sup')||'null'),
+  isDelegate: false,
+  supervisorList: [],
 
   async login() {
     const id = el('inp-id').value.trim();
@@ -426,6 +478,7 @@ const Auth = {
     sessionStorage.setItem('mtg_sup',JSON.stringify(Auth.supervisor));
     el('login-err').style.display='none';
     el('dash-sup-name').textContent=Auth.supervisor.name||'';
+    await loadDelegateInfo();
     showScreen('dash');
     Dashboard.load();
   },
@@ -433,12 +486,23 @@ const Auth = {
   async logout() {
     if (Auth.token) await api('logoutSession',Auth.token).catch(()=>{});
     sessionStorage.removeItem('mtg_token'); sessionStorage.removeItem('mtg_sup');
-    Auth.token=null; Auth.supervisor=null;
+    Auth.token=null; Auth.supervisor=null; Auth.isDelegate=false; Auth.supervisorList=[];
     showScreen('login');
   },
 
   err(msg){const e=el('login-err');e.textContent=msg;e.style.display='block';}
 };
+
+async function loadDelegateInfo() {
+  try {
+    const r = await api('getIsDelegateInfo', Auth.token);
+    Auth.isDelegate = r.isDelegate || false;
+    if (Auth.isDelegate) {
+      const sl = await api('getMeetingSupervisors', Auth.token);
+      if (sl.success) Auth.supervisorList = sl.supervisors || [];
+    }
+  } catch {}
+}
 
 // Enter key on login
 ['inp-id','inp-pw'].forEach(id=>el(id).addEventListener('keydown',e=>{if(e.key==='Enter')Auth.login();}));
@@ -455,6 +519,11 @@ const Dashboard = {
   },
 
   render() {
+    // Update action buttons (admin gets delegate management)
+    const actDiv = el('dash-actions');
+    if (actDiv) actDiv.innerHTML = `
+      ${Auth.supervisor?.isAdmin ? `<button class="btn-secondary" onclick="Delegates.open()"><i class="fas fa-user-shield me-1"></i> Delegates</button>` : ''}
+      <button class="btn-primary" onclick="Dashboard.createSession()"><i class="fas fa-plus me-1"></i> New Session</button>`;
     const list = el('session-list');
     if (!Dashboard.sessions.length) {
       list.innerHTML='<div class="empty-section" style="padding:40px;"><i class="fas fa-calendar-plus fa-2x mb-3 d-block" style="color:#cbd5e1;"></i>No sessions yet. Click "New Session" to start.</div>';
@@ -500,6 +569,35 @@ const Dashboard = {
   }
 };
 
+// ── Delegate Management ────────────────────────────────────────────────────
+const Delegates = {
+  async open() {
+    el('delegate-modal').classList.add('open');
+    el('delegate-body').innerHTML='<div class="text-center py-4"><div class="spinner" style="border-top-color:var(--accent);border-color:#e2e8f0;width:24px;height:24px;margin:auto;"></div></div>';
+    const [supR,delR] = await Promise.all([api('getMeetingSupervisors',Auth.token), api('getMeetingDelegates',Auth.token)]);
+    if (!supR.success||!delR.success){el('delegate-body').innerHTML='<p class="text-danger p-3">Failed to load data.</p>';return;}
+    const delegateSet=new Set(delR.delegates.map(d=>d.supervisor_id));
+    el('delegate-body').innerHTML=`
+      <p class="form-hint mb-3">Delegates can view, edit, and delete all members' entries. They can also add entries on behalf of other supervisors.</p>
+      <div style="max-height:360px;overflow-y:auto;">
+        ${supR.supervisors.map(s=>`
+          <div class="d-flex align-items-center gap-2 mb-2 px-2 py-2" style="border:1px solid #e2e8f0;border-radius:8px;">
+            <input type="checkbox" id="del-${esc(s.supervisor_id)}" value="${esc(s.supervisor_id)}" ${delegateSet.has(s.supervisor_id)?'checked':''} style="width:16px;height:16px;cursor:pointer;flex-shrink:0;"/>
+            <label for="del-${esc(s.supervisor_id)}" style="cursor:pointer;flex:1;margin:0;font-size:13px;">
+              <strong>${esc(s.name)}</strong><span style="font-size:11px;color:#64748b;margin-left:8px;">${esc(s.program||'')}</span>
+            </label>
+          </div>`).join('')}
+      </div>`;
+  },
+  async save() {
+    const ids=[...document.querySelectorAll('#delegate-body input[type=checkbox]:checked')].map(c=>c.value);
+    const r=await api('setMeetingDelegates',Auth.token,ids);
+    if (!r.success){alert(r.message||'Failed to save.');return;}
+    Delegates.close(); alert('Delegates updated successfully.');
+  },
+  close(){el('delegate-modal').classList.remove('open');}
+};
+
 // ── Session View ───────────────────────────────────────────────────────────
 const Session = {
   id:null, info:null, entries:[],
@@ -515,31 +613,47 @@ const Session = {
     el('sess-info-date').textContent = (mDate ? fmtDate(mDate) : 'Date not set') + (mTime ? '  ·  ' + fmtTime(mTime) : '');
     el('sess-info-modified').textContent = 'Modified: ' + fmtModified(s.last_modified_at);
     showScreen('session');
-    const r = await api('getMySessionEntries',Auth.token,sessionId);
+    const r = Auth.isDelegate
+      ? await api('getAllSessionEntries',Auth.token,sessionId)
+      : await api('getMySessionEntries',Auth.token,sessionId);
     Session.entries = r.success ? (r.entries||[]) : [];
     Session.render();
   },
 
   render() {
     ['A','B','C'].forEach(sec=>{
-      const mine = Session.entries.filter(e=>e.section===sec);
+      const secEntries = Session.entries.filter(e=>e.section===sec);
       const container = el('entries-'+sec);
-      if (!mine.length){
+      if (!secEntries.length){
         container.innerHTML='<div class="empty-section"><i class="fas fa-inbox fa-lg mb-2 d-block"></i>No entries yet.</div>';
         return;
       }
-      container.innerHTML=mine.map((e,i)=>`
+      container.innerHTML=secEntries.map((e,i)=>{
+        const isOwn = !e.supervisor_id || e.supervisor_id === Auth.supervisor?.id;
+        const canEdit = isOwn || Auth.isDelegate;
+        const d = e.entry_data || {};
+        let byLine = '';
+        if (Auth.isDelegate && e.actual_supervisor_name) {
+          const attrName = d.__attributedName;
+          byLine = `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">` +
+            `By: ${esc(e.actual_supervisor_name)}` +
+            (attrName && attrName !== e.actual_supervisor_name ? ` → On behalf of: <strong>${esc(attrName)}</strong>` : '') +
+            `</div>`;
+        }
+        return `
         <div class="entry-item">
           <div class="entry-num">${sec}.${i+1}</div>
           <div class="entry-content">
             <div class="entry-type-badge">${entryTypeLabel(e.entry_type)}</div>
             <div class="entry-preview">${entryPreview(e)}</div>
+            ${byLine}
           </div>
           <div class="entry-actions">
-            <button class="btn-entry edit" onclick="Modal.openEdit(${e.id})"><i class="fas fa-edit"></i> Edit</button>
-            <button class="btn-entry del" onclick="Session.deleteEntry(${e.id})"><i class="fas fa-trash"></i></button>
+            ${canEdit?`<button class="btn-entry edit" onclick="Modal.openEdit(${e.id})"><i class="fas fa-edit"></i> Edit</button>`:''}
+            ${canEdit?`<button class="btn-entry del" onclick="Session.deleteEntry(${e.id})"><i class="fas fa-trash"></i></button>`:''}
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     });
   },
 
@@ -568,8 +682,10 @@ function entryPreview(e) {
       return esc(d.title||'—');
     case 'journal':
       return esc(d.title||'—');
-    case 'dept_other':
-      return `${esc(Auth.supervisor.name)}: ${(d.bullets||[]).map(b=>`• ${esc(b)}`).join(' ')||'(no bullets)'}`;
+    case 'dept_other': {
+      const dispName = e.supervisor_name || d.__attributedName || Auth.supervisor?.name || '—';
+      return `${esc(dispName)}: ${(d.bullets||[]).map(b=>`• ${esc(b)}`).join(' ')||'(no bullets)'}`;
+    }
     case 'new_issue':
       return esc(d.text||'—');
     default:
@@ -667,21 +783,32 @@ const Modal = {
 
       case 'dept_other': {
         const bullets=d.bullets||[];
-        return `
-          <p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor.name)}</strong>) will appear automatically in the report.</p>
+        const behalfHtml = Auth.isDelegate ? Modal._behalfDropdown(d) :
+          `<p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor?.name)}</strong>) will appear automatically in the report.</p>`;
+        return `${behalfHtml}
           <div class="form-group"><label class="form-label">Bullet Points *</label>
             <div id="bullet-list">${bullets.map(b=>`<div class="bullet-item"><input class="form-control" value="${esc(b)}" placeholder="e.g. served as committee member in…"/><button class="btn-rm" onclick="this.parentElement.remove()">✕</button></div>`).join('')}</div>
             <button class="btn-add-line" onclick="Modal.addBullet()"><i class="fas fa-plus me-1"></i> Add Bullet</button>
           </div>`;
       }
 
-      case 'new_issue':
-        return `
-          <p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor.name)}</strong>) will appear automatically in the report.</p>
+      case 'new_issue': {
+        const behalfHtml2 = Auth.isDelegate ? Modal._behalfDropdown(d) :
+          `<p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor?.name)}</strong>) will appear automatically in the report.</p>`;
+        return `${behalfHtml2}
           <div class="form-group"><label class="form-label">Description *</label><textarea class="form-control" id="f-text" style="min-height:120px;">${esc(d.text||'')}</textarea></div>`;
+      }
 
       default: return '<p class="text-muted">Unknown entry type.</p>';
     }
+  },
+
+  _behalfDropdown(d) {
+    const curId = d.__attributedId || Auth.supervisor?.id || '';
+    const curName = d.__attributedName || Auth.supervisor?.name || '';
+    const myOpt = `<option value="${esc(Auth.supervisor?.id||'')}:${esc(Auth.supervisor?.name||'')}" ${(!d.__attributedId||d.__attributedId===Auth.supervisor?.id)?'selected':''}>— My own entry (${esc(Auth.supervisor?.name)}) —</option>`;
+    const supOpts = (Auth.supervisorList||[]).map(s=>`<option value="${esc(s.supervisor_id)}:${esc(s.name)}" ${d.__attributedId===s.supervisor_id?'selected':''}>${esc(s.name)}${s.program?' ('+esc(s.program)+')':''}</option>`).join('');
+    return `<div class="form-group"><label class="form-label">Add on behalf of</label><select class="form-control" id="f-behalf">${myOpt}${supOpts}</select></div>`;
   },
 
   addBullet() {
@@ -712,6 +839,17 @@ const Modal = {
   getData() {
     const v=id=>el(id)?.value?.trim()||'';
     const t=Modal.type;
+    // Read attribution if delegate
+    let meta = {};
+    const behalfSel = el('f-behalf');
+    if (behalfSel && behalfSel.value) {
+      const colonIdx = behalfSel.value.indexOf(':');
+      const attrId = behalfSel.value.substring(0, colonIdx);
+      const attrName = behalfSel.value.substring(colonIdx + 1);
+      if (attrId && attrId !== (Auth.supervisor?.id||'')) {
+        meta = { __attributedId: attrId, __attributedName: attrName };
+      }
+    }
     if (t==='master_award'||t==='phd_award')
       return {student_name:v('f-name'),student_id:v('f-id'),program:v('f-prog'),thesis_title_en:v('f-title-en'),thesis_title_ar:v('f-title-ar')};
     if (t==='master_defense'||t==='phd_defense') {
@@ -731,8 +869,9 @@ const Modal = {
     }
     if (t==='dept_other') {
       const bullets=[...document.querySelectorAll('#bullet-list .bullet-item input')].map(i=>i.value.trim()).filter(Boolean);
-      return {bullets};
+      return {...meta, bullets};
     }
+    if (t==='new_issue') return {...meta, text:v('f-text')};
     return {text:v('f-text')};
   },
 
@@ -757,8 +896,10 @@ const Modal = {
     if (err){alert(err);return;}
     const btn=el('modal-save-btn'); btn.disabled=true; btn.textContent='Saving…';
     let r;
-    if (Modal.editId) r=await api('updateMeetingEntry',Auth.token,Modal.editId,data);
-    else r=await api('addMeetingEntry',Auth.token,Session.id,Modal.section,Modal.type,data);
+    const attrId = data.__attributedId || null;
+    const attrName = data.__attributedName || null;
+    if (Modal.editId) r=await api('updateMeetingEntry',Auth.token,Modal.editId,data,attrId,attrName);
+    else r=await api('addMeetingEntry',Auth.token,Session.id,Modal.section,Modal.type,data,attrId,attrName);
     btn.disabled=false; btn.textContent=Modal.editId?'Update Entry':'Save Entry';
     if (!r.success){alert(r.message||'Error saving entry.');return;}
     Modal.close();
@@ -834,12 +975,12 @@ const Export = {
     const label=`${e.section}.${num}. `;
     switch(e.entry_type){
       case 'master_award':
-        return {label, lines:[`A master's degree has been awarded to Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?`Thesis Title in Arabic: ${d.thesis_title_ar}`:null].filter(Boolean)};
+        return {label, lines:[`A master's degree has been awarded to Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?'Thesis Title in Arabic:':null,d.thesis_title_ar?{arabic:d.thesis_title_ar}:null].filter(Boolean)};
       case 'phd_award':
-        return {label, lines:[`A PhD degree has been awarded to Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?`Thesis Title in Arabic: ${d.thesis_title_ar}`:null].filter(Boolean)};
+        return {label, lines:[`A PhD degree has been awarded to Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?'Thesis Title in Arabic:':null,d.thesis_title_ar?{arabic:d.thesis_title_ar}:null].filter(Boolean)};
       case 'master_defense': case 'phd_defense': {
         const kind=e.entry_type==='master_defense'?'Master':'PhD';
-        const lines=[`${kind} Defense Committee proposal for Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?`Thesis Title in Arabic: ${d.thesis_title_ar}`:null,'Proposed Jury:'].filter(Boolean);
+        const lines=[`${kind} Defense Committee proposal for Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?'Thesis Title in Arabic:':null,d.thesis_title_ar?{arabic:d.thesis_title_ar}:null,'Proposed Jury:'].filter(Boolean);
         (d.jury||[]).forEach(j=>{if(j.name)lines.push(`   ${j.name} (${j.role}) – ${j.rank}${j.affiliation?' - '+j.affiliation:''}`)});
         return {label, lines};
       }
@@ -877,22 +1018,40 @@ const Export = {
       const r=await Export.getReportData();
       if (!r.success){alert(r.message||'Failed to load report data.');return;}
       const sess=r.session, entries=r.entries||[];
+
+      // ── Validate date/time ──
+      const missing=[];
+      if (!sess.meeting_date) missing.push('Meeting Date');
+      if (!sess.meeting_time) missing.push('Meeting Time');
+      if (missing.length) {
+        const proceed=confirm(`The following fields are not yet set:\n• ${missing.join('\n• ')}\n\nPlease set them in the export form before generating the report.\n\nPress OK to generate anyway (will show "—"), or Cancel to go back.`);
+        if (!proceed) return;
+      }
+
       const sections=Export.buildSections(entries);
       const { jsPDF }=window.jspdf;
       const doc=new jsPDF({unit:'mm',format:'a4'});
       const margin=18, pageW=210, cW=pageW-2*margin;
       const navy=[10,31,68];
 
-      // Load logo
+      // ── Load logo preserving aspect ratio ──
       const logoData=await new Promise(res=>{
         const img=new Image(); img.crossOrigin='anonymous';
-        img.onload=()=>{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);res(c.toDataURL('image/png'));};
+        img.onload=()=>{
+          const c=document.createElement('canvas');
+          c.width=img.naturalWidth; c.height=img.naturalHeight;
+          c.getContext('2d').drawImage(img,0,0);
+          res({dataURL:c.toDataURL('image/png'),w:img.naturalWidth,h:img.naturalHeight});
+        };
         img.onerror=()=>res(null);
         img.src='/assets/logo_meeting_report.png';
       });
 
       // ── Header ──
-      if (logoData) doc.addImage(logoData,'PNG',margin,6,30,15);
+      if (logoData) {
+        const logoH=14, logoW=logoH*(logoData.w/logoData.h);
+        doc.addImage(logoData.dataURL,'PNG',margin,6,logoW,logoH);
+      }
       doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...navy);
       doc.text('Faculty of Engineering',pageW-margin,10,{align:'right'});
       doc.setFont('helvetica','normal'); doc.setFontSize(8);
@@ -903,15 +1062,17 @@ const Export = {
       doc.setFont('helvetica','bold'); doc.setFontSize(12.5); doc.setTextColor(...navy);
       doc.text('Electrical & Computer Engineering Department Meeting Agenda',pageW/2,30,{align:'center'});
       doc.setFontSize(10);
-      const sessLine=`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year}`;
+      const sessLine=`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year||'—'}`;
       doc.text(sessLine,pageW/2,37,{align:'center'});
       doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60,60,60);
-      const dateStr=`To be held on ${meetingDateStr(sess.meeting_date,sess.meeting_time?sess.meeting_time.substring(0,5):null)}`;
-      doc.text(dateStr,pageW/2,43.5,{align:'center'});
+      const timeStr = sess.meeting_time ? String(sess.meeting_time).substring(0,5) : null;
+      const dateLine=`To be held on ${meetingDateStr(sess.meeting_date, timeStr)}`;
+      doc.text(dateLine,pageW/2,43.5,{align:'center'});
       doc.setDrawColor(...navy); doc.line(margin,48,pageW-margin,48);
 
       let ys=55;
       const pageH=doc.internal.pageSize.getHeight();
+      const txtX=margin+2, txtW=cW-4, lineH=4.5;
 
       function addPageIfNeeded(needed){if(ys+needed>pageH-margin){doc.addPage();ys=margin;}}
 
@@ -928,20 +1089,32 @@ const Export = {
       function renderEntry(sec, num, e) {
         const info=Export.entryText(e,num);
         const numStr=`${sec}.${num}.`;
-        const allLines=[];
+        // Pre-calculate height
+        let totalH=0;
         info.lines.forEach((line,li)=>{
-          const prefix=li===0?numStr+' ':'     ';
-          const wrapped=doc.splitTextToSize(prefix+line, cW-4);
-          wrapped.forEach(l=>allLines.push(l));
+          if (line&&typeof line==='object'&&line.arabic){totalH+=lineH;}
+          else{const prefix=li===0?numStr+' ':'     ';totalH+=doc.splitTextToSize(prefix+String(line),txtW).length*lineH;}
         });
-        const blockH=allLines.length*4.5+4;
-        addPageIfNeeded(blockH);
+        addPageIfNeeded(totalH+4);
         doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-        allLines.forEach((line,i)=>{
-          if (i===0){doc.setFont('helvetica','bold');}
-          else{doc.setFont('helvetica','normal');}
-          doc.text(line,margin+2,ys);
-          ys+=4.5;
+        let isFirst=true;
+        info.lines.forEach((line,li)=>{
+          if (line&&typeof line==='object'&&line.arabic){
+            // Render Arabic via canvas image
+            const img=arabicTextToImg(line.arabic);
+            if(img){const ih=lineH,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.2,iw,ih);}
+            ys+=lineH;
+          } else {
+            const prefix=li===0?numStr+' ':'     ';
+            const wrapped=doc.splitTextToSize(prefix+String(line),txtW);
+            wrapped.forEach((wLine,wi)=>{
+              const isLast=wi===wrapped.length-1;
+              if(isFirst){doc.setFont('helvetica','bold');doc.text(wLine,txtX,ys);doc.setFont('helvetica','normal');isFirst=false;}
+              else if(!isLast&&wLine.trim().split(/\s+/).length>1){justifyTextLine(doc,wLine,txtX,ys,txtW);}
+              else{doc.text(wLine,txtX,ys);}
+              ys+=lineH;
+            });
+          }
         });
         ys+=3;
       }
@@ -980,79 +1153,131 @@ const Export = {
       const r=await Export.getReportData();
       if (!r.success){alert(r.message||'Failed to load report data.');return;}
       const sess=r.session, entries=r.entries||[];
+
+      // ── Validate date/time ──
+      const missing=[];
+      if (!sess.meeting_date) missing.push('Meeting Date');
+      if (!sess.meeting_time) missing.push('Meeting Time');
+      if (missing.length) {
+        const proceed=confirm(`The following fields are not yet set:\n• ${missing.join('\n• ')}\n\nPlease set them in the export form before generating the report.\n\nPress OK to generate anyway, or Cancel to go back.`);
+        if (!proceed) return;
+      }
+
       const sections=Export.buildSections(entries);
+      const timeStr = sess.meeting_time ? String(sess.meeting_time).substring(0,5) : null;
       const D=window.docx;
-      const navy={r:10,g:31,b:68};
-      const children=[];
 
-      // ── Header table (logo left | faculty right) ──
-      // Logo fetch
-      let logoBlob=null;
-      try{const resp=await fetch('/assets/logo_meeting_report.png');logoBlob=await resp.arrayBuffer();}catch{}
-
-      const logoCell=new D.TableCell({
-        children:[logoBlob?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:100,height:50},type:'png'})]}):new D.Paragraph({text:''})],
-        width:{size:30,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
-      });
-      const facCell=new D.TableCell({
-        children:[
-          new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'Faculty of Engineering',bold:true,color:'0a1f44',size:20})]}),
-          new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})]})
-        ],
-        width:{size:70,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},verticalAlign:D.VerticalAlign.CENTER,
-      });
-      children.push(new D.Table({rows:[new D.TableRow({children:[logoCell,facCell]})],width:{size:100,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideH:{style:D.BorderStyle.NONE},insideV:{style:D.BorderStyle.NONE}}}));
-
-      children.push(new D.Paragraph({text:'',spacing:{after:80}}));
-
-      // ── Title block ──
-      children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:'Electrical & Computer Engineering Department Meeting Agenda',bold:true,color:'0a1f44',size:26})]}));
-      children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year}`,bold:true,color:'0a1f44',size:22})]}));
-      children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`To be held on ${meetingDateStr(sess.meeting_date,sess.meeting_time?sess.meeting_time.substring(0,5):null)}`,color:'444444',size:20})]}));
-      children.push(new D.Paragraph({text:'',border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'0a1f44'}},spacing:{after:200}}));
-
-      // ── Sections ──
-      const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
-      ['A','B','C'].forEach(sec=>{
-        children.push(new D.Paragraph({
-          children:[new D.TextRun({text:SECTION_TITLES[sec],bold:true,color:'FFFFFF',size:22})],
-          shading:{type:D.ShadingType.SOLID,color:'0a1f44'},
-          spacing:{before:200,after:120},indent:{left:100}
-        }));
-        const items=sections[sec]||[];
-        if (!items.length){
-          children.push(new D.Paragraph({children:[new D.TextRun({text:'No entries for this section.',italics:true,color:'999999',size:18})],indent:{left:200}}));
-        } else {
-          items.forEach((e,i)=>{
-            const info=Export.entryText(e,i+1);
-            info.lines.forEach((line,li)=>{
-              children.push(new D.Paragraph({
-                children:[new D.TextRun({text:li===0?`${sec}.${i+1}.  ${line}`:line,bold:li===0,size:18,color:li===0?'0a1f44':'333333'})],
-                indent:{left:li===0?100:400},spacing:{after:li===info.lines.length-1?160:40}
-              }));
-            });
-          });
-        }
-      });
-
-      const doc2=new D.Document({sections:[{properties:{},children}]});
-      const blob=await D.Packer.toBlob(doc2);
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url;
-      a.download=`Meeting-Agenda-Session-${sess.session_number}.docx`; a.click();
-      URL.revokeObjectURL(url);
+      // Try docx library first; fall back to Word-compatible HTML
+      if (D && D.Document && D.TableCell) {
+        await Export._generateWordDocx(D, sess, sections, timeStr);
+      } else {
+        Export._generateWordHTML(sess, sections, timeStr);
+      }
     } catch(err){
-      alert('Word generation failed: '+err.message);
+      // If docx fails mid-way, fall back to HTML
+      console.warn('Word docx failed, trying HTML fallback:', err.message);
+      try {
+        const r2=await Export.getReportData();
+        if (r2.success) Export._generateWordHTML(r2.session, Export.buildSections(r2.entries||[]), r2.session.meeting_time?String(r2.session.meeting_time).substring(0,5):null);
+      } catch { alert('Word generation failed: '+err.message); }
     } finally {
       btn.disabled=false; btn.innerHTML='<i class="fas fa-file-word"></i> Export Word';
     }
+  },
+
+  async _generateWordDocx(D, sess, sections, timeStr) {
+    const navy={r:10,g:31,b:68};
+    const children=[];
+
+    // Logo
+    let logoBlob=null; let logoNW=0, logoNH=0;
+    try {
+      const resp=await fetch('/assets/logo_meeting_report.png');
+      const ab=await resp.arrayBuffer();
+      logoBlob=ab;
+      await new Promise(res=>{const img=new Image();img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};img.src=URL.createObjectURL(new Blob([ab]));});
+    } catch{}
+
+    const tH=50, tW=logoNH>0?Math.round(tH*(logoNW/logoNH)):100;
+    const logoCell=new D.TableCell({
+      children:[logoBlob?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:tW,height:tH},type:'png'})]}):new D.Paragraph({text:''})],
+      width:{size:30,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
+    });
+    const facCell=new D.TableCell({
+      children:[
+        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'Faculty of Engineering',bold:true,color:'0a1f44',size:20})]}),
+        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})]})
+      ],
+      width:{size:70,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},verticalAlign:D.VerticalAlign.CENTER,
+    });
+    children.push(new D.Table({rows:[new D.TableRow({children:[logoCell,facCell]})],width:{size:100,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideH:{style:D.BorderStyle.NONE},insideV:{style:D.BorderStyle.NONE}}}));
+    children.push(new D.Paragraph({text:'',spacing:{after:80}}));
+
+    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:'Electrical & Computer Engineering Department Meeting Agenda',bold:true,color:'0a1f44',size:26})]}));
+    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year||'—'}`,bold:true,color:'0a1f44',size:22})]}));
+    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`To be held on ${meetingDateStr(sess.meeting_date, timeStr)}`,color:'444444',size:20})]}));
+    children.push(new D.Paragraph({text:'',border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'0a1f44'}},spacing:{after:200}}));
+
+    const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
+    ['A','B','C'].forEach(sec=>{
+      children.push(new D.Paragraph({children:[new D.TextRun({text:SECTION_TITLES[sec],bold:true,color:'FFFFFF',size:22})],shading:{type:D.ShadingType.SOLID,color:'0a1f44'},spacing:{before:200,after:120},indent:{left:100}}));
+      const items=sections[sec]||[];
+      if (!items.length){
+        children.push(new D.Paragraph({children:[new D.TextRun({text:'No entries for this section.',italics:true,color:'999999',size:18})],indent:{left:200}}));
+      } else {
+        items.forEach((e,i)=>{
+          const info=Export.entryText(e,i+1);
+          info.lines.forEach((line,li)=>{
+            if (line&&typeof line==='object'&&line.arabic){
+              children.push(new D.Paragraph({
+                children:[new D.TextRun({text:line.arabic,size:18,color:'333333'})],
+                alignment:D.AlignmentType.RIGHT,
+                bidirectional:true,
+                indent:{left:400},spacing:{after:40}
+              }));
+            } else {
+              children.push(new D.Paragraph({
+                children:[new D.TextRun({text:li===0?`${sec}.${i+1}.  ${String(line)}`:String(line),bold:li===0,size:18,color:li===0?'0a1f44':'333333'})],
+                indent:{left:li===0?100:400},spacing:{after:li===info.lines.length-1?160:40}
+              }));
+            }
+          });
+        });
+      }
+    });
+
+    const doc2=new D.Document({sections:[{properties:{},children}]});
+    const blob=await D.Packer.toBlob(doc2);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download=`Meeting-Agenda-Session-${sess.session_number}.docx`; a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  _generateWordHTML(sess, sections, timeStr) {
+    const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
+    const dateStr=meetingDateStr(sess.meeting_date, timeStr);
+    let body='';
+    ['A','B','C'].forEach(sec=>{
+      body+=`<div style="background:#0a1f44;color:#fff;padding:5pt 10pt;margin:14pt 0 6pt;"><b>${SECTION_TITLES[sec]}</b></div>`;
+      const items=sections[sec]||[];
+      if (!items.length){body+=`<p style="color:#999;font-style:italic;margin-left:20pt;">No entries for this section.</p>`;}
+      else{items.forEach((e,i)=>{const info=Export.entryText(e,i+1);info.lines.forEach((line,li)=>{if(line&&typeof line==='object'&&line.arabic){body+=`<p style="direction:rtl;text-align:right;margin:2pt 0 2pt 20pt;">${esc(line.arabic)}</p>`;}else{const txt=li===0?`${sec}.${i+1}.  ${String(line)}`:String(line);body+=`<p style="margin:2pt 0 2pt ${li===0?'8':'24'}pt;${li===0?'font-weight:bold;color:#0a1f44;':''}">${esc(txt)}</p>`;}});});}
+    });
+    const html=`<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Meeting Agenda</title><style>@page{margin:2.5cm;}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1e1e1e;}h1{font-size:13pt;color:#0a1f44;text-align:center;margin:0 0 4pt;}h2{font-size:11pt;color:#0a1f44;text-align:center;margin:2pt 0;}.sub{text-align:center;color:#555;font-size:10pt;margin-bottom:10pt;}hr{border:none;border-top:1.5px solid #0a1f44;margin:10pt 0;}p{margin:3pt 0;line-height:1.5;}</style></head><body><p style="text-align:right;font-size:9pt;color:#333;">Faculty of Engineering &nbsp;|&nbsp; ECE Department</p><h1>Electrical &amp; Computer Engineering Department Meeting Agenda</h1><h2>${ordinal(sess.session_number)} Session – Academic Year ${esc(sess.academic_year||'—')}</h2><p class="sub">To be held on ${esc(dateStr)}</p><hr/>${body}</body></html>`;
+    const blob=new Blob(['﻿',html],{type:'application/msword;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download=`Meeting-Agenda-Session-${sess.session_number}.doc`; a.click();
+    URL.revokeObjectURL(url);
   }
 };
 
 // Auto-load dashboard if already logged in
-window.addEventListener('DOMContentLoaded',()=>{
+window.addEventListener('DOMContentLoaded',async ()=>{
   if (Auth.token && Auth.supervisor) {
     el('dash-sup-name').textContent=Auth.supervisor.name||'';
+    await loadDelegateInfo();
     showScreen('dash');
     Dashboard.load();
   }
