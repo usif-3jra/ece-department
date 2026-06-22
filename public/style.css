@@ -491,4 +491,10 @@ body {
   .grade-criterion-row { grid-template-columns: 1fr; gap: 6px; }
   .kpi-card { flex-basis: 100%; }
   .tab-body { padding: 14px; }
+  .login-card {
+    padding: 28px 20px;
+    border-radius: 16px;
+  }
+  .login-logo { height: 64px; }
+  .login-title { font-size: 18px; }
 }

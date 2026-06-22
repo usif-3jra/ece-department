@@ -195,6 +195,30 @@ function mapExConfig(r) {
   };
 }
 
+// ── Grade boost helpers ───────────────────────────────────────────────────
+const ALL_BOUNDARIES  = [54, 59, 64, 69, 72, 75, 79, 82, 85, 89, 94];
+const DEFAULT_BOOSTED = [54, 59, 64, 69, 72, 75, 79, 82, 85];
+
+async function getActiveBorders(sql) {
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS grade_boost_config (
+      boundary INT PRIMARY KEY,
+      boosted  BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    const count = await sql`SELECT COUNT(*) AS c FROM grade_boost_config`;
+    if (!count[0] || Number(count[0].c) === 0) {
+      for (const b of ALL_BOUNDARIES) {
+        await sql`INSERT INTO grade_boost_config (boundary, boosted)
+                  VALUES (${b}, ${DEFAULT_BOOSTED.includes(b)})
+                  ON CONFLICT DO NOTHING`;
+      }
+    }
+    const rows = await sql`SELECT boundary FROM grade_boost_config WHERE boosted = TRUE ORDER BY boundary`;
+    return rows.map(r => Number(r.boundary));
+  } catch { return DEFAULT_BOOSTED; }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
@@ -2154,6 +2178,87 @@ module.exports = async function handler(req, res) {
                   VALUES (${programName}, ${!!unlockedFyp1}, ${!!unlockedFyp2}, NOW())
                   ON CONFLICT (program_name) DO UPDATE
                   SET unlocked_fyp1 = ${!!unlockedFyp1}, unlocked_fyp2 = ${!!unlockedFyp2}, updated_at = NOW()`;
+        return ok({ success: true });
+      }
+
+      case 'getGradeBoostConfig': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        const borders = await getActiveBorders(sql);
+        const activeSet = new Set(borders);
+        return ok({
+          success: true,
+          boundaries: ALL_BOUNDARIES.map(b => ({ boundary: b, boosted: activeSet.has(b) })),
+        });
+      }
+
+      case 'setGradeBoostConfig': {
+        const [sessionToken, config] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        await sql`CREATE TABLE IF NOT EXISTS grade_boost_config (
+          boundary INT PRIMARY KEY, boosted BOOLEAN NOT NULL DEFAULT TRUE,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`;
+        for (const { boundary, boosted } of (config || [])) {
+          if (!ALL_BOUNDARIES.includes(Number(boundary))) continue;
+          await sql`INSERT INTO grade_boost_config (boundary, boosted, updated_at)
+                    VALUES (${Number(boundary)}, ${!!boosted}, NOW())
+                    ON CONFLICT (boundary) DO UPDATE SET boosted = EXCLUDED.boosted, updated_at = NOW()`;
+        }
+        return ok({ success: true });
+      }
+
+      case 'getMyDistributionAccess': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (session.is_admin) return ok({ success: true, canAccess: true });
+        await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
+          supervisor_id TEXT PRIMARY KEY,
+          granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`;
+        const rows = await sql`SELECT 1 FROM distribution_report_access WHERE supervisor_id = ${session.supervisor_id}`;
+        return ok({ success: true, canAccess: rows.length > 0 });
+      }
+
+      case 'getDistributionReportAccess': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
+          supervisor_id TEXT PRIMARY KEY,
+          granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`;
+        const allSups  = await sql`SELECT * FROM supervisors WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
+        const granted  = await sql`SELECT supervisor_id FROM distribution_report_access`;
+        const grantSet = new Set(granted.map(r => r.supervisor_id));
+        return ok({
+          success: true,
+          supervisors: allSups.map(r => ({
+            id:        r.supervisor_id,
+            name:      r.name,
+            program:   r.program   || '',
+            email:     r.email     || '',
+            hasAccess: grantSet.has(r.supervisor_id),
+          })),
+        });
+      }
+
+      case 'setDistributionReportAccess': {
+        const [sessionToken, allowedIds] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
+          supervisor_id TEXT PRIMARY KEY,
+          granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`;
+        await sql`DELETE FROM distribution_report_access`;
+        for (const id of (allowedIds || [])) {
+          if (id) await sql`INSERT INTO distribution_report_access (supervisor_id)
+                            VALUES (${String(id)}) ON CONFLICT DO NOTHING`;
+        }
         return ok({ success: true });
       }
 

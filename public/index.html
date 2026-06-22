@@ -103,7 +103,7 @@
             <i class="fas fa-key me-2 text-primary"></i>Change Password
           </a></li>
           <li><hr class="dropdown-divider"/></li>
-          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.22-06-26 R09</span></li>
+          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.22-06-26 R10</span></li>
         </ul>
       </div>
       <button class="btn btn-sm btn-danger" onclick="Auth.logout()" title="Logout">
@@ -595,6 +595,7 @@
         </div>
       </div>
       <div id="res-incomplete-warning" class="d-none"></div>
+      <div id="res-partial-pending" class="d-none"></div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover table-sm results-table">
           <thead>
@@ -709,6 +710,56 @@
               <tr><td colspan="5" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- ── Distribution Report Access ── -->
+        <hr class="my-4"/>
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <h6 class="mb-0 fw-bold">
+              <i class="fas fa-chart-bar me-2 text-info"></i>Distribution Report Access
+            </h6>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="Admin.distAccessSelectAll(true)">
+                <i class="fas fa-check-square me-1"></i>All
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="Admin.distAccessSelectAll(false)">
+                <i class="far fa-square me-1"></i>None
+              </button>
+            </div>
+          </div>
+          <p class="text-muted small mb-2">
+            Choose which supervisors can download the Grade Distribution PDF Report. The admin always has access regardless.
+          </p>
+          <div id="distAccessList"
+               style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:6px 10px;">
+            <div class="text-center text-muted py-3 small">
+              <span class="spinner-border spinner-border-sm me-2"></span>Loading…
+            </div>
+          </div>
+          <button class="btn btn-info btn-sm mt-2" onclick="Admin.saveDistributionAccess()">
+            <i class="fas fa-shield-alt me-1"></i>Save Access Permissions
+          </button>
+        </div>
+
+        <!-- ── Grade Boost Boundaries ── -->
+        <hr class="my-4"/>
+        <div>
+          <h6 class="mb-1 fw-bold">
+            <i class="fas fa-arrow-up me-2 text-warning"></i>Grade Boost Boundaries
+          </h6>
+          <p class="text-muted small mb-2">
+            When a student's weighted grade lands exactly on a checked boundary, it is boosted by +1 before the letter grade is assigned.
+          </p>
+          <div id="boostConfigList"
+               style="border:1px solid #dee2e6;border-radius:8px;padding:6px 10px;">
+            <div class="text-center text-muted py-3 small">
+              <span class="spinner-border spinner-border-sm me-2"></span>Loading…
+            </div>
+          </div>
+          <button class="btn btn-warning btn-sm mt-2" onclick="Admin.saveBoostConfig()">
+            <i class="fas fa-save me-1"></i>Save Boost Settings
+          </button>
         </div>
       </div>
       <div class="modal-footer">

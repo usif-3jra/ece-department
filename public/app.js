@@ -260,6 +260,14 @@ const App = {
       Ex.loadProjects(),
     ]);
     if (Auth.supervisor && Auth.supervisor.isAdmin) FeedbackInbox.checkUnread();
+    if (Auth.supervisor && !Auth.supervisor.isAdmin) {
+      gsrAuth('getMyDistributionAccess').then(r => {
+        if (r && r.canAccess) {
+          const distBtn = document.getElementById('btn-export-distribution');
+          if (distBtn) distBtn.classList.remove('d-none');
+        }
+      }).catch(() => {});
+    }
     document.querySelector('[data-bs-target="#tab-ex"]').addEventListener('shown.bs.tab', () => Ex.loadProjects());
     document.querySelector('[data-bs-target="#tab-tw"]').addEventListener('shown.bs.tab', () => TW.refreshProjectList());
     document.querySelector('[data-bs-target="#tab-tw"]').addEventListener('hide.bs.tab', () => TW.stopPolling());
@@ -3241,6 +3249,8 @@ const Admin = {
     const tbody = document.getElementById('manageUsersTbody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+    this.loadDistributionAccess();
+    this.loadBoostConfig();
     try {
       const res = await gsrAuth('getAllSupervisorsForAdmin');
       if (!res.success) throw new Error(res.message);
@@ -3302,6 +3312,92 @@ const Admin = {
       }
       Toast.show(msg, failed.length > 0 ? 'warning' : 'success');
       bootstrap.Modal.getInstance(document.getElementById('modalManageUsers')).hide();
+    } catch(e) { Toast.show(e.message || e, 'error'); }
+    finally { Spinner.hide(); }
+  },
+
+  async loadDistributionAccess() {
+    const el = document.getElementById('distAccessList');
+    if (!el) return;
+    el.innerHTML = '<div class="text-center text-muted py-3 small"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>';
+    try {
+      const res = await gsrAuth('getDistributionReportAccess');
+      if (!res.success) { el.innerHTML = `<p class="text-danger small mb-0 py-2">${escHtml(res.message || 'Failed to load.')}</p>`; return; }
+      if (!res.supervisors || !res.supervisors.length) { el.innerHTML = '<p class="text-muted small mb-0 py-2">No supervisors found.</p>'; return; }
+      el.innerHTML = res.supervisors.map(s => `
+        <div class="d-flex align-items-center py-1 border-bottom" style="gap:10px;">
+          <input class="form-check-input dist-access-chk flex-shrink-0" type="checkbox"
+                 value="${escHtml(s.id)}" id="dac_${escHtml(s.id)}" ${s.hasAccess ? 'checked' : ''}>
+          <label class="form-check-label mb-0 w-100" for="dac_${escHtml(s.id)}" style="font-size:13px;cursor:pointer;">
+            <span class="fw-medium">${escHtml(s.name)}</span>
+            <span class="text-muted ms-2 small">${escHtml(s.program)}</span>
+            <code class="ms-2 text-muted" style="font-size:11px;">${escHtml(s.id)}</code>
+          </label>
+        </div>`).join('');
+    } catch(e) { el.innerHTML = '<p class="text-danger small mb-0 py-2">Error loading access list.</p>'; }
+  },
+
+  distAccessSelectAll(checked) {
+    document.querySelectorAll('.dist-access-chk').forEach(el => { el.checked = checked; });
+  },
+
+  async saveDistributionAccess() {
+    const allowedIds = [...document.querySelectorAll('.dist-access-chk:checked')].map(el => el.value);
+    Spinner.show();
+    try {
+      const res = await gsrAuth('setDistributionReportAccess', allowedIds);
+      if (!res.success) { Toast.show(res.message || 'Failed to save.', 'error'); return; }
+      Toast.show(`Distribution report access saved — ${allowedIds.length} supervisor(s) granted.`);
+    } catch(e) { Toast.show(e.message || e, 'error'); }
+    finally { Spinner.hide(); }
+  },
+
+  _boostLabel(b) {
+    const map = {
+      54: '54% → 55%  &nbsp;<span class="text-muted">(F → D-)</span>',
+      59: '59% → 60%  &nbsp;<span class="text-muted">(D- → D)</span>',
+      64: '64% → 65%  &nbsp;<span class="text-muted">(D → C-)</span>',
+      69: '69% → 70%  &nbsp;<span class="text-muted">(C- → C)</span>',
+      72: '72% → 73%  &nbsp;<span class="text-muted">(C → C+)</span>',
+      75: '75% → 76%  &nbsp;<span class="text-muted">(C+ → B-)</span>',
+      79: '79% → 80%  &nbsp;<span class="text-muted">(B- → B)</span>',
+      82: '82% → 83%  &nbsp;<span class="text-muted">(B → B+)</span>',
+      85: '85% → 86%  &nbsp;<span class="text-muted">(B+ → A-)</span>',
+      89: '89% → 90%  &nbsp;<span class="text-muted">(A- → A)</span>',
+      94: '94% → 95%  &nbsp;<span class="text-muted">(A → A+)</span>',
+    };
+    return map[b] || `${b}%`;
+  },
+
+  async loadBoostConfig() {
+    const el = document.getElementById('boostConfigList');
+    if (!el) return;
+    el.innerHTML = '<div class="text-center text-muted py-3 small"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>';
+    try {
+      const res = await gsrAuth('getGradeBoostConfig');
+      if (!res.success) { el.innerHTML = `<p class="text-danger small mb-0 py-2">${escHtml(res.message || 'Failed to load.')}</p>`; return; }
+      el.innerHTML = `<div class="row g-0">${res.boundaries.map(({ boundary, boosted }) => `
+        <div class="col-12 col-sm-6 d-flex align-items-center py-1 border-bottom" style="gap:10px;">
+          <input class="form-check-input boost-cfg-chk flex-shrink-0" type="checkbox"
+                 value="${boundary}" id="bc_${boundary}" ${boosted ? 'checked' : ''}>
+          <label class="form-check-label mb-0" for="bc_${boundary}" style="font-size:13px;cursor:pointer;font-family:monospace;">
+            ${this._boostLabel(boundary)}
+          </label>
+        </div>`).join('')}</div>`;
+    } catch(e) { el.innerHTML = '<p class="text-danger small mb-0 py-2">Error loading boost configuration.</p>'; }
+  },
+
+  async saveBoostConfig() {
+    const config = [...document.querySelectorAll('.boost-cfg-chk')].map(el => ({
+      boundary: Number(el.value),
+      boosted:  el.checked,
+    }));
+    Spinner.show();
+    try {
+      const res = await gsrAuth('setGradeBoostConfig', config);
+      if (!res.success) { Toast.show(res.message || 'Failed to save.', 'error'); return; }
+      const active = config.filter(c => c.boosted).length;
+      Toast.show(`Boost settings saved — ${active} of ${config.length} boundaries active.`);
     } catch(e) { Toast.show(e.message || e, 'error'); }
     finally { Spinner.hide(); }
   },
