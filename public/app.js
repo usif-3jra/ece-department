@@ -2954,31 +2954,25 @@ const Res = {
       });
       y = doc.lastAutoTable.finalY + 5;
 
-      // ── Per-program grade stats sourced directly from results tab data ──
-      // Uses the identical finalGrade values already displayed on screen.
-      const _rndStat = v => Math.round(v * 10) / 10;
-      const _gstat = arr => {
-        const n = arr.length;
-        if (!n) return { avg: 0, std: 0, n: 0 };
-        const avg = arr.reduce((a, b) => a + b, 0) / n;
-        const std = Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / n);
-        return { avg: _rndStat(avg), std: _rndStat(std), n };
+      // ── Per-program stats: same filter + same computation as the results tab ──
+      // matchesProg mirrors applyFilter()'s program-matching logic exactly.
+      const matchesProg = (r, prog) => {
+        if ((r.projectProgram || 'Unspecified') === prog) return true;
+        const proj = (Reg._projectsCache || []).find(p => p.Title === r.projectTitle);
+        if (!proj) return false;
+        const supIds = (proj.Supervisors || '').split(',').map(x => x.trim()).filter(Boolean);
+        return supIds.some(sid => {
+          const sup = (Reg.allSupervisors || []).find(s => s.id === sid);
+          return sup && sup.program === prog;
+        });
       };
-      const _progGrades = {};
-      (Res.allResults || []).forEach(r => {
-        const pr = r.projectProgram || 'Unspecified';
-        if (!_progGrades[pr]) _progGrades[pr] = { FYP1: [], FYP2: [] };
-        if (r.finalGrade != null) (_progGrades[pr][r.projectType] || (_progGrades[pr][r.projectType] = [])).push(r.finalGrade);
-      });
+      const fmtStat = v => parseFloat(v).toFixed(1);
       const avgByProgramType = {};
-      progList.forEach(p => {
-        const g = _progGrades[p] || {};
-        avgByProgramType[p] = { FYP1: _gstat(g.FYP1 || []), FYP2: _gstat(g.FYP2 || []) };
+      progList.forEach(prog => {
+        const pf = (Res.allResults || []).filter(r => matchesProg(r, prog));
+        avgByProgramType[prog] = Res._computeStats(pf);
       });
-      const avgOverall = {
-        FYP1: _gstat((Res.allResults || []).filter(r => r.projectType === 'FYP1' && r.finalGrade != null).map(r => r.finalGrade)),
-        FYP2: _gstat((Res.allResults || []).filter(r => r.projectType === 'FYP2' && r.finalGrade != null).map(r => r.finalGrade)),
-      };
+      const avgOverall = Res._computeStats(Res.allResults || []);
 
       // ═══════════════════════════════════════════════════════════════
       // PAGE 2 — Average Grade by Program & FYP Type
@@ -2986,30 +2980,30 @@ const Res = {
       doc.addPage();
       y = drawHdr('Average Grade by Program & FYP Type');
 
-      // Stats table — avg ± std dev
+      // Stats table — avg ± std dev (values identical to results tab Program Summary)
       y = groupHeader(y, 'Average Final Grade & Standard Deviation per Program (weighted composite student grades)');
-      const ovf1 = avgOverall.FYP1 || { avg: 0, std: 0, n: 0 };
-      const ovf2 = avgOverall.FYP2 || { avg: 0, std: 0, n: 0 };
+      const ovf1 = avgOverall.FYP1 || { count: 0, mean: 0, sd: 0 };
+      const ovf2 = avgOverall.FYP2 || { count: 0, mean: 0, sd: 0 };
       const avgBody = [
         ...progList.map(p => {
           const d = avgByProgramType[p] || {};
-          const f1 = d.FYP1 || { avg: 0, std: 0, n: 0 };
-          const f2 = d.FYP2 || { avg: 0, std: 0, n: 0 };
+          const f1 = d.FYP1 || { count: 0, mean: 0, sd: 0 };
+          const f2 = d.FYP2 || { count: 0, mean: 0, sd: 0 };
           return [p,
-            f1.n > 0 ? `${f1.avg}%` : '—', f1.n > 0 ? `±${f1.std}%` : '—', f1.n || 0,
-            f2.n > 0 ? `${f2.avg}%` : '—', f2.n > 0 ? `±${f2.std}%` : '—', f2.n || 0];
+            f1.count > 0 ? `${fmtStat(f1.mean)}%` : '—', f1.count > 0 ? `±${fmtStat(f1.sd)}%` : '—',
+            f2.count > 0 ? `${fmtStat(f2.mean)}%` : '—', f2.count > 0 ? `±${fmtStat(f2.sd)}%` : '—'];
         }),
         ['ALL PROGRAMS',
-          ovf1.n > 0 ? `${ovf1.avg}%` : '—', ovf1.n > 0 ? `±${ovf1.std}%` : '—', ovf1.n || 0,
-          ovf2.n > 0 ? `${ovf2.avg}%` : '—', ovf2.n > 0 ? `±${ovf2.std}%` : '—', ovf2.n || 0],
+          ovf1.count > 0 ? `${fmtStat(ovf1.mean)}%` : '—', ovf1.count > 0 ? `±${fmtStat(ovf1.sd)}%` : '—',
+          ovf2.count > 0 ? `${fmtStat(ovf2.mean)}%` : '—', ovf2.count > 0 ? `±${fmtStat(ovf2.sd)}%` : '—'],
       ];
       doc.autoTable({
         startY: y,
-        head: [['Program', 'FYP1 Avg Grade', 'FYP1 ± Std Dev', 'FYP1 (n)', 'FYP2 Avg Grade', 'FYP2 ± Std Dev', 'FYP2 (n)']],
+        head: [['Program', 'FYP1 Avg Grade', 'FYP1 ± Std Dev', 'FYP2 Avg Grade', 'FYP2 ± Std Dev']],
         body: avgBody,
         ...tblBase,
         ...totalRowCB(avgBody.length - 1),
-        columnStyles: { 0:{fontStyle:'bold',cellWidth:42}, 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center'}, 4:{halign:'center'}, 5:{halign:'center'}, 6:{halign:'center'} },
+        columnStyles: { 0:{fontStyle:'bold',cellWidth:52}, 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center'}, 4:{halign:'center'} },
       });
       y = doc.lastAutoTable.finalY + 8;
 
@@ -3033,35 +3027,37 @@ const Res = {
 
       progList.forEach((prog, gi) => {
         const d  = avgByProgramType[prog] || {};
-        const f1 = d.FYP1 || { avg: 0, std: 0, n: 0 };
-        const f2 = d.FYP2 || { avg: 0, std: 0, n: 0 };
+        const f1 = d.FYP1 || { count: 0, mean: 0, sd: 0 };
+        const f2 = d.FYP2 || { count: 0, mean: 0, sd: 0 };
+        const m1 = parseFloat(f1.mean) || 0, s1 = parseFloat(f1.sd) || 0;
+        const m2 = parseFloat(f2.mean) || 0, s2 = parseFloat(f2.sd) || 0;
         const gx = plotX + gi * groupW + groupW / 2;
         const gap = 1.5;
 
         // FYP1 bar (navy, left)
-        const b1h = (f1.avg / 100) * plotH;
+        const b1h = (m1 / 100) * plotH;
         const b1x = gx - barW - gap / 2;
         const b1y = plotY + plotH - b1h;
         doc.setFillColor(...navy);
-        if (f1.n > 0 && b1h > 0.3) doc.rect(b1x, b1y, barW, b1h, 'F');
-        if (f1.n > 0) {
+        if (f1.count > 0 && b1h > 0.3) doc.rect(b1x, b1y, barW, b1h, 'F');
+        if (f1.count > 0) {
           doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor(...navy);
-          doc.text(`${f1.avg}%`, b1x + barW / 2, b1y - 3.5, { align: 'center' });
+          doc.text(`${fmtStat(m1)}%`, b1x + barW / 2, b1y - 3.5, { align: 'center' });
           doc.setFont('helvetica', 'normal'); doc.setFontSize(5); doc.setTextColor(100, 100, 100);
-          doc.text(`±${f1.std}%`, b1x + barW / 2, b1y - 1.2, { align: 'center' });
+          doc.text(`±${fmtStat(s1)}%`, b1x + barW / 2, b1y - 1.2, { align: 'center' });
         }
 
         // FYP2 bar (teal, right)
-        const b2h = (f2.avg / 100) * plotH;
+        const b2h = (m2 / 100) * plotH;
         const b2x = gx + gap / 2;
         const b2y = plotY + plotH - b2h;
         doc.setFillColor(...teal);
-        if (f2.n > 0 && b2h > 0.3) doc.rect(b2x, b2y, barW, b2h, 'F');
-        if (f2.n > 0) {
+        if (f2.count > 0 && b2h > 0.3) doc.rect(b2x, b2y, barW, b2h, 'F');
+        if (f2.count > 0) {
           doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor(...teal);
-          doc.text(`${f2.avg}%`, b2x + barW / 2, b2y - 3.5, { align: 'center' });
+          doc.text(`${fmtStat(m2)}%`, b2x + barW / 2, b2y - 3.5, { align: 'center' });
           doc.setFont('helvetica', 'normal'); doc.setFontSize(5); doc.setTextColor(100, 100, 100);
-          doc.text(`±${f2.std}%`, b2x + barW / 2, b2y - 1.2, { align: 'center' });
+          doc.text(`±${fmtStat(s2)}%`, b2x + barW / 2, b2y - 1.2, { align: 'center' });
         }
 
         // Program label (truncated)
