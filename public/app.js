@@ -2339,7 +2339,8 @@ const Res = {
             proj.students.map(s => [
               s.studentName, s.studentId, proj.title,
               `${s.summary.teamworkPct}%`, `${s.summary.reportPct}%`, `${s.summary.presPct}%`,
-              `${s.summary.finalGrade}%`,
+              `${s.summary.rawFinalGrade}%`,
+              `${s.summary.filteredFinalGrade}%`,
               `${s.summary.finalGrade + (s.summary.boosted ? 1 : 0)}%${s.summary.boosted ? ' (+1)' : ''}`,
               s.summary.letterGrade,
             ])
@@ -2350,8 +2351,8 @@ const Res = {
             startY: ys, margin: { left: margin, right: margin }, theme: 'grid',
             headStyles: { fillColor: navy, textColor: 255, fontSize: 7.5, fontStyle: 'bold', cellPadding: 2, halign: 'center' },
             bodyStyles: { fontSize: 7.5, cellPadding: 2 },
-            columnStyles: { 0: { cellWidth: cW*0.21 }, 1: { cellWidth: cW*0.10, halign:'center' }, 2: { cellWidth: cW*0.22 }, 3:{cellWidth:cW*0.077,halign:'center'}, 4:{cellWidth:cW*0.077,halign:'center'}, 5:{cellWidth:cW*0.077,halign:'center'}, 6:{cellWidth:cW*0.077,halign:'center'}, 7:{cellWidth:cW*0.09,halign:'center',fontStyle:'bold'}, 8:{cellWidth:cW*0.077,halign:'center',fontStyle:'bold'} },
-            head: [['Student Name', 'Student ID', 'Project', `TW (${meta.weights?.tw??35}%)`, `Report (${meta.weights?.report??35}%)`, `Pres (${meta.weights?.pres??30}%)`, 'Weight', 'Final Grade', 'Letter']],
+            columnStyles: { 0:{cellWidth:cW*0.19}, 1:{cellWidth:cW*0.09,halign:'center'}, 2:{cellWidth:cW*0.20}, 3:{cellWidth:cW*0.066,halign:'center'}, 4:{cellWidth:cW*0.066,halign:'center'}, 5:{cellWidth:cW*0.066,halign:'center'}, 6:{cellWidth:cW*0.066,halign:'center'}, 7:{cellWidth:cW*0.066,halign:'center'}, 8:{cellWidth:cW*0.08,halign:'center',fontStyle:'bold'}, 9:{cellWidth:cW*0.066,halign:'center',fontStyle:'bold'} },
+            head: [['Student Name', 'Student ID', 'Project', `TW (${meta.weights?.tw??35}%)`, `Report (${meta.weights?.report??35}%)`, `Pres (${meta.weights?.pres??30}%)`, 'Raw %', 'Adj. %', 'Final Grade', 'Letter']],
             body: rows,
           });
           ys = doc.lastAutoTable.finalY + 6;
@@ -2494,7 +2495,8 @@ const Res = {
           proj.students.map(s => [
             ++_sumIdx, s.studentName, s.studentId, proj.title,
             `${s.summary.teamworkPct}%`, `${s.summary.reportPct}%`, `${s.summary.presPct}%`,
-            `${s.summary.finalGrade}%`,
+            `${s.summary.rawFinalGrade}%`,
+            `${s.summary.filteredFinalGrade}%`,
             `${s.summary.finalGrade + (s.summary.boosted ? 1 : 0)}%${s.summary.boosted ? ' (+1)' : ''}`,
             s.summary.letterGrade,
           ])
@@ -2503,8 +2505,8 @@ const Res = {
           startY: y, margin: { left: margin, right: margin }, theme: 'grid',
           headStyles: { fillColor: navy, textColor: 255, fontSize: 7.5, fontStyle: 'bold', cellPadding: 2, halign: 'center' },
           bodyStyles: { fontSize: 7.5, cellPadding: 2 },
-          columnStyles: { 0:{cellWidth:8,halign:'center'}, 1:{cellWidth:cW*0.19}, 2:{cellWidth:cW*0.10,halign:'center'}, 3:{cellWidth:cW*0.21}, 4:{cellWidth:cW*0.075,halign:'center'}, 5:{cellWidth:cW*0.075,halign:'center'}, 6:{cellWidth:cW*0.075,halign:'center'}, 7:{cellWidth:cW*0.075,halign:'center'}, 8:{cellWidth:cW*0.09,halign:'center',fontStyle:'bold'}, 9:{cellWidth:cW*0.075,halign:'center',fontStyle:'bold'} },
-          head: [['#', 'Student Name', 'Student ID', 'Project Title', `TW (${meta.weights?.tw??35}%)`, `Report (${meta.weights?.report??35}%)`, `Pres (${meta.weights?.pres??30}%)`, 'Weight', 'Final Grade', 'Letter']],
+          columnStyles: { 0:{cellWidth:7,halign:'center'}, 1:{cellWidth:cW*0.17}, 2:{cellWidth:cW*0.09,halign:'center'}, 3:{cellWidth:cW*0.19}, 4:{cellWidth:cW*0.063,halign:'center'}, 5:{cellWidth:cW*0.063,halign:'center'}, 6:{cellWidth:cW*0.063,halign:'center'}, 7:{cellWidth:cW*0.063,halign:'center'}, 8:{cellWidth:cW*0.063,halign:'center'}, 9:{cellWidth:cW*0.075,halign:'center',fontStyle:'bold'}, 10:{cellWidth:cW*0.063,halign:'center',fontStyle:'bold'} },
+          head: [['#', 'Student Name', 'Student ID', 'Project Title', `TW (${meta.weights?.tw??35}%)`, `Report (${meta.weights?.report??35}%)`, `Pres (${meta.weights?.pres??30}%)`, 'Raw %', 'Adj. %', 'Final Grade', 'Letter']],
           body: _sumRows,
         });
 
@@ -2689,10 +2691,11 @@ const Res = {
               startY: y, margin: { left: margin, right: margin }, theme: 'grid',
               headStyles: { fillColor: green, textColor: 255, fontSize: 7.5, fontStyle: 'bold', cellPadding: 2, halign: 'center' },
               bodyStyles: { fontSize: 9, fontStyle: 'bold', cellPadding: 2.5, halign: 'center' },
-              columnStyles: { 0:{cellWidth:cW*0.18}, 1:{cellWidth:cW*0.18}, 2:{cellWidth:cW*0.18}, 3:{cellWidth:cW*0.15}, 4:{cellWidth:cW*0.15}, 5:{cellWidth:cW*0.16} },
-              head: [[`Teamwork (${meta.weights?.tw ?? 35}%)`, `Report (${meta.weights?.report ?? 35}%)`, `Presentation (${meta.weights?.pres ?? 30}%)`, 'Weighted %', 'Final Grade', 'Letter Grade']],
-              body: [[`${stu.summary.teamworkPct}%`, `${stu.summary.reportPct}%`, `${stu.summary.presPct}%`, `${stu.summary.finalGrade}%`, `${stu.summary.finalGrade + (stu.summary.boosted ? 1 : 0)}%${stu.summary.boosted ? ' (+1)' : ''}`, stu.summary.letterGrade]],
+              columnStyles: { 0:{cellWidth:cW*0.16}, 1:{cellWidth:cW*0.15}, 2:{cellWidth:cW*0.16}, 3:{cellWidth:cW*0.11}, 4:{cellWidth:cW*0.11}, 5:{cellWidth:cW*0.15}, 6:{cellWidth:cW*0.14} },
+              head: [[`Teamwork (${meta.weights?.tw ?? 35}%)`, `Report (${meta.weights?.report ?? 35}%)`, `Presentation (${meta.weights?.pres ?? 30}%)`, 'Raw %', 'Adj. %', 'Final Grade', 'Letter Grade']],
+              body: [[`${stu.summary.teamworkPct}%`, `${stu.summary.reportPct}%`, `${stu.summary.presPct}%`, `${stu.summary.rawFinalGrade}%`, `${stu.summary.filteredFinalGrade}%`, `${stu.summary.finalGrade + (stu.summary.boosted ? 1 : 0)}%${stu.summary.boosted ? ' (+1)' : ''}`, stu.summary.letterGrade]],
             });
+            { const ny = doc.lastAutoTable.finalY + 3; doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(100,100,100); doc.text(`Outlier exclusion: ${meta.outlierRuleEnabled ? 'ON — Adj. % excludes outlier examiners' : 'OFF — Raw % and Adj. % are the same'}`, margin, ny); doc.setTextColor(0,0,0); }
           }
         }
 
@@ -3200,7 +3203,7 @@ const Res = {
       aoa.push([]);
 
       aoa.push(['#','Student Name','Student ID','Project Title','Type',
-                'Teamwork %','Report %','Presentation %','Weighted %','Final Grade','Letter Grade']);
+                'Teamwork %','Report %','Presentation %','Raw %','Adj. %','Final Grade','Letter Grade']);
       rows.forEach((r, i) => {
         const fg = r.finalGrade + (r.boosted ? 1 : 0);
         aoa.push([
@@ -3209,10 +3212,11 @@ const Res = {
           r.studentId,
           r.projectTitle,
           r.projectType,
-          r.teamworkPct + '%',
-          r.reportPct   + '%',
-          r.presPct     + '%',
-          r.finalGrade  + '%',
+          r.teamworkPct    + '%',
+          r.reportPct      + '%',
+          r.presPct        + '%',
+          r.rawFinalGrade  + '%',
+          r.filteredFinalGrade + '%',
           fg + '%' + (r.boosted ? ' ↑' : ''),
           r.letterGrade
         ]);
@@ -3245,7 +3249,7 @@ const Res = {
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       ws['!cols'] = [
         {wch:4},{wch:28},{wch:14},{wch:42},{wch:6},
-        {wch:11},{wch:10},{wch:15},{wch:11},{wch:13},{wch:13}
+        {wch:11},{wch:10},{wch:15},{wch:9},{wch:9},{wch:13},{wch:13}
       ];
       XLSX.utils.book_append_sheet(wb, ws, pt);
     }
