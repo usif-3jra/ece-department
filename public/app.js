@@ -2382,7 +2382,65 @@ const Res = {
             head: [['Type', 'Students', 'Mean Grade', 'Std Dev']],
             body: statRows,
           });
+          ys = doc.lastAutoTable.finalY + 6;
         }
+
+        // ── Grade Distribution Histograms ─────────────────────────────────────
+        const gradeOrder = ['A+','A','A-','B+','B','B-','C+','C','C-','D','D-','F'];
+        const gradeColors2 = {
+          'A+': [22,163,74], 'A': [22,163,74], 'A-': [22,163,74],
+          'B+': [37,99,235], 'B': [37,99,235], 'B-': [37,99,235],
+          'C+': [234,179,8], 'C': [234,179,8], 'C-': [234,179,8],
+          'D': [239,68,68], 'D-': [239,68,68], 'F': [127,29,29],
+        };
+        for (const fypType of fypTypesToExport) {
+          const typeProjectsForChart = res.projects.filter(p => p.type === fypType);
+          if (!typeProjectsForChart.length) continue;
+          const gradeCounts = {};
+          gradeOrder.forEach(g => { gradeCounts[g] = 0; });
+          typeProjectsForChart.forEach(proj => proj.students.forEach(stu => {
+            const lg = stu.summary.letterGrade;
+            if (Object.prototype.hasOwnProperty.call(gradeCounts, lg)) gradeCounts[lg]++;
+          }));
+          const maxCount = Math.max(1, ...gradeOrder.map(g => gradeCounts[g]));
+          const pageH = doc.internal.pageSize.getHeight();
+          if (ys + 60 > pageH - margin) { doc.addPage(); ys = margin; }
+          const chartH2 = 38, chartTop = ys + 8;
+          const barSlot = cW / gradeOrder.length;
+          const barW2   = barSlot - 3;
+
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...navy);
+          doc.text(`Grade Distribution — ${fypType}`, margin, ys + 4); ys += 8;
+          doc.setTextColor(0, 0, 0);
+
+          doc.setFillColor(248, 250, 252);
+          doc.rect(margin, chartTop, cW, chartH2 + 8, 'F');
+          doc.setDrawColor(220, 220, 220);
+          doc.rect(margin, chartTop, cW, chartH2 + 8);
+
+          gradeOrder.forEach((grade, i) => {
+            const count = gradeCounts[grade];
+            const bx = margin + i * barSlot + 1.5;
+            const maxBarH = chartH2 - 4;
+            const [r2, g2, b2] = gradeColors2[grade];
+            if (count > 0) {
+              const barH2 = Math.max(3, (count / maxCount) * maxBarH);
+              const barY2 = chartTop + chartH2 - barH2;
+              doc.setFillColor(r2, g2, b2);
+              doc.rect(bx, barY2, barW2, barH2, 'F');
+              doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(50, 50, 50);
+              doc.text(String(count), bx + barW2 / 2, barY2 - 1, { align: 'center' });
+            } else {
+              doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5); doc.setTextColor(180, 180, 180);
+              doc.text('N/A', bx + barW2 / 2, chartTop + chartH2 - 3, { align: 'center' });
+            }
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(50, 50, 50);
+            doc.text(grade, bx + barW2 / 2, chartTop + chartH2 + 6, { align: 'center' });
+          });
+
+          ys = chartTop + chartH2 + 16;
+        }
+
         // Per-student examiner grading pages (anonymized)
         for (const fypType of fypTypesToExport) {
           const examProjects = res.projects.filter(p => p.type === fypType);
