@@ -202,7 +202,11 @@
       <div class="topbar-title" id="sess-topbar-title">Session</div>
       <span class="topbar-sub" id="sess-topbar-sub"></span>
     </div>
-    <button class="btn-topbar" onclick="Export.open()"><i class="fas fa-download me-1"></i> Export Report</button>
+    <div style="text-align:right;margin-right:14px;line-height:1.5;min-width:0;flex-shrink:1;">
+      <div id="sess-info-date" style="font-size:11px;color:#cbd5e1;white-space:nowrap;"></div>
+      <div id="sess-info-modified" style="font-size:10px;color:#94a3b8;white-space:nowrap;"></div>
+    </div>
+    <button class="btn-topbar" style="flex-shrink:0;" onclick="Export.open()"><i class="fas fa-download me-1"></i> Export Report</button>
   </div>
   <div class="page-body">
     <div class="privacy-note mb-3"><i class="fas fa-lock me-1"></i> Your entries are <strong>private</strong> until the report is downloaded. All members' entries are combined at export time.</div>
@@ -244,7 +248,7 @@
             <div class="add-entry-item" onclick="Modal.open('B','journal')">Journal Paper<small>Paper published in a journal</small></div>
             <div class="add-entry-item" onclick="Modal.open('B','course_mod')">Course Modification<small>Changes to any course</small></div>
             <div class="add-entry-item" onclick="Modal.open('B','event')">Event / Activity<small>Event organized or participated in</small></div>
-            <div class="add-entry-item" onclick="Modal.open('B','dept_other')">Other<small>Committee roles, other activities</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','dept_other')">Others (Bullet Point List)<small>Committee roles, other activities</small></div>
           </div>
         </div>
       </div>
@@ -345,6 +349,13 @@ function fmtDate(d) {
   return dt.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
 }
 
+function fmtTime(t) {
+  if (!t) return '—';
+  const [h,m] = String(t).split(':');
+  const hr=parseInt(h), ampm=hr>=12?'PM':'AM', h12=hr%12||12;
+  return `${h12}:${m||'00'} ${ampm}`;
+}
+
 function fmtModified(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
@@ -399,8 +410,8 @@ async function translateToArabic(text) {
 
 // ── Auth ───────────────────────────────────────────────────────────────────
 const Auth = {
-  token: localStorage.getItem('mtg_token'),
-  supervisor: JSON.parse(localStorage.getItem('mtg_sup')||'null'),
+  token: sessionStorage.getItem('mtg_token'),
+  supervisor: JSON.parse(sessionStorage.getItem('mtg_sup')||'null'),
 
   async login() {
     const id = el('inp-id').value.trim();
@@ -411,8 +422,8 @@ const Auth = {
     el('btn-login').disabled=false; el('login-label').textContent='Sign In';
     if (!r.success){Auth.err(r.message||'Login failed.');return;}
     Auth.token=r.sessionToken; Auth.supervisor=r.supervisor;
-    localStorage.setItem('mtg_token',Auth.token);
-    localStorage.setItem('mtg_sup',JSON.stringify(Auth.supervisor));
+    sessionStorage.setItem('mtg_token',Auth.token);
+    sessionStorage.setItem('mtg_sup',JSON.stringify(Auth.supervisor));
     el('login-err').style.display='none';
     el('dash-sup-name').textContent=Auth.supervisor.name||'';
     showScreen('dash');
@@ -421,20 +432,13 @@ const Auth = {
 
   async logout() {
     if (Auth.token) await api('logoutSession',Auth.token).catch(()=>{});
-    localStorage.removeItem('mtg_token'); localStorage.removeItem('mtg_sup');
+    sessionStorage.removeItem('mtg_token'); sessionStorage.removeItem('mtg_sup');
     Auth.token=null; Auth.supervisor=null;
     showScreen('login');
   },
 
   err(msg){const e=el('login-err');e.textContent=msg;e.style.display='block';}
 };
-
-// Auto-login if token exists
-if (Auth.token && Auth.supervisor) {
-  el('dash-sup-name').textContent = Auth.supervisor.name||'';
-  showScreen('dash');
-  Dashboard.load && Dashboard.load();
-}
 
 // Enter key on login
 ['inp-id','inp-pw'].forEach(id=>el(id).addEventListener('keydown',e=>{if(e.key==='Enter')Auth.login();}));
@@ -506,6 +510,10 @@ const Session = {
     Session.info=s;
     el('sess-topbar-title').textContent=`${ordinal(s.session_number)} Session`;
     el('sess-topbar-sub').textContent=`Academic Year ${s.academic_year||''}`;
+    const mDate = s.meeting_date ? String(s.meeting_date).split('T')[0] : null;
+    const mTime = s.meeting_time ? String(s.meeting_time).substring(0,5) : null;
+    el('sess-info-date').textContent = (mDate ? fmtDate(mDate) : 'Date not set') + (mTime ? '  ·  ' + fmtTime(mTime) : '');
+    el('sess-info-modified').textContent = 'Modified: ' + fmtModified(s.last_modified_at);
     showScreen('session');
     const r = await api('getMySessionEntries',Auth.token,sessionId);
     Session.entries = r.success ? (r.entries||[]) : [];
@@ -545,7 +553,7 @@ const Session = {
 };
 
 function entryTypeLabel(t) {
-  const map={master_award:"Master's Award",phd_award:"PhD Award",master_defense:"Master Defense",phd_defense:"PhD Defense",student_other:"Other (Student)",conference:"Conference Paper",journal:"Journal Paper",course_mod:"Course Modification",event:"Event/Activity",dept_other:"Other (Department)",new_issue:"New Issue"};
+  const map={master_award:"Master's Award",phd_award:"PhD Award",master_defense:"Master Defense",phd_defense:"PhD Defense",student_other:"Other (Student)",conference:"Conference Paper",journal:"Journal Paper",course_mod:"Course Modification",event:"Event/Activity",dept_other:"Others (Bullet Point List)",new_issue:"New Issue"};
   return map[t]||t;
 }
 
@@ -634,10 +642,10 @@ const Modal = {
           <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
           <div class="form-group"><label class="form-label">Conference Name * <span class="form-hint d-inline">(include ordinal, e.g. "4th International Conference on…")</span></label><input class="form-control" id="f-conf" value="${esc(d.conference_name||'')}"/></div>
           <div class="row g-2">
-            <div class="col-6"><div class="form-group"><label class="form-label">Location</label><input class="form-control" id="f-loc" value="${esc(d.location||'')}" placeholder="Tokyo - Japan"/></div></div>
-            <div class="col-6"><div class="form-group"><label class="form-label">Date</label><input class="form-control" id="f-cdate" value="${esc(d.date||'')}" placeholder="October 2026"/></div></div>
+            <div class="col-6"><div class="form-group"><label class="form-label">Location *</label><input class="form-control" id="f-loc" value="${esc(d.location||'')}" placeholder="Tokyo - Japan"/></div></div>
+            <div class="col-6"><div class="form-group"><label class="form-label">Date *</label><input class="form-control" id="f-cdate" value="${esc(d.date||'')}" placeholder="October 2026"/></div></div>
           </div>
-          <div class="form-group"><label class="form-label">Author(s)</label><input class="form-control" id="f-author" value="${esc(d.author||'')}"/></div>`;
+          <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}"/></div>`;
 
       case 'journal': {
         const authors=d.authors||[];
@@ -645,13 +653,13 @@ const Modal = {
           <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
           <div class="form-group"><label class="form-label">Journal Name *</label><input class="form-control" id="f-jname" value="${esc(d.journal_name||'')}"/></div>
           <div class="row g-2">
-            <div class="col-3"><div class="form-group"><label class="form-label">Year</label><input class="form-control" id="f-year" value="${esc(d.year||'')}"/></div></div>
+            <div class="col-3"><div class="form-group"><label class="form-label">Year *</label><input class="form-control" id="f-year" value="${esc(d.year||'')}"/></div></div>
             <div class="col-3"><div class="form-group"><label class="form-label">Volume</label><input class="form-control" id="f-vol" value="${esc(d.volume||'')}"/></div></div>
             <div class="col-3"><div class="form-group"><label class="form-label">Issue</label><input class="form-control" id="f-iss" value="${esc(d.issue||'')}"/></div></div>
             <div class="col-3"><div class="form-group"><label class="form-label">Pages</label><input class="form-control" id="f-pgs" value="${esc(d.pages||'')}"/></div></div>
           </div>
           <div class="form-group"><label class="form-label">DOI / URL</label><input class="form-control" id="f-doi" value="${esc(d.doi||'')}" placeholder="https://doi.org/…"/></div>
-          <div class="form-group"><label class="form-label">Authors</label>
+          <div class="form-group"><label class="form-label">Authors *</label>
             <div id="author-chips">${authors.map(a=>`<span class="author-chip">${esc(a)}<button class="chip-rm" onclick="this.parentElement.remove()">×</button></span>`).join('')}</div>
             <div class="d-flex gap-2 mt-2"><input class="form-control" id="f-author-inp" placeholder="Author name" style="flex:1;"/><button class="btn-primary" style="padding:6px 14px;" onclick="Modal.addAuthor()">Add</button></div>
           </div>`;
@@ -732,8 +740,12 @@ const Modal = {
     const t=Modal.type;
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && (!data.student_name||!data.student_id||!data.program)) return 'Please fill Student Name, ID, and Program.';
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && !data.thesis_title_en) return 'Please enter the thesis title in English.';
+    if ((t==='master_defense'||t==='phd_defense') && (!data.jury?.[0]?.name||!data.jury?.[0]?.rank)) return 'Please fill the Main Supervisor\'s name and rank.';
     if (t==='conference' && (!data.title||!data.conference_name)) return 'Please enter the paper title and conference name.';
+    if (t==='conference' && (!data.location||!data.date||!data.author)) return 'Please fill Location, Date, and Author(s).';
     if (t==='journal' && (!data.title||!data.journal_name)) return 'Please enter the paper title and journal name.';
+    if (t==='journal' && !data.year) return 'Please enter the publication year.';
+    if (t==='journal' && (!data.authors||!data.authors.length)) return 'Please add at least one author.';
     if (t==='dept_other' && (!data.bullets||!data.bullets.length)) return 'Please add at least one bullet point.';
     if ((t==='student_other'||t==='course_mod'||t==='event'||t==='new_issue') && !data.text) return 'Please enter a description.';
     return null;
@@ -762,8 +774,12 @@ const Export = {
   allSessions:[],
   currentSessionId:null,
 
-  open() {
+  async open() {
     showScreen('export');
+    if (!Dashboard.sessions || !Dashboard.sessions.length) {
+      const r = await api('getMeetingSessions', Auth.token);
+      if (r.success) Dashboard.sessions = r.sessions || [];
+    }
     Export.allSessions=Dashboard.sessions||[];
     Export.currentSessionId=Session.id;
     const sel=el('exp-session');
