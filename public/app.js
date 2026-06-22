@@ -1940,9 +1940,10 @@ const Res = {
         }
         return;
       }
-      this.allResults  = res.results;
-      this.abetByType  = res.abetByType  || {};
-      this.statsByType = res.statsByType || {};
+      this.allResults        = res.results;
+      this.abetByType        = res.abetByType  || {};
+      this.statsByType       = res.statsByType || {};
+      this.outlierRuleEnabled = res.outlierRuleEnabled !== false;
       this._populateProgramFilter();
       this.applyFilter();
 
@@ -2081,6 +2082,11 @@ const Res = {
         ? ` <span title="Outlier detected &amp; excluded: ${(r.outlierDetails||[]).map(o=>o.criterion+' ('+o.score+')').join(', ')}" style="cursor:help;color:#d97706;">&#9888;</span>`
         : '';
       const boostedGrade = r.finalGrade + (r.boosted ? 1 : 0);
+      const rawGrade  = r.rawFinalGrade      !== undefined ? r.rawFinalGrade      : r.finalGrade;
+      const adjGrade  = r.filteredFinalGrade !== undefined ? r.filteredFinalGrade : r.finalGrade;
+      const gradesDiffer = rawGrade !== adjGrade;
+      const rawCellStyle  = gradesDiffer ? ' style="background:#fef9c3;font-weight:600;"' : '';
+      const adjCellStyle  = gradesDiffer ? ' style="background:#dcfce7;font-weight:600;"' : '';
       return `<tr>
         <td>${i + 1}</td>
         <td class="fw-medium">${escHtml(r.studentName)}${outlierTip}</td>
@@ -2090,7 +2096,8 @@ const Res = {
         <td>${r.teamworkPct}%${r.peerWarning ? ' <span title="No peer evaluations received — peer component counted as 0%" style="cursor:help;color:#d97706;font-weight:bold;">&#9888;</span>' : ''}</td>
         <td>${r.reportPct}%</td>
         <td>${r.presPct}%</td>
-        <td>${r.finalGrade}%</td>
+        <td${rawCellStyle}>${rawGrade}%</td>
+        <td${adjCellStyle}>${adjGrade}%</td>
         <td class="fw-bold">${boostedGrade}%${r.boosted ? ' <span class="badge bg-warning text-dark ms-1" title="Grade boundary boost applied" style="font-size:10px;">↑</span>' : ''}</td>
         <td class="text-center"><span class="grade-${escHtml(lc)} px-2 py-1 rounded">${escHtml(r.letterGrade)}</span></td>
       </tr>`;
@@ -3309,6 +3316,7 @@ const Admin = {
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
     this.loadDistributionAccess();
     this.loadBoostConfig();
+    this.loadOutlierRule();
     try {
       const res = await gsrAuth('getAllSupervisorsForAdmin');
       if (!res.success) throw new Error(res.message);
@@ -3458,6 +3466,36 @@ const Admin = {
       Toast.show(`Boost settings saved — ${active} of ${config.length} boundaries active.`);
     } catch(e) { Toast.show(e.message || e, 'error'); }
     finally { Spinner.hide(); }
+  },
+
+  async loadOutlierRule() {
+    const chk  = document.getElementById('toggle-outlier-rule');
+    const lbl  = document.getElementById('outlier-rule-label');
+    const hint = document.getElementById('outlier-rule-hint');
+    if (!chk) return;
+    try {
+      const r = await gsrAuth('getOutlierRuleEnabled');
+      if (!r || !r.success) return;
+      chk.checked = r.enabled;
+      if (lbl)  lbl.textContent  = r.enabled ? 'Enabled' : 'Disabled';
+      if (hint) hint.textContent = r.enabled
+        ? 'Final Grade and Letter Grade use the Adj. % column (outlier scores excluded).'
+        : 'Final Grade and Letter Grade use the Raw % column (all scores included).';
+    } catch(e) { if (lbl) lbl.textContent = 'Error loading setting.'; }
+  },
+
+  async saveOutlierRule(enabled) {
+    const lbl  = document.getElementById('outlier-rule-label');
+    const hint = document.getElementById('outlier-rule-hint');
+    try {
+      const r = await gsrAuth('setOutlierRuleEnabled', enabled);
+      if (!r || !r.success) { Toast.show(r?.message || 'Failed to save.', 'error'); return; }
+      if (lbl)  lbl.textContent  = enabled ? 'Enabled' : 'Disabled';
+      if (hint) hint.textContent = enabled
+        ? 'Final Grade and Letter Grade use the Adj. % column (outlier scores excluded).'
+        : 'Final Grade and Letter Grade use the Raw % column (all scores included).';
+      Toast.show(`Outlier exclusion rule ${enabled ? 'enabled' : 'disabled'}. Reload results to apply.`);
+    } catch(e) { Toast.show(e.message || e, 'error'); }
   },
 };
 

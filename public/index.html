@@ -103,7 +103,7 @@
             <i class="fas fa-key me-2 text-primary"></i>Change Password
           </a></li>
           <li><hr class="dropdown-divider"/></li>
-          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.22-06-26 R12</span></li>
+          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.22-06-26 R13</span></li>
         </ul>
       </div>
       <button class="btn btn-sm btn-danger" onclick="Auth.logout()" title="Logout">
@@ -602,11 +602,13 @@
             <tr>
               <th>#</th><th>Student Name</th><th>Student ID</th><th>Project Title</th>
               <th>Type</th><th>Teamwork %</th><th>Report %</th><th>Presentation %</th>
-              <th>Weighted %</th><th>Final Grade</th><th>Letter Grade</th>
+              <th title="Composite grade without outlier exclusion">Raw %</th>
+              <th title="Composite grade with outlier exclusion applied">Adj. %</th>
+              <th>Final Grade</th><th>Letter Grade</th>
             </tr>
           </thead>
           <tbody id="tbResults">
-            <tr><td colspan="11" class="text-center text-muted py-5">Click "Load Results" to compute and display grades.</td></tr>
+            <tr><td colspan="12" class="text-center text-muted py-5">Click "Load Results" to compute and display grades.</td></tr>
           </tbody>
         </table>
       </div>
@@ -760,6 +762,25 @@
           <button class="btn btn-warning btn-sm mt-2" onclick="Admin.saveBoostConfig()">
             <i class="fas fa-save me-1"></i>Save Boost Settings
           </button>
+        </div>
+
+        <!-- ── Outlier Exclusion Rule ── -->
+        <hr class="my-4"/>
+        <div>
+          <h6 class="mb-1 fw-bold">
+            <i class="fas fa-filter me-2 text-info"></i>Outlier Exclusion Rule
+          </h6>
+          <p class="text-muted small mb-2">
+            When enabled, the Modified Z-score algorithm automatically excludes statistical outlier examiner scores before computing the composite grade. The results table always shows both the Raw % (no exclusion) and Adj. % (with exclusion) columns so you can compare both.
+          </p>
+          <div class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" id="toggle-outlier-rule"
+                   onchange="Admin.saveOutlierRule(this.checked)" style="cursor:pointer;"/>
+            <label class="form-check-label fw-medium" for="toggle-outlier-rule" id="outlier-rule-label">
+              Loading…
+            </label>
+          </div>
+          <p class="text-muted small mb-0" id="outlier-rule-hint"></p>
         </div>
       </div>
       <div class="modal-footer">

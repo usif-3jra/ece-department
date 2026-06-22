@@ -1964,6 +1964,7 @@ module.exports = async function handler(req, res) {
         const supW  = parseFloat(cfg.supervisor_weight   || 80) / 100;
         const repW  = parseFloat(cfg.report_weight       || 35) / 100;
         const presW = parseFloat(cfg.presentation_weight || 30) / 100;
+        const outlierRuleEnabled = cfg.outlier_rule_enabled !== '0';
 
         const results = showableStudents.map(student => {
           const project = projects.find(p => p.project_id === student.project_id);
@@ -1983,45 +1984,46 @@ module.exports = async function handler(req, res) {
 
           const projExCfg = exCfg.filter(c => !c.project_type || c.project_type === pt);
 
-          // ── Report: outlier filtering then scope-aware per-student filter
+          // ── Report: always compute both raw and outlier-filtered grades
           const repCfg     = projExCfg.filter(c => c.category === 'Report');
           const rawRepG    = exGrades.filter(g => g.project_id === student.project_id && g.category === 'Report');
           const repExCount = new Set(rawRepG.map(g => g.assignment_id)).size;
           const { filteredGrades: repGClean, outlierLog: repOutliers } = repExCount >= 3
             ? filterOutlierGrades(rawRepG) : { filteredGrades: rawRepG, outlierLog: [] };
-          const repG   = repGClean.filter(g => {
-            const c = repCfg.find(cf => cf.criterion_name === g.criterion);
-            return c && c.grading_scope === 'Individual'
-              ? g.student_id === student.student_id
-              : (g.student_id === 'GROUP' || !g.student_id);
-          });
-          const repPct = weightedPct(repG.map(g => ({ Criterion: g.criterion, Score: g.score })), repCfg.map(c => ({ CriterionName: c.criterion_name, MaxGrade: c.max_grade, Weight: c.weight })));
+          const repCfgMap = c => ({ CriterionName: c.criterion_name, MaxGrade: c.max_grade, Weight: c.weight });
+          const repScope  = g => { const c = repCfg.find(cf => cf.criterion_name === g.criterion); return c && c.grading_scope === 'Individual' ? g.student_id === student.student_id : (g.student_id === 'GROUP' || !g.student_id); };
+          const repG          = repGClean.filter(repScope);
+          const rawRepGScoped = rawRepG.filter(repScope);
+          const repPct        = weightedPct(repG.map(g => ({ Criterion: g.criterion, Score: g.score })), repCfg.map(repCfgMap));
+          const rawRepPct     = weightedPct(rawRepGScoped.map(g => ({ Criterion: g.criterion, Score: g.score })), repCfg.map(repCfgMap));
 
-          // ── Presentation: outlier filtering then scope-aware per-student filter
+          // ── Presentation: always compute both raw and outlier-filtered grades
           const presCfg     = projExCfg.filter(c => c.category === 'Presentation');
           const rawPresG    = exGrades.filter(g => g.project_id === student.project_id && g.category === 'Presentation');
           const presExCount = new Set(rawPresG.map(g => g.assignment_id)).size;
           const { filteredGrades: presGClean, outlierLog: presOutliers } = presExCount >= 3
             ? filterOutlierGrades(rawPresG) : { filteredGrades: rawPresG, outlierLog: [] };
-          const presG   = presGClean.filter(g => {
-            const c = presCfg.find(cf => cf.criterion_name === g.criterion);
-            return c && c.grading_scope === 'Individual'
-              ? g.student_id === student.student_id
-              : (g.student_id === 'GROUP' || !g.student_id);
-          });
-          const presPct = weightedPct(presG.map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(c => ({ CriterionName: c.criterion_name, MaxGrade: c.max_grade, Weight: c.weight })));
+          const presCfgMap = c => ({ CriterionName: c.criterion_name, MaxGrade: c.max_grade, Weight: c.weight });
+          const presScope  = g => { const c = presCfg.find(cf => cf.criterion_name === g.criterion); return c && c.grading_scope === 'Individual' ? g.student_id === student.student_id : (g.student_id === 'GROUP' || !g.student_id); };
+          const presG          = presGClean.filter(presScope);
+          const rawPresGScoped = rawPresG.filter(presScope);
+          const presPct        = weightedPct(presG.map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(presCfgMap));
+          const rawPresPct     = weightedPct(rawPresGScoped.map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(presCfgMap));
 
-          const final = (twScore * twW) + (repPct * repW) + (presPct * presW);
-          const outliers = [...repOutliers, ...presOutliers];
+          const filteredFinal  = (twScore * twW) + (repPct    * repW) + (presPct    * presW);
+          const rawFinal       = (twScore * twW) + (rawRepPct * repW) + (rawPresPct * presW);
+          const outliers       = [...repOutliers, ...presOutliers];
+          const effectiveFinal = outlierRuleEnabled ? filteredFinal : rawFinal;
 
-          const finalRounded = Math.round(final);
+          const effectiveRounded = Math.round(effectiveFinal);
           return {
             studentId: student.student_id, studentName: student.student_name,
             projectId: student.project_id, projectTitle: project ? project.title : '—',
             projectType: pt, projectProgram: project ? (project.program_type || '') : '',
             teamworkPct: rnd(twScore), reportPct: rnd(repPct), presPct: rnd(presPct),
-            finalGrade: finalRounded, boosted: GRADE_BORDERS.includes(finalRounded),
-            letterGrade: letterGrade(final),
+            rawFinalGrade: Math.round(rawFinal), filteredFinalGrade: Math.round(filteredFinal),
+            finalGrade: effectiveRounded, boosted: GRADE_BORDERS.includes(effectiveRounded),
+            letterGrade: letterGrade(effectiveFinal),
             isSolo, peerWarning: !isSolo && peer.length === 0,
             outliersDetected: outliers.length > 0,
             outlierDetails: outliers.map(o => ({ criterion: o.criterion, score: o.score })),
@@ -2064,7 +2066,7 @@ module.exports = async function handler(req, res) {
           statsByType[pt] = { count: gr.length, mean: rnd(mean), sd: rnd(sd) };
         });
 
-        return ok({ success: true, results, abetByType, statsByType, incompleteByType: incompleteOut, completeTypes, partialPendingByType });
+        return ok({ success: true, results, abetByType, statsByType, incompleteByType: incompleteOut, completeTypes, partialPendingByType, outlierRuleEnabled });
       }
 
       case 'updateProject': {
@@ -2297,6 +2299,24 @@ module.exports = async function handler(req, res) {
         await sql`DELETE FROM tw_grades WHERE project_id = ${projectId}`;
         await sql`DELETE FROM students WHERE project_id = ${projectId}`;
         await sql`DELETE FROM projects WHERE project_id = ${projectId}`;
+        return ok({ success: true });
+      }
+
+      // ─── Outlier Rule Config ─────────────────────────────────────────────
+
+      case 'getOutlierRuleEnabled': {
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const cfg2 = await getTWConfig();
+        return ok({ success: true, enabled: cfg2.outlier_rule_enabled !== '0' });
+      }
+
+      case 'setOutlierRuleEnabled': {
+        const [token, enabled] = args;
+        const session = await verifySession(token);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        await sql`INSERT INTO tw_config (config_key, config_value) VALUES ('outlier_rule_enabled', ${enabled ? '1' : '0'}) ON CONFLICT (config_key) DO UPDATE SET config_value = ${enabled ? '1' : '0'}`;
         return ok({ success: true });
       }
 
