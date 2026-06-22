@@ -209,6 +209,7 @@
       <div id="sess-info-modified" style="font-size:10px;color:#94a3b8;white-space:nowrap;"></div>
     </div>
     <button class="btn-topbar" style="flex-shrink:0;" onclick="Export.open()"><i class="fas fa-download me-1"></i> Export Report</button>
+    <button class="btn-topbar" style="flex-shrink:0;" onclick="Auth.logout()" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
   </div>
   <div class="page-body">
     <div class="privacy-note mb-3"><i class="fas fa-lock me-1"></i> Your entries are <strong>private</strong> until the report is downloaded. All members' entries are combined at export time.</div>
@@ -283,6 +284,7 @@
       <div class="topbar-title">Export Meeting Report</div>
       <span class="topbar-sub">Generate PDF or Word document</span>
     </div>
+    <button class="btn-topbar" onclick="Auth.logout()" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
   </div>
   <div class="page-body">
     <div class="export-card">
@@ -312,6 +314,35 @@
         </button>
       </div>
       <p class="mt-3" style="font-size:12px;color:#94a3b8;"><i class="fas fa-info-circle me-1"></i>The report aggregates all members' entries. Entries are ordered by submission time within each section.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CREATE SESSION MODAL ══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="create-session-modal" onclick="if(event.target===this)el('create-session-modal').classList.remove('open')">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-calendar-plus me-2"></i>New Meeting Session</h3>
+      <button class="modal-close" onclick="el('create-session-modal').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#64748b;margin-bottom:16px;">You can set the meeting date and time now, or fill them in later from the Export screen.</p>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="export-label">Meeting Date <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
+          <input type="date" id="new-sess-date" class="export-input"/>
+        </div>
+        <div class="col-md-6">
+          <label class="export-label">Meeting Time <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
+          <input type="time" id="new-sess-time" class="export-input"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="el('create-session-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary" id="btn-confirm-create" onclick="Dashboard.confirmCreate()">
+        <i class="fas fa-plus me-1"></i> Create Session
+      </button>
     </div>
   </div>
 </div>
@@ -478,25 +509,21 @@ function reshapeArabic(text) {
 let _arabicFontCache = null;
 async function loadArabicFont() {
   if (_arabicFontCache !== null) return _arabicFontCache;
-  const urls = [
-    'https://cdn.jsdelivr.net/npm/@fontsource/amiri@5/files/amiri-arabic-400-normal.woff2',
-    'https://unpkg.com/@fontsource/amiri@5/files/amiri-arabic-400-normal.woff2',
-  ];
-  for (const url of urls) {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 8000);
-      const resp = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(tid);
-      if (!resp.ok) continue;
+  // jsPDF requires TTF format; serve Amiri-Regular.ttf from /assets/ for real Arabic text
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch('/assets/Amiri-Regular.ttf', { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (resp.ok) {
       const buf = await resp.arrayBuffer();
       const u8 = new Uint8Array(buf);
       let b64 = '';
       for (let i = 0; i < u8.length; i += 4096) b64 += String.fromCharCode(...u8.subarray(i, i+4096));
       _arabicFontCache = btoa(b64);
       return _arabicFontCache;
-    } catch {}
-  }
+    }
+  } catch {}
   _arabicFontCache = false;
   return false;
 }
@@ -634,12 +661,28 @@ const Dashboard = {
     await Dashboard.load();
   },
 
-  async createSession() {
-    if (!confirm('Create a new meeting session?')) return;
-    const r = await api('createMeetingSession',Auth.token);
-    if (!r.success){alert(r.message||'Error creating session.');return;}
-    await Dashboard.load();
-    Session.load(r.session.id);
+  createSession() {
+    el('new-sess-date').value = '';
+    el('new-sess-time').value = '';
+    el('create-session-modal').classList.add('open');
+  },
+  async confirmCreate() {
+    const btn = el('btn-confirm-create');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creating…';
+    try {
+      const r = await api('createMeetingSession', Auth.token);
+      if (!r.success) { alert(r.message || 'Error creating session.'); return; }
+      const date = el('new-sess-date').value || null;
+      const time = el('new-sess-time').value || null;
+      if (date || time) await api('updateSessionDetails', Auth.token, r.session.id, date, time);
+      el('create-session-modal').classList.remove('open');
+      await Dashboard.load();
+      Session.load(r.session.id);
+    } catch(e) {
+      alert('Error: ' + (e.message || 'Unknown error'));
+    } finally {
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus me-1"></i> Create Session';
+    }
   }
 };
 
@@ -687,7 +730,8 @@ const Session = {
     el('sess-info-date').textContent = 'Meeting Date: ' + (mDate ? fmtDate(mDate) + (mTime ? ' at ' + fmtTime(mTime) : '') : 'Not Scheduled');
     el('sess-info-modified').textContent = 'Last Entry Made: ' + fmtModified(s.last_modified_at);
     showScreen('session');
-    const r = Auth.isDelegate
+    const isSuperUser = Auth.isDelegate || Auth.supervisor?.isAdmin;
+    const r = isSuperUser
       ? await api('getAllSessionEntries',Auth.token,sessionId)
       : await api('getMySessionEntries',Auth.token,sessionId);
     Session.entries = r.success ? (r.entries||[]) : [];
@@ -695,6 +739,7 @@ const Session = {
   },
 
   render() {
+    const isSuperUser = Auth.isDelegate || Auth.supervisor?.isAdmin;
     ['A','B','C'].forEach(sec=>{
       const secEntries = Session.entries.filter(e=>e.section===sec);
       const container = el('entries-'+sec);
@@ -704,10 +749,10 @@ const Session = {
       }
       container.innerHTML=secEntries.map((e,i)=>{
         const isOwn = !e.supervisor_id || e.supervisor_id === Auth.supervisor?.id;
-        const canEdit = isOwn || Auth.isDelegate;
+        const canEdit = isOwn || isSuperUser;
         const d = e.entry_data || {};
         let byLine = '';
-        if (Auth.isDelegate && e.actual_supervisor_name) {
+        if (isSuperUser && e.actual_supervisor_name) {
           const attrName = d.__attributedName;
           byLine = `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">` +
             `By: ${esc(e.actual_supervisor_name)}` +
@@ -1108,13 +1153,13 @@ const Export = {
       const margin=18, pageW=210, cW=pageW-2*margin;
       const navy=[10,31,68];
 
-      // ── Embed Arabic font (Amiri) for real text rendering ──
+      // ── Embed Arabic font (Amiri TTF from /assets/) for real text rendering ──
       let pdfHasArabic = false;
       try {
         const fontB64 = await loadArabicFont();
         if (fontB64) {
-          doc.addFileToVFS('Amiri-Regular.woff2', fontB64);
-          doc.addFont('Amiri-Regular.woff2', 'Amiri', 'normal');
+          doc.addFileToVFS('Amiri-Regular.ttf', fontB64);
+          doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
           pdfHasArabic = true;
         }
       } catch {}
@@ -1192,13 +1237,16 @@ const Export = {
         doc.setFontSize(9); doc.setTextColor(30,30,30);
         info.lines.forEach((line,li)=>{
           if (line&&typeof line==='object'&&line.arabic){
+            let arabicDone=false;
             if(pdfHasArabic){
-              // Real Arabic vector text
-              doc.setFont('Amiri','normal'); doc.setFontSize(11);
-              doc.text(reshapeArabic(line.arabic),txtX+txtW,ys,{align:'right'});
-              doc.setFontSize(9);
-            } else {
-              // Fallback: canvas image
+              try {
+                doc.setFont('Amiri','normal'); doc.setFontSize(11);
+                doc.text(reshapeArabic(line.arabic),txtX+txtW,ys,{align:'right'});
+                doc.setFontSize(9); doc.setFont('helvetica','normal');
+                arabicDone=true;
+              } catch { pdfHasArabic=false; } // font failed; fall through to canvas
+            }
+            if(!arabicDone){
               const img=arabicTextToImg(line.arabic);
               if(img){const ih=lineH,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.2,iw,ih);}
             }
@@ -1296,33 +1344,46 @@ const Export = {
   },
 
   async _generateWordDocx(D, sess, sections, timeStr) {
-    const navy={r:10,g:31,b:68};
     const children=[];
 
-    // Logo
+    // ── Fetch logo for Word header ──
     let logoBlob=null; let logoNW=0, logoNH=0;
     try {
       const resp=await fetch('/assets/logo_meeting_report.png');
-      const ab=await resp.arrayBuffer();
-      logoBlob=ab;
-      await new Promise(res=>{const img=new Image();img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};img.src=URL.createObjectURL(new Blob([ab]));});
+      if (resp.ok) {
+        const ab=await resp.arrayBuffer();
+        logoBlob=ab;
+        await new Promise(res=>{const img=new Image();img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};img.src=URL.createObjectURL(new Blob([ab]));});
+      }
     } catch{}
 
-    const tH=50, tW=logoNH>0?Math.round(tH*(logoNW/logoNH)):100;
-    const logoCell=new D.TableCell({
-      children:[logoBlob?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:tW,height:tH},type:'png'})]}):new D.Paragraph({text:''})],
-      width:{size:30,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
+    // ── Build header table (logo + faculty text) ──
+    const noBorder={style:D.BorderStyle.NONE,size:0,color:'FFFFFF'};
+    const hH=45, hW=logoNH>0?Math.round(hH*(logoNW/logoNH)):90;
+    const hLogoCell=new D.TableCell({
+      children:[logoBlob
+        ?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:hW,height:hH},type:'image/png'})]})
+        :new D.Paragraph({text:''})],
+      width:{size:38,type:D.WidthType.PERCENTAGE},
+      borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder},
+      verticalAlign:D.VerticalAlign.CENTER,
     });
-    const facCell=new D.TableCell({
+    const hFacCell=new D.TableCell({
       children:[
         new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'Faculty of Engineering',bold:true,color:'0a1f44',size:20})]}),
-        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})]})
+        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})]}),
       ],
-      width:{size:70,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},verticalAlign:D.VerticalAlign.CENTER,
+      width:{size:62,type:D.WidthType.PERCENTAGE},
+      borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder},
+      verticalAlign:D.VerticalAlign.CENTER,
     });
-    children.push(new D.Table({rows:[new D.TableRow({children:[logoCell,facCell]})],width:{size:100,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideH:{style:D.BorderStyle.NONE},insideV:{style:D.BorderStyle.NONE}}}));
-    children.push(new D.Paragraph({text:'',spacing:{after:80}}));
+    const headerTable=new D.Table({
+      rows:[new D.TableRow({children:[hLogoCell,hFacCell]})],
+      width:{size:100,type:D.WidthType.PERCENTAGE},
+      borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder,insideH:noBorder,insideV:noBorder},
+    });
 
+    // ── Document body (title block + sections) ──
     children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:'Electrical & Computer Engineering Department Meeting Agenda',bold:true,color:'0a1f44',size:26})]}));
     children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year||'—'}`,bold:true,color:'0a1f44',size:22})]}));
     children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`To be held on ${meetingDateStr(sess.meeting_date, timeStr)}`,color:'444444',size:20})]}));
@@ -1356,7 +1417,12 @@ const Export = {
       }
     });
 
-    const doc2=new D.Document({sections:[{properties:{},children}]});
+    // ── Assemble document with header ──
+    const sectionDef={properties:{},children};
+    if (D.Header) {
+      sectionDef.headers={default:new D.Header({children:[headerTable]})};
+    }
+    const doc2=new D.Document({sections:[sectionDef]});
     const blob=await D.Packer.toBlob(doc2);
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url;
