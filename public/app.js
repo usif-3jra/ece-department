@@ -2512,9 +2512,14 @@ const Res = {
 
         // ── Page 2: Grade Statistics, Distribution & ABET ────────────────────
         doc.addPage();
-        let ys = drawHdr(doc, `${fypType} — Grade Statistics & ABET Outcomes`);
+        let ys = drawHdr(doc, `${fypType} — ${program} — Grade Statistics & ABET Outcomes`);
 
-        const tStats = res.statistics[fypType];
+        // Compute stats only from the filtered students (program + FYP type), not global
+        const _filtGrades = typeProjects.flatMap(proj => proj.students.map(s => s.summary.finalGrade)).filter(v => v != null && !isNaN(Number(v))).map(Number);
+        const _filtCount  = _filtGrades.length;
+        const _filtMean   = _filtCount > 0 ? _filtGrades.reduce((a, b) => a + b, 0) / _filtCount : 0;
+        const _filtSd     = _filtCount > 0 ? Math.sqrt(_filtGrades.reduce((a, b) => a + Math.pow(b - _filtMean, 2), 0) / _filtCount) : 0;
+        const tStats = _filtCount > 0 ? { count: _filtCount, mean: _filtMean.toFixed(2), sd: _filtSd.toFixed(2) } : null;
         if (tStats) {
           doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...navy);
           doc.text('Grade Statistics', margin, ys + 4); ys += 8;
@@ -2525,7 +2530,7 @@ const Res = {
             bodyStyles: { fontSize: 8.5, cellPadding: 2.5, halign: 'center' },
             columnStyles: { 0: { fontStyle: 'bold', halign: 'left' } },
             head: [['Type', 'Students', 'Mean Grade', 'Standard Deviation']],
-            body: [[fypType, tStats.count, `${tStats.mean}%`, typeof tStats.sd === 'number' ? tStats.sd.toFixed(2) : tStats.sd]],
+            body: [[fypType, tStats.count, `${parseFloat(tStats.mean).toFixed(1)}%`, parseFloat(tStats.sd).toFixed(2)]],
           });
           ys = doc.lastAutoTable.finalY + 10;
         }
@@ -2580,7 +2585,9 @@ const Res = {
 
         ys = chartTop + chartH2 + 14;
 
-        const tAbet = res.abet[fypType];
+        // Use per-program ABET from getFinalResults cache if available; otherwise fall back to global
+        const _progAbet = (Res.abetByProgram && Res.abetByProgram[program]) ? Res.abetByProgram[program][fypType] : null;
+        const tAbet = _progAbet || (res.abet && res.abet[fypType]);
         if (tAbet) {
           const abetRows = abetKeys.map(k => {
             const v = tAbet[k];
