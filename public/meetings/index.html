@@ -21,12 +21,13 @@
     .screen{display:none;} .screen.active{display:block;}
 
     /* ── Login ── */
-    #scr-login{min-height:100vh;display:none;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a1f44 0%,#1e3a5f 100%);}
+    #scr-login{min-height:100vh;display:none;align-items:center;justify-content:center;position:relative;background:linear-gradient(135deg,#c7d9f5 0%,#d6e4ff 45%,#e2d8f5 100%);padding:20px;}
+    #scr-login::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 15% 20%,rgba(37,99,235,.18) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 85% 80%,rgba(124,58,237,.12) 0%,transparent 55%),radial-gradient(ellipse 30% 25% at 50% 50%,rgba(6,182,212,.10) 0%,transparent 50%);}
     #scr-login.active{display:flex;}
-    .login-card{background:#fff;border-radius:20px;padding:44px 40px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.25);}
-    .login-logo{height:60px;display:block;margin:0 auto 18px;}
-    .login-title{font-size:20px;font-weight:700;color:var(--navy);text-align:center;margin-bottom:4px;}
-    .login-sub{font-size:12.5px;color:#64748b;text-align:center;margin-bottom:28px;}
+    .login-card{position:relative;z-index:1;background:rgba(255,255,255,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.9);border-radius:24px;padding:44px 40px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(37,99,235,.15),0 4px 16px rgba(0,0,0,.08),inset 0 1px 0 #fff;}
+    .login-logo{height:86px;width:auto;object-fit:contain;display:block;margin:0 auto 22px;filter:drop-shadow(0 2px 10px rgba(37,99,235,.3));}
+    .login-title{font-size:21px;font-weight:700;color:var(--navy);text-align:center;margin-bottom:4px;letter-spacing:-.02em;}
+    .login-sub{font-size:12px;color:#64748b;text-align:center;margin-bottom:28px;}
     .login-label{font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;display:block;}
     .login-input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:14px;transition:border-color .2s;}
     .login-input:focus{outline:none;border-color:var(--accent);}
@@ -59,10 +60,12 @@
     .session-info p{font-size:12px;color:#64748b;}
     .session-modified{font-size:11px;color:#94a3b8;white-space:nowrap;}
     .session-arrow{color:#94a3b8;}
+    .btn-del-session{background:none;border:1px solid #fca5a5;color:#ef4444;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;flex-shrink:0;transition:all .15s;}
+    .btn-del-session:hover{background:#fef2f2;border-color:#ef4444;}
 
     /* ── Section panels ── */
-    .section-panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden;}
-    .section-header{background:var(--navy);color:#fff;padding:13px 20px;display:flex;align-items:center;justify-content:space-between;}
+    .section-panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;}
+    .section-header{background:var(--navy);color:#fff;padding:13px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:var(--radius) var(--radius) 0 0;}
     .section-header h2{font-size:14px;font-weight:700;margin:0;}
     .section-header small{font-size:11px;color:#94a3b8;display:block;margin-top:2px;}
     .section-body{padding:16px 20px;}
@@ -79,7 +82,7 @@
 
     /* ── Add entry dropdown ── */
     .add-entry-wrap{position:relative;display:inline-block;}
-    .add-entry-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:50;min-width:230px;padding:6px 0;display:none;}
+    .add-entry-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:150;min-width:230px;padding:6px 0;display:none;}
     .add-entry-menu.open{display:block;}
     .add-entry-item{padding:9px 16px;font-size:13px;cursor:pointer;color:#334155;display:flex;flex-direction:column;gap:2px;transition:background .12s;}
     .add-entry-item:hover{background:#f1f5f9;}
@@ -150,8 +153,7 @@
 <!-- ═══ LOGIN ═══════════════════════════════════════════════════════════════ -->
 <div id="scr-login" class="screen active">
   <div class="login-card">
-    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="login-logo"
-         onerror="this.src='https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png'"/>
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="BAU" class="login-logo"/>
     <p class="login-title">Department Meeting Organizer</p>
     <p class="login-sub">ECE Department — Faculty of Engineering — Beirut Arab University</p>
     <label class="login-label" for="inp-id">Supervisor ID</label>
@@ -454,7 +456,10 @@ const Dashboard = {
       list.innerHTML='<div class="empty-section" style="padding:40px;"><i class="fas fa-calendar-plus fa-2x mb-3 d-block" style="color:#cbd5e1;"></i>No sessions yet. Click "New Session" to start.</div>';
       return;
     }
-    list.innerHTML = Dashboard.sessions.map(s=>`
+    list.innerHTML = Dashboard.sessions.map(s=>{
+      const canDelete = Auth.supervisor && (Auth.supervisor.isAdmin || s.created_by === Auth.supervisor.id);
+      const delBtn = canDelete ? `<button class="btn-del-session" onclick="event.stopPropagation();Dashboard.deleteSession(${s.id})"><i class="fas fa-trash-alt"></i></button>` : '';
+      return `
       <div class="session-card" onclick="Session.load(${s.id})">
         <div class="session-num"><span>${s.session_number}</span>th</div>
         <div class="session-info">
@@ -462,13 +467,24 @@ const Dashboard = {
           <p>${s.meeting_date ? 'Scheduled: '+fmtDate(s.meeting_date) : '<em>Date not set</em>'}</p>
         </div>
         <div class="session-modified">Modified<br>${fmtModified(s.last_modified_at)}</div>
+        ${delBtn}
         <div class="session-arrow"><i class="fas fa-chevron-right"></i></div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     // Fix ordinal display
     list.querySelectorAll('.session-num').forEach((el,i)=>{
       const n=Dashboard.sessions[i].session_number;
       el.innerHTML=`<span>${n}</span>${ordinal(n).replace(n,'')}`;
     });
+  },
+
+  async deleteSession(sessionId) {
+    const s = Dashboard.sessions.find(x=>x.id===sessionId);
+    const label = s ? `${ordinal(s.session_number)} Session (${s.academic_year})` : `Session #${sessionId}`;
+    if (!confirm(`Delete ${label}?\n\nThis will permanently remove the session and all its entries.`)) return;
+    const r = await api('deleteSession', Auth.token, sessionId);
+    if (!r.success) { alert(r.message || 'Could not delete session.'); return; }
+    await Dashboard.load();
   },
 
   async createSession() {

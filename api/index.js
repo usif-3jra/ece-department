@@ -2327,7 +2327,7 @@ module.exports = async function handler(req, res) {
         const session = await verifySession(token);
         if (!session) return ok({ success: false, message: 'Session expired.' });
         await ensureMeetingTables(sql);
-        const rows = await sql`SELECT id, session_number, academic_year, meeting_date, meeting_time, last_modified_at FROM meeting_sessions ORDER BY session_number DESC`;
+        const rows = await sql`SELECT id, session_number, academic_year, meeting_date, meeting_time, created_by, last_modified_at FROM meeting_sessions ORDER BY session_number DESC`;
         return ok({ success: true, sessions: rows });
       }
 
@@ -2336,6 +2336,16 @@ module.exports = async function handler(req, res) {
         const session = await verifySession(token);
         if (!session) return ok({ success: false, message: 'Session expired.' });
         await ensureMeetingTables(sql);
+        const latestRows = await sql`SELECT session_number, created_at, meeting_date FROM meeting_sessions ORDER BY session_number DESC LIMIT 1`;
+        if (latestRows.length) {
+          const latest = latestRows[0];
+          const daysSinceCreated = (Date.now() - new Date(latest.created_at).getTime()) / (1000 * 60 * 60 * 24);
+          const meetingDatePassed = latest.meeting_date && new Date(latest.meeting_date) < new Date();
+          if (!meetingDatePassed && daysSinceCreated < 7) {
+            const daysLeft = Math.ceil(7 - daysSinceCreated);
+            return ok({ success: false, message: `Cannot create a new session yet. The previous session must be completed (meeting date set and passed) or at least 7 days must pass since it was created (${daysLeft} day(s) remaining).` });
+          }
+        }
         const maxRow = await sql`SELECT COALESCE(MAX(session_number), 13) AS mx FROM meeting_sessions`;
         const nextNum = Number(maxRow[0].mx) + 1;
         const now = new Date();
@@ -2386,6 +2396,29 @@ module.exports = async function handler(req, res) {
         const session = await verifySession(token);
         if (!session) return ok({ success: false, message: 'Session expired.' });
         await sql`UPDATE meeting_sessions SET meeting_date = ${meetingDate || null}, meeting_time = ${meetingTime || null}, last_modified_at = NOW() WHERE id = ${Number(sessionId)}`;
+        return ok({ success: true });
+      }
+
+      case 'deleteSession': {
+        const [token, sessionId] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMeetingTables(sql);
+        const sid = Number(sessionId);
+        if (session.is_admin) {
+          // Admin can delete any session (and its entries)
+          await sql`DELETE FROM meeting_entries WHERE session_id = ${sid}`;
+          await sql`DELETE FROM meeting_sessions WHERE id = ${sid}`;
+          return ok({ success: true });
+        }
+        // Non-admin: must be creator AND sole contributor
+        const sesRows = await sql`SELECT created_by FROM meeting_sessions WHERE id = ${sid}`;
+        if (!sesRows.length) return ok({ success: false, message: 'Session not found.' });
+        if (sesRows[0].created_by !== session.supervisor_id) return ok({ success: false, message: 'Only the session creator can delete this session.' });
+        const otherEntries = await sql`SELECT 1 FROM meeting_entries WHERE session_id = ${sid} AND supervisor_id <> ${session.supervisor_id} LIMIT 1`;
+        if (otherEntries.length) return ok({ success: false, message: 'Cannot delete: other members have already contributed to this session.' });
+        await sql`DELETE FROM meeting_entries WHERE session_id = ${sid}`;
+        await sql`DELETE FROM meeting_sessions WHERE id = ${sid}`;
         return ok({ success: true });
       }
 
