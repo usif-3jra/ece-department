@@ -2954,6 +2954,32 @@ const Res = {
       });
       y = doc.lastAutoTable.finalY + 5;
 
+      // ── Per-program grade stats sourced directly from results tab data ──
+      // Uses the identical finalGrade values already displayed on screen.
+      const _rndStat = v => Math.round(v * 10) / 10;
+      const _gstat = arr => {
+        const n = arr.length;
+        if (!n) return { avg: 0, std: 0, n: 0 };
+        const avg = arr.reduce((a, b) => a + b, 0) / n;
+        const std = Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / n);
+        return { avg: _rndStat(avg), std: _rndStat(std), n };
+      };
+      const _progGrades = {};
+      (Res.allResults || []).forEach(r => {
+        const pr = r.projectProgram || 'Unspecified';
+        if (!_progGrades[pr]) _progGrades[pr] = { FYP1: [], FYP2: [] };
+        if (r.finalGrade != null) (_progGrades[pr][r.projectType] || (_progGrades[pr][r.projectType] = [])).push(r.finalGrade);
+      });
+      const avgByProgramType = {};
+      progList.forEach(p => {
+        const g = _progGrades[p] || {};
+        avgByProgramType[p] = { FYP1: _gstat(g.FYP1 || []), FYP2: _gstat(g.FYP2 || []) };
+      });
+      const avgOverall = {
+        FYP1: _gstat((Res.allResults || []).filter(r => r.projectType === 'FYP1' && r.finalGrade != null).map(r => r.finalGrade)),
+        FYP2: _gstat((Res.allResults || []).filter(r => r.projectType === 'FYP2' && r.finalGrade != null).map(r => r.finalGrade)),
+      };
+
       // ═══════════════════════════════════════════════════════════════
       // PAGE 2 — Average Grade by Program & FYP Type
       // ═══════════════════════════════════════════════════════════════
@@ -2962,12 +2988,11 @@ const Res = {
 
       // Stats table — avg ± std dev
       y = groupHeader(y, 'Average Final Grade & Standard Deviation per Program (weighted composite student grades)');
-      const ov = res.avgOverall || {};
-      const ovf1 = ov.FYP1 || { avg: 0, std: 0, n: 0 };
-      const ovf2 = ov.FYP2 || { avg: 0, std: 0, n: 0 };
+      const ovf1 = avgOverall.FYP1 || { avg: 0, std: 0, n: 0 };
+      const ovf2 = avgOverall.FYP2 || { avg: 0, std: 0, n: 0 };
       const avgBody = [
         ...progList.map(p => {
-          const d = res.avgByProgramType[p] || {};
+          const d = avgByProgramType[p] || {};
           const f1 = d.FYP1 || { avg: 0, std: 0, n: 0 };
           const f2 = d.FYP2 || { avg: 0, std: 0, n: 0 };
           return [p,
@@ -3007,7 +3032,7 @@ const Res = {
       });
 
       progList.forEach((prog, gi) => {
-        const d  = res.avgByProgramType[prog] || {};
+        const d  = avgByProgramType[prog] || {};
         const f1 = d.FYP1 || { avg: 0, std: 0, n: 0 };
         const f2 = d.FYP2 || { avg: 0, std: 0, n: 0 };
         const gx = plotX + gi * groupW + groupW / 2;
