@@ -427,6 +427,80 @@ function justifyTextLine(doc, line, x, y, maxW) {
   words.forEach(word => { doc.text(word, xPos, y); xPos += doc.getTextWidth(word) + spaceW; });
 }
 
+// ── Arabic reshaping for jsPDF real-text rendering ──────────────────────────
+const _AR_FORMS = {
+  'ء':['ﺀ','ﺀ','ﺀ','ﺀ'],'آ':['ﺁ','ﺂ','ﺁ','ﺂ'],
+  'أ':['ﺃ','ﺄ','ﺃ','ﺄ'],'ؤ':['ﺅ','ﺆ','ﺅ','ﺆ'],
+  'إ':['ﺇ','ﺈ','ﺇ','ﺈ'],'ئ':['ﺉ','ﺊ','ﺋ','ﺌ'],
+  'ا':['ﺍ','ﺎ','ﺍ','ﺎ'],'ب':['ﺏ','ﺐ','ﺑ','ﺒ'],
+  'ة':['ﺓ','ﺔ','ﺓ','ﺔ'],'ت':['ﺕ','ﺖ','ﺗ','ﺘ'],
+  'ث':['ﺙ','ﺚ','ﺛ','ﺜ'],'ج':['ﺝ','ﺞ','ﺟ','ﺠ'],
+  'ح':['ﺡ','ﺢ','ﺣ','ﺤ'],'خ':['ﺥ','ﺦ','ﺧ','ﺨ'],
+  'د':['ﺩ','ﺪ','ﺩ','ﺪ'],'ذ':['ﺫ','ﺬ','ﺫ','ﺬ'],
+  'ر':['ﺭ','ﺮ','ﺭ','ﺮ'],'ز':['ﺯ','ﺰ','ﺯ','ﺰ'],
+  'س':['ﺱ','ﺲ','ﺳ','ﺴ'],'ش':['ﺵ','ﺶ','ﺷ','ﺸ'],
+  'ص':['ﺹ','ﺺ','ﺻ','ﺼ'],'ض':['ﺽ','ﺾ','ﺿ','ﻀ'],
+  'ط':['ﻁ','ﻂ','ﻃ','ﻄ'],'ظ':['ﻅ','ﻆ','ﻇ','ﻈ'],
+  'ع':['ﻉ','ﻊ','ﻋ','ﻌ'],'غ':['ﻍ','ﻎ','ﻏ','ﻐ'],
+  'ف':['ﻑ','ﻒ','ﻓ','ﻔ'],'ق':['ﻕ','ﻖ','ﻗ','ﻘ'],
+  'ك':['ﻙ','ﻚ','ﻛ','ﻜ'],'ل':['ﻝ','ﻞ','ﻟ','ﻠ'],
+  'م':['ﻡ','ﻢ','ﻣ','ﻤ'],'ن':['ﻥ','ﻦ','ﻧ','ﻨ'],
+  'ه':['ﻩ','ﻪ','ﻫ','ﻬ'],'و':['ﻭ','ﻮ','ﻭ','ﻮ'],
+  'ى':['ﻯ','ﻰ','ﻯ','ﻰ'],'ي':['ﻱ','ﻲ','ﻳ','ﻴ'],
+};
+// Letters that do not connect to the left (so next char starts a new word group)
+const _AR_NO_LEFT = new Set('ءآأؤإادذرزوى');
+const _LAM_ALEF = {
+  'ﻟ':{'ﺍ':'ﻻ','ﺎ':'ﻼ','ﺁ':'ﻵ','ﺂ':'ﻶ','ﺃ':'ﻷ','ﺄ':'ﻸ','ﺇ':'ﻹ','ﺈ':'ﻺ'},
+  'ﻠ':{'ﺍ':'ﻼ','ﺎ':'ﻼ','ﺁ':'ﻶ','ﺂ':'ﻶ','ﺃ':'ﻸ','ﺄ':'ﻸ','ﺇ':'ﻺ','ﺈ':'ﻺ'},
+};
+function reshapeArabic(text) {
+  if (!text) return '';
+  const chars = [...text];
+  const shaped = [];
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    const forms = _AR_FORMS[c];
+    if (!forms) { shaped.push(c); continue; }
+    const pC = i > 0 ? chars[i-1] : null, nC = i < chars.length-1 ? chars[i+1] : null;
+    const pJ = pC && _AR_FORMS[pC] && !_AR_NO_LEFT.has(pC);
+    const nJ = nC && _AR_FORMS[nC];
+    shaped.push(forms[pJ && nJ ? 3 : pJ ? 1 : nJ ? 2 : 0]);
+  }
+  const ligatured = [];
+  for (let i = 0; i < shaped.length; i++) {
+    const lig = _LAM_ALEF[shaped[i]]?.[shaped[i+1]];
+    if (lig) { ligatured.push(lig); i++; } else ligatured.push(shaped[i]);
+  }
+  return ligatured.reverse().join('');
+}
+
+let _arabicFontCache = null;
+async function loadArabicFont() {
+  if (_arabicFontCache !== null) return _arabicFontCache;
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/@fontsource/amiri@5/files/amiri-arabic-400-normal.woff2',
+    'https://unpkg.com/@fontsource/amiri@5/files/amiri-arabic-400-normal.woff2',
+  ];
+  for (const url of urls) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!resp.ok) continue;
+      const buf = await resp.arrayBuffer();
+      const u8 = new Uint8Array(buf);
+      let b64 = '';
+      for (let i = 0; i < u8.length; i += 4096) b64 += String.fromCharCode(...u8.subarray(i, i+4096));
+      _arabicFontCache = btoa(b64);
+      return _arabicFontCache;
+    } catch {}
+  }
+  _arabicFontCache = false;
+  return false;
+}
+
 async function api(action, ...args) {
   const r = await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,args})});
   return r.json();
@@ -610,8 +684,8 @@ const Session = {
     el('sess-topbar-sub').textContent=`Academic Year ${s.academic_year||''}`;
     const mDate = s.meeting_date ? String(s.meeting_date).split('T')[0] : null;
     const mTime = s.meeting_time ? String(s.meeting_time).substring(0,5) : null;
-    el('sess-info-date').textContent = (mDate ? fmtDate(mDate) : 'Date not set') + (mTime ? '  ·  ' + fmtTime(mTime) : '');
-    el('sess-info-modified').textContent = 'Modified: ' + fmtModified(s.last_modified_at);
+    el('sess-info-date').textContent = 'Meeting Date: ' + (mDate ? fmtDate(mDate) + (mTime ? ' at ' + fmtTime(mTime) : '') : 'Not Scheduled');
+    el('sess-info-modified').textContent = 'Last Entry Made: ' + fmtModified(s.last_modified_at);
     showScreen('session');
     const r = Auth.isDelegate
       ? await api('getAllSessionEntries',Auth.token,sessionId)
@@ -1034,6 +1108,17 @@ const Export = {
       const margin=18, pageW=210, cW=pageW-2*margin;
       const navy=[10,31,68];
 
+      // ── Embed Arabic font (Amiri) for real text rendering ──
+      let pdfHasArabic = false;
+      try {
+        const fontB64 = await loadArabicFont();
+        if (fontB64) {
+          doc.addFileToVFS('Amiri-Regular.woff2', fontB64);
+          doc.addFont('Amiri-Regular.woff2', 'Amiri', 'normal');
+          pdfHasArabic = true;
+        }
+      } catch {}
+
       // ── Load logo preserving aspect ratio ──
       const logoData=await new Promise(res=>{
         const img=new Image(); img.crossOrigin='anonymous';
@@ -1088,30 +1173,55 @@ const Export = {
 
       function renderEntry(sec, num, e) {
         const info=Export.entryText(e,num);
-        const numStr=`${sec}.${num}.`;
-        // Pre-calculate height
+        const numStr=`${sec}.${num}. `;
+        // Measure number prefix width at bold 9pt for indentation
+        doc.setFont('helvetica','bold'); doc.setFontSize(9);
+        const numW=doc.getTextWidth(numStr);
+        const indent=txtX+numW, innerW=txtW-numW;
+        // Pre-calculate total height
         let totalH=0;
         info.lines.forEach((line,li)=>{
           if (line&&typeof line==='object'&&line.arabic){totalH+=lineH;}
-          else{const prefix=li===0?numStr+' ':'     ';totalH+=doc.splitTextToSize(prefix+String(line),txtW).length*lineH;}
+          else{
+            if(li===0)doc.setFont('helvetica','bold'); else doc.setFont('helvetica','normal');
+            doc.setFontSize(9);
+            totalH+=doc.splitTextToSize(String(line),innerW).length*lineH;
+          }
         });
         addPageIfNeeded(totalH+4);
-        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
-        let isFirst=true;
+        doc.setFontSize(9); doc.setTextColor(30,30,30);
         info.lines.forEach((line,li)=>{
           if (line&&typeof line==='object'&&line.arabic){
-            // Render Arabic via canvas image
-            const img=arabicTextToImg(line.arabic);
-            if(img){const ih=lineH,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.2,iw,ih);}
+            if(pdfHasArabic){
+              // Real Arabic vector text
+              doc.setFont('Amiri','normal'); doc.setFontSize(11);
+              doc.text(reshapeArabic(line.arabic),txtX+txtW,ys,{align:'right'});
+              doc.setFontSize(9);
+            } else {
+              // Fallback: canvas image
+              const img=arabicTextToImg(line.arabic);
+              if(img){const ih=lineH,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.2,iw,ih);}
+            }
             ys+=lineH;
-          } else {
-            const prefix=li===0?numStr+' ':'     ';
-            const wrapped=doc.splitTextToSize(prefix+String(line),txtW);
+          } else if(li===0){
+            // First sentence: BOLD throughout, number prefix at left, content indented
+            doc.setFont('helvetica','bold');
+            doc.text(numStr,txtX,ys);
+            const wrapped=doc.splitTextToSize(String(line),innerW);
             wrapped.forEach((wLine,wi)=>{
               const isLast=wi===wrapped.length-1;
-              if(isFirst){doc.setFont('helvetica','bold');doc.text(wLine,txtX,ys);doc.setFont('helvetica','normal');isFirst=false;}
-              else if(!isLast&&wLine.trim().split(/\s+/).length>1){justifyTextLine(doc,wLine,txtX,ys,txtW);}
-              else{doc.text(wLine,txtX,ys);}
+              if(!isLast&&wLine.trim().split(/\s+/).length>1){justifyTextLine(doc,wLine,indent,ys,innerW);}
+              else{doc.text(wLine,indent,ys);}
+              ys+=lineH;
+            });
+          } else {
+            // Subsequent lines: normal weight, aligned to same indent
+            doc.setFont('helvetica','normal');
+            const wrapped=doc.splitTextToSize(String(line),innerW);
+            wrapped.forEach((wLine,wi)=>{
+              const isLast=wi===wrapped.length-1;
+              if(!isLast&&wLine.trim().split(/\s+/).length>1){justifyTextLine(doc,wLine,indent,ys,innerW);}
+              else{doc.text(wLine,indent,ys);}
               ys+=lineH;
             });
           }
