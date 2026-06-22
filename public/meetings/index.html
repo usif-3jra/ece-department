@@ -692,7 +692,7 @@ const Delegates = {
     el('delegate-modal').classList.add('open');
     el('delegate-body').innerHTML='<div class="text-center py-4"><div class="spinner" style="border-top-color:var(--accent);border-color:#e2e8f0;width:24px;height:24px;margin:auto;"></div></div>';
     const [supR,delR] = await Promise.all([api('getMeetingSupervisors',Auth.token), api('getMeetingDelegates',Auth.token)]);
-    if (!supR.success||!delR.success){el('delegate-body').innerHTML='<p class="text-danger p-3">Failed to load data.</p>';return;}
+    if (!supR.success||!delR.success){const msg=(delR.message||supR.message||'Server error');el('delegate-body').innerHTML=`<p class="text-danger p-3">Failed to load data.<br><small style="opacity:.75">${esc(msg)}</small></p>`;return;}
     const delegateSet=new Set(delR.delegates.map(d=>d.supervisor_id));
     el('delegate-body').innerHTML=`
       <p class="form-hint mb-3">Delegates can view, edit, and delete all members' entries. They can also add entries on behalf of other supervisors.</p>
@@ -730,10 +730,14 @@ const Session = {
     el('sess-info-date').textContent = 'Meeting Date: ' + (mDate ? fmtDate(mDate) + (mTime ? ' at ' + fmtTime(mTime) : '') : 'Not Scheduled');
     el('sess-info-modified').textContent = 'Last Entry Made: ' + fmtModified(s.last_modified_at);
     showScreen('session');
-    const isSuperUser = Auth.isDelegate || Auth.supervisor?.isAdmin;
+    const isSuperUser = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
     const r = isSuperUser
       ? await api('getAllSessionEntries',Auth.token,sessionId)
       : await api('getMySessionEntries',Auth.token,sessionId);
+    if (isSuperUser && !r.success) {
+      ['A','B','C'].forEach(s=>{ el('entries-'+s).innerHTML=`<div class="empty-section" style="color:#ef4444;"><i class="fas fa-exclamation-circle fa-lg mb-2 d-block"></i>${esc(r.message||'Could not load all entries.')}</div>`; });
+      return;
+    }
     Session.entries = r.success ? (r.entries||[]) : [];
     Session.render();
   },
@@ -1352,8 +1356,8 @@ const Export = {
       const resp=await fetch('/assets/logo_meeting_report.png');
       if (resp.ok) {
         const ab=await resp.arrayBuffer();
-        logoBlob=ab;
-        await new Promise(res=>{const img=new Image();img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};img.src=URL.createObjectURL(new Blob([ab]));});
+        logoBlob=new Uint8Array(ab);
+        await new Promise(res=>{const img=new Image();img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};img.onerror=()=>res();img.src=URL.createObjectURL(new Blob([ab]));setTimeout(res,3000);});
       }
     } catch{}
 
@@ -1362,7 +1366,7 @@ const Export = {
     const hH=45, hW=logoNH>0?Math.round(hH*(logoNW/logoNH)):90;
     const hLogoCell=new D.TableCell({
       children:[logoBlob
-        ?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:hW,height:hH},type:'image/png'})]})
+        ?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:hW,height:hH},type:'png'})]})
         :new D.Paragraph({text:''})],
       width:{size:38,type:D.WidthType.PERCENTAGE},
       borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder},
@@ -1406,10 +1410,21 @@ const Export = {
                 bidirectional:true,
                 indent:{left:400},spacing:{after:40}
               }));
+            } else if (li===0) {
+              // Hanging indent: number starts at 100 twips, wrapped content aligns at 460
+              children.push(new D.Paragraph({
+                children:[
+                  new D.TextRun({text:`${sec}.${i+1}. `,bold:true,size:18,color:'0a1f44'}),
+                  new D.TextRun({text:String(line),bold:true,size:18,color:'0a1f44'})
+                ],
+                indent:{left:460,hanging:360},
+                spacing:{after:info.lines.length===1?160:40}
+              }));
             } else {
               children.push(new D.Paragraph({
-                children:[new D.TextRun({text:li===0?`${sec}.${i+1}.  ${String(line)}`:String(line),bold:li===0,size:18,color:li===0?'0a1f44':'333333'})],
-                indent:{left:li===0?100:400},spacing:{after:li===info.lines.length-1?160:40}
+                children:[new D.TextRun({text:String(line),size:18,color:'333333'})],
+                indent:{left:460},
+                spacing:{after:li===info.lines.length-1?160:40}
               }));
             }
           });
@@ -1420,7 +1435,12 @@ const Export = {
     // ── Assemble document with header ──
     const sectionDef={properties:{},children};
     if (D.Header) {
-      sectionDef.headers={default:new D.Header({children:[headerTable]})};
+      try { sectionDef.headers={default:new D.Header({children:[headerTable]})}; } catch{}
+    }
+    // Fallback: if header was not set, prepend logo table into document body
+    if (!sectionDef.headers) {
+      children.unshift(new D.Paragraph({text:'',spacing:{after:80}}));
+      children.unshift(headerTable);
     }
     const doc2=new D.Document({sections:[sectionDef]});
     const blob=await D.Packer.toBlob(doc2);

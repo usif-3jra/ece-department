@@ -220,7 +220,13 @@ async function getActiveBorders(sql) {
 }
 
 // ── Meeting Organizer table setup ─────────────────────────────────────────
+let _meetingTablesReady  = false;
+let _pubSettingsReady    = false;
+let _feedbackTableReady  = false;
+let _distAccessReady     = false;
+let _delegateTablesReady = false;
 async function ensureMeetingTables(sql) {
+  if (_meetingTablesReady) return;
   await sql`CREATE TABLE IF NOT EXISTS meeting_sessions (
     id               SERIAL PRIMARY KEY,
     session_number   INT NOT NULL,
@@ -241,6 +247,26 @@ async function ensureMeetingTables(sql) {
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
+  _meetingTablesReady = true;
+}
+async function ensureDelegateTables(sql) {
+  if (_delegateTablesReady) return;
+  await sql`CREATE TABLE IF NOT EXISTS meeting_delegates (
+    supervisor_id VARCHAR(50) PRIMARY KEY,
+    granted_by    VARCHAR(50) NOT NULL,
+    granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  _delegateTablesReady = true;
+}
+async function isMeetingDelegate(sql, supervisorId) {
+  await ensureDelegateTables(sql);
+  const rows = await sql`SELECT 1 FROM meeting_delegates WHERE supervisor_id = ${supervisorId}`;
+  return rows.length > 0;
+}
+// Robust admin check: accepts both the stored is_admin flag AND a direct ID match
+// (guards against sessions created before is_admin was reliably stored)
+function isAdminUser(session) {
+  return !!(session && (session.is_admin || session.supervisor_id === ADMIN_ID));
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────
@@ -987,10 +1013,13 @@ module.exports = async function handler(req, res) {
         const from = session.name || session.supervisor_id;
         const ts   = new Date().toISOString();
         // Always store in DB first so feedback is never lost
-        await sql`CREATE TABLE IF NOT EXISTS feedback (
-          id TEXT PRIMARY KEY, supervisor_id TEXT, supervisor_name TEXT,
-          program TEXT, message TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(), is_read BOOLEAN DEFAULT FALSE
-        )`;
+        if (!_feedbackTableReady) {
+          await sql`CREATE TABLE IF NOT EXISTS feedback (
+            id TEXT PRIMARY KEY, supervisor_id TEXT, supervisor_name TEXT,
+            program TEXT, message TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(), is_read BOOLEAN DEFAULT FALSE
+          )`;
+          _feedbackTableReady = true;
+        }
         await sql`INSERT INTO feedback (id, supervisor_id, supervisor_name, program, message, submitted_at)
                   VALUES (${uid('FB')}, ${session.supervisor_id}, ${from}, ${session.program || ''}, ${String(message || '')}, ${ts})`;
         // Email notification — always to admin's personal email
@@ -1018,10 +1047,13 @@ module.exports = async function handler(req, res) {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
-        await sql`CREATE TABLE IF NOT EXISTS feedback (
-          id TEXT PRIMARY KEY, supervisor_id TEXT, supervisor_name TEXT,
-          program TEXT, message TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(), is_read BOOLEAN DEFAULT FALSE
-        )`;
+        if (!_feedbackTableReady) {
+          await sql`CREATE TABLE IF NOT EXISTS feedback (
+            id TEXT PRIMARY KEY, supervisor_id TEXT, supervisor_name TEXT,
+            program TEXT, message TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(), is_read BOOLEAN DEFAULT FALSE
+          )`;
+          _feedbackTableReady = true;
+        }
         const rows = await sql`SELECT * FROM feedback ORDER BY submitted_at DESC`;
         await sql`UPDATE feedback SET is_read = TRUE WHERE is_read = FALSE`;
         return ok({ success: true, feedbacks: rows.map(r => ({
@@ -1036,10 +1068,13 @@ module.exports = async function handler(req, res) {
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ count: 0 });
         try {
-          await sql`CREATE TABLE IF NOT EXISTS feedback (
-            id TEXT PRIMARY KEY, supervisor_id TEXT, supervisor_name TEXT,
-            program TEXT, message TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(), is_read BOOLEAN DEFAULT FALSE
-          )`;
+          if (!_feedbackTableReady) {
+            await sql`CREATE TABLE IF NOT EXISTS feedback (
+              id TEXT PRIMARY KEY, supervisor_id TEXT, supervisor_name TEXT,
+              program TEXT, message TEXT, submitted_at TIMESTAMPTZ DEFAULT NOW(), is_read BOOLEAN DEFAULT FALSE
+            )`;
+            _feedbackTableReady = true;
+          }
           const rows = await sql`SELECT COUNT(*) AS cnt FROM feedback WHERE is_read = FALSE`;
           return ok({ count: Number(rows[0]?.cnt || 0) });
         } catch { return ok({ count: 0 }); }
@@ -1542,6 +1577,7 @@ module.exports = async function handler(req, res) {
         const supW  = parseFloat(cfg.supervisor_weight   || 80) / 100;
         const repW  = parseFloat(cfg.report_weight       || 35) / 100;
         const presW = parseFloat(cfg.presentation_weight || 30) / 100;
+        const outlierRuleEnabled = cfg.outlier_rule_enabled !== '0';
 
         let projects = await filterProjectsBySession(session, allProjects, allSups);
 
@@ -1613,16 +1649,40 @@ module.exports = async function handler(req, res) {
 
             const repTable  = buildExTable(repExaminers,  repCfg,  'Report',       sid, session.is_admin);
             const presTable = buildExTable(presExaminers, presCfg, 'Presentation', sid, session.is_admin);
-            const repPct    = repTable  ? repTable.pct  : 0;
-            const presPct   = presTable ? presTable.pct : 0;
-            const final     = (twScore * twW) + (repPct * repW) + (presPct * presW);
+
+            // Compute raw and outlier-filtered pcts (mirrors getFinalResults logic)
+            const rawRepAllG   = projGrades.filter(g => g.category === 'Report');
+            const rawPresAllG  = projGrades.filter(g => g.category === 'Presentation');
+            const repExCnt     = new Set(rawRepAllG.map(g => g.assignment_id)).size;
+            const presExCnt    = new Set(rawPresAllG.map(g => g.assignment_id)).size;
+            const { filteredGrades: repGFilt }  = repExCnt  >= 3 ? filterOutlierGrades(rawRepAllG)  : { filteredGrades: rawRepAllG };
+            const { filteredGrades: presGFilt } = presExCnt >= 3 ? filterOutlierGrades(rawPresAllG) : { filteredGrades: rawPresAllG };
+            const exCfgMapFn   = c => ({ CriterionName: c.criterion_name, MaxGrade: c.max_grade, Weight: c.weight });
+            const repScopeFn   = g => { const c = repCfg.find(cf => cf.criterion_name === g.criterion); return (c && c.grading_scope === 'Individual') ? g.student_id === sid : (g.student_id === 'GROUP' || !g.student_id); };
+            const presScopeFn  = g => { const c = presCfg.find(cf => cf.criterion_name === g.criterion); return (c && c.grading_scope === 'Individual') ? g.student_id === sid : (g.student_id === 'GROUP' || !g.student_id); };
+            const rawRepPct    = weightedPct(rawRepAllG.filter(repScopeFn).map(g => ({ Criterion: g.criterion, Score: g.score })), repCfg.map(exCfgMapFn));
+            const filtRepPct   = weightedPct(repGFilt.filter(repScopeFn).map(g => ({ Criterion: g.criterion, Score: g.score })), repCfg.map(exCfgMapFn));
+            const rawPresPct   = weightedPct(rawPresAllG.filter(presScopeFn).map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(exCfgMapFn));
+            const filtPresPct  = weightedPct(presGFilt.filter(presScopeFn).map(g => ({ Criterion: g.criterion, Score: g.score })), presCfg.map(exCfgMapFn));
+            const rawFinal      = (twScore * twW) + (rawRepPct  * repW) + (rawPresPct  * presW);
+            const filteredFinal = (twScore * twW) + (filtRepPct * repW) + (filtPresPct * presW);
+            const effectiveFinal = outlierRuleEnabled ? filteredFinal : rawFinal;
 
             return {
               studentId: sid, studentName: student.student_name,
               isSolo: projStudents.length === 1,
               twDetails, peerDetails, indPct: rnd(indPct), peerPct: rnd(peerPct), twScore: rnd(twScore),
               repTable, presTable,
-              summary: { teamworkPct: rnd(twScore), reportPct: rnd(repPct), presPct: rnd(presPct), finalGrade: Math.round(final), boosted: GRADE_BORDERS.includes(Math.round(final)), letterGrade: letterGrade(final) },
+              summary: {
+                teamworkPct: rnd(twScore),
+                reportPct: rnd(filtRepPct),
+                presPct: rnd(filtPresPct),
+                rawFinalGrade: Math.round(rawFinal),
+                filteredFinalGrade: Math.round(filteredFinal),
+                finalGrade: Math.round(effectiveFinal),
+                boosted: GRADE_BORDERS.includes(Math.round(effectiveFinal)),
+                letterGrade: letterGrade(effectiveFinal),
+              },
             };
           });
 
@@ -1669,7 +1729,8 @@ module.exports = async function handler(req, res) {
         const now = new Date();
         return ok({ success: true, projects: projectDetails, statistics: statsByType, abet: abetByType,
           meta: { year: `${now.getFullYear()}–${now.getFullYear()+1}`, semester: cfg.semester || '', department: 'ECE',
-            weights: { tw: Math.round(twW*100), report: Math.round(repW*100), pres: Math.round(presW*100) } } });
+            weights: { tw: Math.round(twW*100), report: Math.round(repW*100), pres: Math.round(presW*100) },
+            outlierRuleEnabled } });
       }
 
       // ─── Criteria Grade Distribution (Admin statistical report) ──────
@@ -1973,10 +2034,13 @@ module.exports = async function handler(req, res) {
           // Non-admin: program publish / unlock settings gate per-type visibility
           let pubRows = [];
           try {
-            await sql`CREATE TABLE IF NOT EXISTS program_publish_settings (
-              program_name TEXT PRIMARY KEY, unlocked_fyp1 BOOLEAN NOT NULL DEFAULT FALSE,
-              unlocked_fyp2 BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )`;
+            if (!_pubSettingsReady) {
+              await sql`CREATE TABLE IF NOT EXISTS program_publish_settings (
+                program_name TEXT PRIMARY KEY, unlocked_fyp1 BOOLEAN NOT NULL DEFAULT FALSE,
+                unlocked_fyp2 BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              )`;
+              _pubSettingsReady = true;
+            }
             pubRows = await sql`SELECT * FROM program_publish_settings`;
           } catch {}
           const pubMap = {};
@@ -2256,12 +2320,15 @@ module.exports = async function handler(req, res) {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
-        try {
-          await sql`CREATE TABLE IF NOT EXISTS program_publish_settings (
-            program_name TEXT PRIMARY KEY, unlocked_fyp1 BOOLEAN NOT NULL DEFAULT FALSE,
-            unlocked_fyp2 BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-          )`;
-        } catch {}
+        if (!_pubSettingsReady) {
+          try {
+            await sql`CREATE TABLE IF NOT EXISTS program_publish_settings (
+              program_name TEXT PRIMARY KEY, unlocked_fyp1 BOOLEAN NOT NULL DEFAULT FALSE,
+              unlocked_fyp2 BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`;
+            _pubSettingsReady = true;
+          } catch {}
+        }
         const programs = await sql`SELECT * FROM programs ORDER BY program_name`;
         const settings = await sql`SELECT * FROM program_publish_settings`;
         const map = {};
@@ -2280,12 +2347,15 @@ module.exports = async function handler(req, res) {
         const [sessionToken, programName, unlockedFyp1, unlockedFyp2] = args;
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
-        try {
-          await sql`CREATE TABLE IF NOT EXISTS program_publish_settings (
-            program_name TEXT PRIMARY KEY, unlocked_fyp1 BOOLEAN NOT NULL DEFAULT FALSE,
-            unlocked_fyp2 BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-          )`;
-        } catch {}
+        if (!_pubSettingsReady) {
+          try {
+            await sql`CREATE TABLE IF NOT EXISTS program_publish_settings (
+              program_name TEXT PRIMARY KEY, unlocked_fyp1 BOOLEAN NOT NULL DEFAULT FALSE,
+              unlocked_fyp2 BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`;
+            _pubSettingsReady = true;
+          } catch {}
+        }
         await sql`INSERT INTO program_publish_settings (program_name, unlocked_fyp1, unlocked_fyp2, updated_at)
                   VALUES (${programName}, ${!!unlockedFyp1}, ${!!unlockedFyp2}, NOW())
                   ON CONFLICT (program_name) DO UPDATE
@@ -2327,10 +2397,13 @@ module.exports = async function handler(req, res) {
         const session = await verifySession(sessionToken);
         if (!session) return ok({ success: false, message: 'Session expired.' });
         if (session.is_admin) return ok({ success: true, canAccess: true });
-        await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
-          supervisor_id TEXT PRIMARY KEY,
-          granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )`;
+        if (!_distAccessReady) {
+          await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
+            supervisor_id TEXT PRIMARY KEY,
+            granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )`;
+          _distAccessReady = true;
+        }
         const rows = await sql`SELECT 1 FROM distribution_report_access WHERE supervisor_id = ${session.supervisor_id}`;
         return ok({ success: true, canAccess: rows.length > 0 });
       }
@@ -2339,10 +2412,13 @@ module.exports = async function handler(req, res) {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
-        await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
-          supervisor_id TEXT PRIMARY KEY,
-          granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )`;
+        if (!_distAccessReady) {
+          await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
+            supervisor_id TEXT PRIMARY KEY,
+            granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )`;
+          _distAccessReady = true;
+        }
         const allSups  = await sql`SELECT * FROM supervisors WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
         const granted  = await sql`SELECT supervisor_id FROM distribution_report_access`;
         const grantSet = new Set(granted.map(r => r.supervisor_id));
@@ -2362,10 +2438,13 @@ module.exports = async function handler(req, res) {
         const [sessionToken, allowedIds] = args;
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
-        await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
-          supervisor_id TEXT PRIMARY KEY,
-          granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )`;
+        if (!_distAccessReady) {
+          await sql`CREATE TABLE IF NOT EXISTS distribution_report_access (
+            supervisor_id TEXT PRIMARY KEY,
+            granted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )`;
+          _distAccessReady = true;
+        }
         await sql`DELETE FROM distribution_report_access`;
         for (const id of (allowedIds || [])) {
           if (id) await sql`INSERT INTO distribution_report_access (supervisor_id)
@@ -2450,20 +2529,29 @@ module.exports = async function handler(req, res) {
       }
 
       case 'addMeetingEntry': {
-        const [token, sessionId, section, entryType, entryData] = args;
+        const [token, sessionId, section, entryType, entryData, attributedId, attributedName] = args;
         const session = await verifySession(token);
         if (!session) return ok({ success: false, message: 'Session expired.' });
         await ensureMeetingTables(sql);
-        const rows = await sql`INSERT INTO meeting_entries (session_id, supervisor_id, section, entry_type, entry_data) VALUES (${Number(sessionId)}, ${session.supervisor_id}, ${section}, ${entryType}, ${JSON.stringify(entryData)}) RETURNING *`;
+        const finalData = attributedName
+          ? { ...(entryData || {}), __attributedId: attributedId, __attributedName: attributedName }
+          : (entryData || {});
+        const rows = await sql`INSERT INTO meeting_entries (session_id, supervisor_id, section, entry_type, entry_data) VALUES (${Number(sessionId)}, ${session.supervisor_id}, ${section}, ${entryType}, ${JSON.stringify(finalData)}) RETURNING *`;
         await sql`UPDATE meeting_sessions SET last_modified_at = NOW() WHERE id = ${Number(sessionId)}`;
         return ok({ success: true, entry: rows[0] });
       }
 
       case 'updateMeetingEntry': {
-        const [token, entryId, entryData] = args;
+        const [token, entryId, entryData, attributedId, attributedName] = args;
         const session = await verifySession(token);
         if (!session) return ok({ success: false, message: 'Session expired.' });
-        const rows = await sql`UPDATE meeting_entries SET entry_data = ${JSON.stringify(entryData)}, updated_at = NOW() WHERE id = ${Number(entryId)} AND supervisor_id = ${session.supervisor_id} RETURNING session_id`;
+        const authorized = isAdminUser(session) || await isMeetingDelegate(sql, session.supervisor_id);
+        const finalData = attributedName
+          ? { ...(entryData || {}), __attributedId: attributedId, __attributedName: attributedName }
+          : (entryData || {});
+        const rows = authorized
+          ? await sql`UPDATE meeting_entries SET entry_data = ${JSON.stringify(finalData)}, updated_at = NOW() WHERE id = ${Number(entryId)} RETURNING session_id`
+          : await sql`UPDATE meeting_entries SET entry_data = ${JSON.stringify(finalData)}, updated_at = NOW() WHERE id = ${Number(entryId)} AND supervisor_id = ${session.supervisor_id} RETURNING session_id`;
         if (rows.length) await sql`UPDATE meeting_sessions SET last_modified_at = NOW() WHERE id = ${rows[0].session_id}`;
         return ok({ success: true });
       }
@@ -2472,7 +2560,10 @@ module.exports = async function handler(req, res) {
         const [token, entryId] = args;
         const session = await verifySession(token);
         if (!session) return ok({ success: false, message: 'Session expired.' });
-        const rows = await sql`DELETE FROM meeting_entries WHERE id = ${Number(entryId)} AND supervisor_id = ${session.supervisor_id} RETURNING session_id`;
+        const authorized = isAdminUser(session) || await isMeetingDelegate(sql, session.supervisor_id);
+        const rows = authorized
+          ? await sql`DELETE FROM meeting_entries WHERE id = ${Number(entryId)} RETURNING session_id`
+          : await sql`DELETE FROM meeting_entries WHERE id = ${Number(entryId)} AND supervisor_id = ${session.supervisor_id} RETURNING session_id`;
         if (rows.length) await sql`UPDATE meeting_sessions SET last_modified_at = NOW() WHERE id = ${rows[0].session_id}`;
         return ok({ success: true });
       }
@@ -2516,13 +2607,77 @@ module.exports = async function handler(req, res) {
         const sessionRows = await sql`SELECT * FROM meeting_sessions WHERE id = ${Number(sessionId)}`;
         if (!sessionRows.length) return ok({ success: false, message: 'Session not found.' });
         const entries = await sql`
-          SELECT me.*, s.name AS supervisor_name
+          SELECT me.*,
+                 COALESCE(me.entry_data->>'__attributedName', s.name) AS supervisor_name,
+                 s.name AS actual_supervisor_name
           FROM meeting_entries me
           JOIN supervisors s ON s.supervisor_id = me.supervisor_id
           WHERE me.session_id = ${Number(sessionId)}
           ORDER BY me.section, me.created_at
         `;
         return ok({ success: true, session: sessionRows[0], entries });
+      }
+
+      case 'getAllSessionEntries': {
+        const [token, sessionId] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const authorized = isAdminUser(session) || await isMeetingDelegate(sql, session.supervisor_id);
+        if (!authorized) return ok({ success: false, message: 'Unauthorized.' });
+        await ensureMeetingTables(sql);
+        const rows = await sql`
+          SELECT me.*,
+                 COALESCE(me.entry_data->>'__attributedName', s.name) AS supervisor_name,
+                 s.name AS actual_supervisor_name
+          FROM meeting_entries me
+          JOIN supervisors s ON s.supervisor_id = me.supervisor_id
+          WHERE me.session_id = ${Number(sessionId)}
+          ORDER BY me.section, me.created_at
+        `;
+        return ok({ success: true, entries: rows });
+      }
+
+      case 'getMeetingDelegates': {
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!isAdminUser(session)) return ok({ success: false, message: 'Unauthorized.' });
+        await ensureDelegateTables(sql);
+        const rows = await sql`
+          SELECT d.supervisor_id, s.name, s.program
+          FROM meeting_delegates d
+          JOIN supervisors s ON s.supervisor_id = d.supervisor_id
+          ORDER BY s.name
+        `;
+        return ok({ success: true, delegates: rows });
+      }
+
+      case 'setMeetingDelegates': {
+        const [token, supervisorIds] = args;
+        const session = await verifySession(token);
+        if (!isAdminUser(session)) return ok({ success: false, message: 'Unauthorized.' });
+        await ensureDelegateTables(sql);
+        await sql`DELETE FROM meeting_delegates`;
+        for (const id of (supervisorIds || [])) {
+          if (id) await sql`INSERT INTO meeting_delegates (supervisor_id, granted_by) VALUES (${String(id)}, ${session.supervisor_id}) ON CONFLICT DO NOTHING`;
+        }
+        return ok({ success: true });
+      }
+
+      case 'getIsDelegateInfo': {
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, isDelegate: false });
+        if (isAdminUser(session)) return ok({ success: true, isDelegate: true, isAdmin: true });
+        const isDelegate = await isMeetingDelegate(sql, session.supervisor_id);
+        return ok({ success: true, isDelegate, isAdmin: false });
+      }
+
+      case 'getMeetingSupervisors': {
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const rows = await sql`SELECT supervisor_id, name, program FROM supervisors WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
+        return ok({ success: true, supervisors: rows });
       }
 
       default:
