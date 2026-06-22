@@ -30,6 +30,9 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'landing.
 // ── FYP system (served at /fyp) ──────────────────────────────────────────
 app.get('/fyp', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// ── Meeting Organizer ────────────────────────────────────────────────────
+app.get('/meetings', (req, res) => res.sendFile(path.join(__dirname, 'public', 'meetings', 'index.html')));
+
 // ── Static files (js, css, images, html pages) ───────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
 

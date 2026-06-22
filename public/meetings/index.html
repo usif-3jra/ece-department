@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Meeting Organizer — ECE Department</title>
+  <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+  <style>
+    :root {
+      --navy:#0a1f44; --navy2:#1e3a5f; --accent:#2563ab;
+      --bg:#f0f4f8; --card:#fff; --radius:12px;
+      --shadow:0 2px 12px rgba(10,31,68,.10);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#1e293b;min-height:100vh;}
+    .screen{display:none;} .screen.active{display:block;}
+
+    /* ── Login ── */
+    #scr-login{min-height:100vh;display:none;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a1f44 0%,#1e3a5f 100%);}
+    #scr-login.active{display:flex;}
+    .login-card{background:#fff;border-radius:20px;padding:44px 40px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.25);}
+    .login-logo{height:60px;display:block;margin:0 auto 18px;}
+    .login-title{font-size:20px;font-weight:700;color:var(--navy);text-align:center;margin-bottom:4px;}
+    .login-sub{font-size:12.5px;color:#64748b;text-align:center;margin-bottom:28px;}
+    .login-label{font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;display:block;}
+    .login-input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:14px;transition:border-color .2s;}
+    .login-input:focus{outline:none;border-color:var(--accent);}
+    .btn-login{width:100%;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s;}
+    .btn-login:hover{background:var(--navy2);}
+    .login-err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;display:none;}
+
+    /* ── Top navbar ── */
+    .topbar{background:var(--navy);color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+    .topbar-logo{height:32px;}
+    .topbar-title{font-size:15px;font-weight:700;flex:1;}
+    .topbar-sub{font-size:11px;color:#94a3b8;display:block;}
+    .topbar-name{font-size:13px;color:#cbd5e1;}
+    .btn-topbar{background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s;}
+    .btn-topbar:hover{background:rgba(255,255,255,.22);}
+    .btn-back{background:rgba(255,255,255,.12);}
+
+    /* ── Page content ── */
+    .page-body{max-width:900px;margin:0 auto;padding:28px 20px;}
+    .page-heading{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+    .page-sub{font-size:13px;color:#64748b;margin-bottom:24px;}
+
+    /* ── Session cards ── */
+    .session-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 22px;display:flex;align-items:center;gap:16px;cursor:pointer;border:1.5px solid transparent;transition:border-color .18s,box-shadow .18s;margin-bottom:12px;}
+    .session-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(37,99,235,.13);}
+    .session-num{background:var(--navy);color:#fff;border-radius:10px;min-width:52px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;line-height:1.2;}
+    .session-num span{font-size:17px;}
+    .session-info{flex:1;}
+    .session-info h3{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:3px;}
+    .session-info p{font-size:12px;color:#64748b;}
+    .session-modified{font-size:11px;color:#94a3b8;white-space:nowrap;}
+    .session-arrow{color:#94a3b8;}
+
+    /* ── Section panels ── */
+    .section-panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden;}
+    .section-header{background:var(--navy);color:#fff;padding:13px 20px;display:flex;align-items:center;justify-content:space-between;}
+    .section-header h2{font-size:14px;font-weight:700;margin:0;}
+    .section-header small{font-size:11px;color:#94a3b8;display:block;margin-top:2px;}
+    .section-body{padding:16px 20px;}
+    .entry-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:13px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;}
+    .entry-num{background:var(--accent);color:#fff;border-radius:6px;width:32px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px;}
+    .entry-content{flex:1;min-width:0;}
+    .entry-type-badge{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+    .entry-preview{font-size:13px;color:#334155;line-height:1.5;}
+    .entry-actions{display:flex;gap:6px;flex-shrink:0;}
+    .btn-entry{background:none;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:#64748b;transition:all .15s;}
+    .btn-entry.edit:hover{border-color:var(--accent);color:var(--accent);}
+    .btn-entry.del:hover{border-color:#ef4444;color:#ef4444;}
+    .empty-section{text-align:center;padding:24px;color:#94a3b8;font-size:13px;}
+
+    /* ── Add entry dropdown ── */
+    .add-entry-wrap{position:relative;display:inline-block;}
+    .add-entry-menu{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:50;min-width:230px;padding:6px 0;display:none;}
+    .add-entry-menu.open{display:block;}
+    .add-entry-item{padding:9px 16px;font-size:13px;cursor:pointer;color:#334155;display:flex;flex-direction:column;gap:2px;transition:background .12s;}
+    .add-entry-item:hover{background:#f1f5f9;}
+    .add-entry-item small{font-size:11px;color:#94a3b8;}
+    .privacy-note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;margin-top:8px;}
+
+    /* ── Export screen ── */
+    .export-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;}
+    .export-label{font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;display:block;}
+    .export-input{width:100%;padding:9px 13px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;}
+    .export-input:focus{outline:none;border-color:var(--accent);}
+    .modified-stamp{background:#f1f5f9;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#475569;margin-top:4px;}
+    .modified-stamp strong{color:var(--navy);}
+    .btn-export{padding:12px 28px;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+    .btn-export.pdf{background:#dc2626;color:#fff;}
+    .btn-export.pdf:hover{background:#b91c1c;}
+    .btn-export.word{background:#2563ab;color:#fff;}
+    .btn-export.word:hover{background:#1d4ed8;}
+    .btn-export:disabled{opacity:.55;cursor:not-allowed;}
+
+    /* ── Modal ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:16px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,.3);}
+    .modal-header{background:var(--navy);color:#fff;padding:16px 22px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;}
+    .modal-header h3{font-size:15px;font-weight:700;margin:0;}
+    .modal-close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;}
+    .modal-body{padding:22px;}
+    .modal-footer{padding:16px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:10px;}
+    .form-group{margin-bottom:16px;}
+    .form-label{font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;display:block;}
+    .form-control{width:100%;padding:9px 13px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13.5px;font-family:inherit;}
+    .form-control:focus{outline:none;border-color:var(--accent);}
+    textarea.form-control{resize:vertical;min-height:72px;}
+    .form-hint{font-size:11px;color:#94a3b8;margin-top:4px;}
+    .translate-row{display:flex;gap:8px;align-items:flex-start;}
+    .translate-row textarea{flex:1;}
+    .btn-translate{background:var(--navy);color:#fff;border:none;border-radius:7px;padding:8px 12px;font-size:12px;cursor:pointer;white-space:nowrap;margin-top:0;display:flex;align-items:center;gap:5px;transition:background .2s;}
+    .btn-translate:hover{background:var(--navy2);}
+    .btn-translate:disabled{opacity:.5;cursor:not-allowed;}
+    .jury-row{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:13px;margin-bottom:10px;}
+    .jury-row h5{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;}
+    .jury-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .bullet-item{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+    .bullet-item input{flex:1;}
+    .btn-rm{background:none;border:1px solid #fca5a5;color:#ef4444;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;}
+    .btn-add-line{background:none;border:1.5px dashed #cbd5e1;color:#64748b;border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;width:100%;margin-top:4px;transition:all .15s;}
+    .btn-add-line:hover{border-color:var(--accent);color:var(--accent);}
+    .author-chip{display:inline-flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:4px 10px;font-size:12px;color:#1d4ed8;margin:3px;}
+    .chip-rm{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:14px;line-height:1;}
+
+    /* ── Utility ── */
+    .btn-primary{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .2s;}
+    .btn-primary:hover{background:var(--navy2);}
+    .btn-secondary{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:8px;padding:9px 18px;font-size:13.5px;cursor:pointer;}
+    .btn-green{background:#15803d;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer;}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    @media(max-width:576px){
+      .login-card{padding:32px 22px;}
+      .page-body{padding:18px 14px;}
+      .jury-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══════════════════════════════════════════════════════════════ -->
+<div id="scr-login" class="screen active">
+  <div class="login-card">
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="login-logo"
+         onerror="this.src='https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png'"/>
+    <p class="login-title">Department Meeting Organizer</p>
+    <p class="login-sub">ECE Department — Faculty of Engineering — Beirut Arab University</p>
+    <label class="login-label" for="inp-id">Supervisor ID</label>
+    <input id="inp-id" type="text" class="login-input" placeholder="e.g. F20170170" autocomplete="username" style="margin-bottom:12px;"/>
+    <label class="login-label" for="inp-pw">Password</label>
+    <input id="inp-pw" type="password" class="login-input" placeholder="••••••••" autocomplete="current-password"/>
+    <div id="login-err" class="login-err"></div>
+    <button class="btn-login" id="btn-login" onclick="Auth.login()">
+      <span id="login-label">Sign In</span>
+    </button>
+  </div>
+</div>
+
+<!-- ═══ DASHBOARD ════════════════════════════════════════════════════════════ -->
+<div id="scr-dash" class="screen">
+  <div class="topbar">
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
+    <div style="flex:1">
+      <div class="topbar-title">Meeting Organizer</div>
+      <span class="topbar-sub">ECE Department — BAU</span>
+    </div>
+    <span class="topbar-name" id="dash-sup-name"></span>
+    <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+  <div class="page-body">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div>
+        <div class="page-heading">Meeting Sessions</div>
+        <div class="page-sub">Click a session to add or view your agenda points</div>
+      </div>
+      <button class="btn-primary" onclick="Dashboard.createSession()">
+        <i class="fas fa-plus me-1"></i> New Session
+      </button>
+    </div>
+    <div id="session-list">
+      <div class="text-center py-5 text-secondary"><div class="spinner" style="border-top-color:var(--accent);border-color:#e2e8f0;border-top-color:var(--accent);width:28px;height:28px;"></div><p class="mt-3 small">Loading sessions…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SESSION VIEW ══════════════════════════════════════════════════════════ -->
+<div id="scr-session" class="screen">
+  <div class="topbar">
+    <button class="btn-topbar btn-back" onclick="showScreen('dash');Dashboard.load()"><i class="fas fa-arrow-left"></i></button>
+    <div style="flex:1;margin-left:8px;">
+      <div class="topbar-title" id="sess-topbar-title">Session</div>
+      <span class="topbar-sub" id="sess-topbar-sub"></span>
+    </div>
+    <button class="btn-topbar" onclick="Export.open()"><i class="fas fa-download me-1"></i> Export Report</button>
+  </div>
+  <div class="page-body">
+    <div class="privacy-note mb-3"><i class="fas fa-lock me-1"></i> Your entries are <strong>private</strong> until the report is downloaded. All members' entries are combined at export time.</div>
+
+    <!-- Section A -->
+    <div class="section-panel">
+      <div class="section-header">
+        <div>
+          <h2>A. Student Affairs</h2>
+          <small>Degrees awarded, defense committees, student matters</small>
+        </div>
+        <div class="add-entry-wrap">
+          <button class="btn-topbar" onclick="toggleMenu('menu-a')"><i class="fas fa-plus me-1"></i> Add Entry</button>
+          <div class="add-entry-menu" id="menu-a">
+            <div class="add-entry-item" onclick="Modal.open('A','master_award')">Master's Degree Award<small>Student awarded master's degree</small></div>
+            <div class="add-entry-item" onclick="Modal.open('A','phd_award')">PhD Degree Award<small>Student awarded PhD degree</small></div>
+            <div class="add-entry-item" onclick="Modal.open('A','master_defense')">Master Defense Committee<small>Defense committee proposal</small></div>
+            <div class="add-entry-item" onclick="Modal.open('A','phd_defense')">PhD Defense Committee<small>Defense committee proposal</small></div>
+            <div class="add-entry-item" onclick="Modal.open('A','student_other')">Other<small>Any other student matter</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="section-body" id="entries-A">
+        <div class="empty-section"><i class="fas fa-inbox fa-lg mb-2 d-block"></i>No entries yet. Click "Add Entry" to add your first point.</div>
+      </div>
+    </div>
+
+    <!-- Section B -->
+    <div class="section-panel">
+      <div class="section-header">
+        <div>
+          <h2>B. Department Affairs</h2>
+          <small>Publications, course modifications, events, committees</small>
+        </div>
+        <div class="add-entry-wrap">
+          <button class="btn-topbar" onclick="toggleMenu('menu-b')"><i class="fas fa-plus me-1"></i> Add Entry</button>
+          <div class="add-entry-menu" id="menu-b">
+            <div class="add-entry-item" onclick="Modal.open('B','conference')">Conference Paper<small>Paper accepted at a conference</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','journal')">Journal Paper<small>Paper published in a journal</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','course_mod')">Course Modification<small>Changes to any course</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','event')">Event / Activity<small>Event organized or participated in</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','dept_other')">Other<small>Committee roles, other activities</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="section-body" id="entries-B">
+        <div class="empty-section"><i class="fas fa-inbox fa-lg mb-2 d-block"></i>No entries yet.</div>
+      </div>
+    </div>
+
+    <!-- Section C -->
+    <div class="section-panel">
+      <div class="section-header">
+        <div>
+          <h2>C. New Issues</h2>
+          <small>New points raised by members</small>
+        </div>
+        <button class="btn-topbar" onclick="Modal.open('C','new_issue')"><i class="fas fa-plus me-1"></i> Add Entry</button>
+      </div>
+      <div class="section-body" id="entries-C">
+        <div class="empty-section"><i class="fas fa-inbox fa-lg mb-2 d-block"></i>No entries yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXPORT SCREEN ════════════════════════════════════════════════════════ -->
+<div id="scr-export" class="screen">
+  <div class="topbar">
+    <button class="btn-topbar btn-back" onclick="showScreen('session')"><i class="fas fa-arrow-left"></i></button>
+    <div style="flex:1;margin-left:8px;">
+      <div class="topbar-title">Export Meeting Report</div>
+      <span class="topbar-sub">Generate PDF or Word document</span>
+    </div>
+  </div>
+  <div class="page-body">
+    <div class="export-card">
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="export-label">Session Number</label>
+          <select id="exp-session" class="export-input" onchange="Export.onSessionChange()"></select>
+        </div>
+        <div class="col-md-4">
+          <label class="export-label">Meeting Date</label>
+          <input type="date" id="exp-date" class="export-input" onchange="Export.saveDetails()"/>
+        </div>
+        <div class="col-md-4">
+          <label class="export-label">Meeting Time</label>
+          <input type="time" id="exp-time" class="export-input" onchange="Export.saveDetails()"/>
+        </div>
+      </div>
+      <div class="mb-4">
+        <div class="modified-stamp"><i class="fas fa-history me-1"></i> Last modified: <strong id="exp-modified">—</strong></div>
+      </div>
+      <div class="d-flex gap-3 flex-wrap">
+        <button class="btn-export pdf" id="btn-exp-pdf" onclick="Export.generatePDF()">
+          <i class="fas fa-file-pdf"></i> Export PDF
+        </button>
+        <button class="btn-export word" id="btn-exp-word" onclick="Export.generateWord()">
+          <i class="fas fa-file-word"></i> Export Word
+        </button>
+      </div>
+      <p class="mt-3" style="font-size:12px;color:#94a3b8;"><i class="fas fa-info-circle me-1"></i>The report aggregates all members' entries. Entries are ordered by submission time within each section.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ENTRY MODAL ══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)Modal.close()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-title">Add Entry</h3>
+      <button class="modal-close" onclick="Modal.close()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="Modal.close()">Cancel</button>
+      <button class="btn-primary" id="modal-save-btn" onclick="Modal.submit()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Utilities ──────────────────────────────────────────────────────────────
+const PROGRAMS = ['Computer Engineering','Communications and Electronics Engineering','Electrical Power and Machines Engineering','Biomedical Engineering'];
+const RANKS = ['Professor','Associate Professor','Assistant Professor','Lecturer','Researcher'];
+
+function ordinal(n) {
+  const n10 = n%10, n100 = n%100;
+  if (n100>=11&&n100<=13) return n+'th';
+  if (n10===1) return n+'st';
+  if (n10===2) return n+'nd';
+  if (n10===3) return n+'rd';
+  return n+'th';
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+}
+
+function fmtModified(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})+' at '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+}
+
+function meetingDateStr(dateStr, timeStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr+'T00:00:00');
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  let s = `${days[d.getDay()]}. ${months[d.getMonth()]} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
+  if (timeStr) {
+    const [h,m] = timeStr.split(':');
+    const hr = parseInt(h), mn = m||'00';
+    const ampm = hr>=12?'PM':'AM', h12 = hr%12||12;
+    s += `, at ${h12}:${mn} ${ampm}`;
+  }
+  return s;
+}
+
+async function api(action, ...args) {
+  const r = await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,args})});
+  return r.json();
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('scr-'+id).classList.add('active');
+}
+
+function toggleMenu(id) {
+  document.querySelectorAll('.add-entry-menu').forEach(m=>{if(m.id!==id)m.classList.remove('open');});
+  document.getElementById(id).classList.toggle('open');
+}
+document.addEventListener('click',e=>{
+  if (!e.target.closest('.add-entry-wrap')) document.querySelectorAll('.add-entry-menu').forEach(m=>m.classList.remove('open'));
+});
+
+function el(id){return document.getElementById(id);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function translateToArabic(text) {
+  if (!text.trim()) return '';
+  const url = 'https://translate.googleapis.com/translate_a/single?'+new URLSearchParams({client:'gtx',sl:'en',tl:'ar',dt:'t',q:text});
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    return data[0].map(x=>x[0]).join('');
+  } catch { return ''; }
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+const Auth = {
+  token: localStorage.getItem('mtg_token'),
+  supervisor: JSON.parse(localStorage.getItem('mtg_sup')||'null'),
+
+  async login() {
+    const id = el('inp-id').value.trim();
+    const pw = el('inp-pw').value;
+    if (!id||!pw){Auth.err('Please enter your Supervisor ID and password.');return;}
+    el('btn-login').disabled=true; el('login-label').innerHTML='<span class="spinner"></span>';
+    const r = await api('loginSupervisor',id,pw);
+    el('btn-login').disabled=false; el('login-label').textContent='Sign In';
+    if (!r.success){Auth.err(r.message||'Login failed.');return;}
+    Auth.token=r.sessionToken; Auth.supervisor=r.supervisor;
+    localStorage.setItem('mtg_token',Auth.token);
+    localStorage.setItem('mtg_sup',JSON.stringify(Auth.supervisor));
+    el('login-err').style.display='none';
+    el('dash-sup-name').textContent=Auth.supervisor.name||'';
+    showScreen('dash');
+    Dashboard.load();
+  },
+
+  async logout() {
+    if (Auth.token) await api('logoutSession',Auth.token).catch(()=>{});
+    localStorage.removeItem('mtg_token'); localStorage.removeItem('mtg_sup');
+    Auth.token=null; Auth.supervisor=null;
+    showScreen('login');
+  },
+
+  err(msg){const e=el('login-err');e.textContent=msg;e.style.display='block';}
+};
+
+// Auto-login if token exists
+if (Auth.token && Auth.supervisor) {
+  el('dash-sup-name').textContent = Auth.supervisor.name||'';
+  showScreen('dash');
+  Dashboard.load && Dashboard.load();
+}
+
+// Enter key on login
+['inp-id','inp-pw'].forEach(id=>el(id).addEventListener('keydown',e=>{if(e.key==='Enter')Auth.login();}));
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+const Dashboard = {
+  sessions:[],
+
+  async load() {
+    const r = await api('getMeetingSessions',Auth.token);
+    if (!r.success){Auth.logout();return;}
+    Dashboard.sessions=r.sessions||[];
+    Dashboard.render();
+  },
+
+  render() {
+    const list = el('session-list');
+    if (!Dashboard.sessions.length) {
+      list.innerHTML='<div class="empty-section" style="padding:40px;"><i class="fas fa-calendar-plus fa-2x mb-3 d-block" style="color:#cbd5e1;"></i>No sessions yet. Click "New Session" to start.</div>';
+      return;
+    }
+    list.innerHTML = Dashboard.sessions.map(s=>`
+      <div class="session-card" onclick="Session.load(${s.id})">
+        <div class="session-num"><span>${s.session_number}</span>th</div>
+        <div class="session-info">
+          <h3>${ordinal(s.session_number)} Session &mdash; Academic Year ${esc(s.academic_year)}</h3>
+          <p>${s.meeting_date ? 'Scheduled: '+fmtDate(s.meeting_date) : '<em>Date not set</em>'}</p>
+        </div>
+        <div class="session-modified">Modified<br>${fmtModified(s.last_modified_at)}</div>
+        <div class="session-arrow"><i class="fas fa-chevron-right"></i></div>
+      </div>`).join('');
+    // Fix ordinal display
+    list.querySelectorAll('.session-num').forEach((el,i)=>{
+      const n=Dashboard.sessions[i].session_number;
+      el.innerHTML=`<span>${n}</span>${ordinal(n).replace(n,'')}`;
+    });
+  },
+
+  async createSession() {
+    if (!confirm('Create a new meeting session?')) return;
+    const r = await api('createMeetingSession',Auth.token);
+    if (!r.success){alert(r.message||'Error creating session.');return;}
+    await Dashboard.load();
+    Session.load(r.session.id);
+  }
+};
+
+// ── Session View ───────────────────────────────────────────────────────────
+const Session = {
+  id:null, info:null, entries:[],
+
+  async load(sessionId) {
+    Session.id=sessionId;
+    const s = Dashboard.sessions.find(x=>x.id===sessionId)||{session_number:'—',academic_year:'—'};
+    Session.info=s;
+    el('sess-topbar-title').textContent=`${ordinal(s.session_number)} Session`;
+    el('sess-topbar-sub').textContent=`Academic Year ${s.academic_year||''}`;
+    showScreen('session');
+    const r = await api('getMySessionEntries',Auth.token,sessionId);
+    Session.entries = r.success ? (r.entries||[]) : [];
+    Session.render();
+  },
+
+  render() {
+    ['A','B','C'].forEach(sec=>{
+      const mine = Session.entries.filter(e=>e.section===sec);
+      const container = el('entries-'+sec);
+      if (!mine.length){
+        container.innerHTML='<div class="empty-section"><i class="fas fa-inbox fa-lg mb-2 d-block"></i>No entries yet.</div>';
+        return;
+      }
+      container.innerHTML=mine.map((e,i)=>`
+        <div class="entry-item">
+          <div class="entry-num">${sec}.${i+1}</div>
+          <div class="entry-content">
+            <div class="entry-type-badge">${entryTypeLabel(e.entry_type)}</div>
+            <div class="entry-preview">${entryPreview(e)}</div>
+          </div>
+          <div class="entry-actions">
+            <button class="btn-entry edit" onclick="Modal.openEdit(${e.id})"><i class="fas fa-edit"></i> Edit</button>
+            <button class="btn-entry del" onclick="Session.deleteEntry(${e.id})"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>`).join('');
+    });
+  },
+
+  async deleteEntry(id) {
+    if (!confirm('Delete this entry?')) return;
+    const r = await api('deleteMeetingEntry',Auth.token,id);
+    if (!r.success){alert('Error deleting entry.');return;}
+    Session.entries=Session.entries.filter(e=>e.id!==id);
+    Session.render();
+  }
+};
+
+function entryTypeLabel(t) {
+  const map={master_award:"Master's Award",phd_award:"PhD Award",master_defense:"Master Defense",phd_defense:"PhD Defense",student_other:"Other (Student)",conference:"Conference Paper",journal:"Journal Paper",course_mod:"Course Modification",event:"Event/Activity",dept_other:"Other (Department)",new_issue:"New Issue"};
+  return map[t]||t;
+}
+
+function entryPreview(e) {
+  const d=e.entry_data||{};
+  switch(e.entry_type){
+    case 'master_award': case 'phd_award':
+      return esc(`${d.student_name||'—'} (${d.student_id||'—'}) — ${d.program||'—'}`);
+    case 'master_defense': case 'phd_defense':
+      return esc(`${d.student_name||'—'} — ${d.thesis_title_en||'—'}`);
+    case 'conference':
+      return esc(d.title||'—');
+    case 'journal':
+      return esc(d.title||'—');
+    case 'dept_other':
+      return `${esc(Auth.supervisor.name)}: ${(d.bullets||[]).map(b=>`• ${esc(b)}`).join(' ')||'(no bullets)'}`;
+    case 'new_issue':
+      return esc(d.text||'—');
+    default:
+      return esc(d.text||JSON.stringify(d));
+  }
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+const Modal = {
+  section:null, type:null, editId:null,
+
+  open(section, type) {
+    document.querySelectorAll('.add-entry-menu').forEach(m=>m.classList.remove('open'));
+    Modal.section=section; Modal.type=type; Modal.editId=null;
+    el('modal-title').textContent='Add — '+entryTypeLabel(type);
+    el('modal-body').innerHTML=Modal.buildForm(type,{});
+    el('modal-overlay').classList.add('open');
+    el('modal-save-btn').textContent='Save Entry';
+  },
+
+  openEdit(id) {
+    const entry=Session.entries.find(e=>e.id===id); if(!entry) return;
+    Modal.section=entry.section; Modal.type=entry.entry_type; Modal.editId=id;
+    el('modal-title').textContent='Edit — '+entryTypeLabel(entry.entry_type);
+    el('modal-body').innerHTML=Modal.buildForm(entry.entry_type, entry.entry_data||{});
+    el('modal-overlay').classList.add('open');
+    el('modal-save-btn').textContent='Update Entry';
+  },
+
+  close() { el('modal-overlay').classList.remove('open'); },
+
+  buildForm(type, d) {
+    const prog = PROGRAMS.map(p=>`<option value="${p}"${d.program===p?' selected':''}>${p}</option>`).join('');
+    const ranks = RANKS.map(r=>`<option value="${r}"${d.rank===r?' selected':''}>${r}</option>`).join('');
+
+    const studentFields = `
+      <div class="form-group"><label class="form-label">Student Full Name *</label><input class="form-control" id="f-name" value="${esc(d.student_name||'')}" placeholder="e.g. Mohamad Haitham Fayed"/></div>
+      <div class="row g-2"><div class="col-6"><div class="form-group"><label class="form-label">Student ID *</label><input class="form-control" id="f-id" value="${esc(d.student_id||'')}" placeholder="e.g. E20070306"/></div></div>
+      <div class="col-6"><div class="form-group"><label class="form-label">Program *</label><select class="form-control" id="f-prog"><option value="">Select…</option>${prog}</select></div></div></div>
+      <div class="form-group"><label class="form-label">Thesis Title (English) *</label><textarea class="form-control" id="f-title-en">${esc(d.thesis_title_en||'')}</textarea></div>
+      <div class="form-group"><label class="form-label">Thesis Title (Arabic)</label>
+        <div class="translate-row">
+          <textarea class="form-control" id="f-title-ar" dir="rtl" placeholder="اكتب أو ترجم تلقائياً">${esc(d.thesis_title_ar||'')}</textarea>
+          <button class="btn-translate" id="btn-tr" onclick="Modal.translate()"><i class="fas fa-language"></i> Translate</button>
+        </div>
+        <div class="form-hint">Click "Translate" to auto-translate English title to Arabic (editable)</div>
+      </div>`;
+
+    const juryMembers = (roles => roles.map((role,i)=>{
+      const j=(d.jury||[])[i]||{};
+      return `<div class="jury-row"><h5>${role}</h5><div class="jury-grid">
+        <div><label class="form-label">Full Name</label><input class="form-control jury-name" data-i="${i}" value="${esc(j.name||'')}" placeholder="Dr. / Prof. …"/></div>
+        <div><label class="form-label">Rank</label><select class="form-control jury-rank" data-i="${i}"><option value="">Select…</option>${RANKS.map(r=>`<option${j.rank===r?' selected':''}>${r}</option>`).join('')}</select></div>
+        <div><label class="form-label">Affiliation</label><input class="form-control jury-affil" data-i="${i}" value="${esc(j.affiliation||'')}" placeholder="BAU"/></div>
+      </div></div>`;
+    }).join(''))(['Main Supervisor','Co-Supervisor','External Examiner','Internal Examiner']);
+
+    switch(type){
+      case 'master_award': case 'phd_award':
+        return studentFields;
+
+      case 'master_defense': case 'phd_defense':
+        return studentFields+`<hr style="margin:16px 0;border-color:#e2e8f0;"><p class="form-label mb-2" style="font-size:13px;font-weight:700;color:var(--navy);">Proposed Jury</p>`+juryMembers;
+
+      case 'student_other': case 'course_mod': case 'event':
+        return `<div class="form-group"><label class="form-label">Description *</label><textarea class="form-control" id="f-text" style="min-height:120px;">${esc(d.text||'')}</textarea></div>`;
+
+      case 'conference':
+        return `
+          <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
+          <div class="form-group"><label class="form-label">Conference Name * <span class="form-hint d-inline">(include ordinal, e.g. "4th International Conference on…")</span></label><input class="form-control" id="f-conf" value="${esc(d.conference_name||'')}"/></div>
+          <div class="row g-2">
+            <div class="col-6"><div class="form-group"><label class="form-label">Location</label><input class="form-control" id="f-loc" value="${esc(d.location||'')}" placeholder="Tokyo - Japan"/></div></div>
+            <div class="col-6"><div class="form-group"><label class="form-label">Date</label><input class="form-control" id="f-cdate" value="${esc(d.date||'')}" placeholder="October 2026"/></div></div>
+          </div>
+          <div class="form-group"><label class="form-label">Author(s)</label><input class="form-control" id="f-author" value="${esc(d.author||'')}"/></div>`;
+
+      case 'journal': {
+        const authors=d.authors||[];
+        return `
+          <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
+          <div class="form-group"><label class="form-label">Journal Name *</label><input class="form-control" id="f-jname" value="${esc(d.journal_name||'')}"/></div>
+          <div class="row g-2">
+            <div class="col-3"><div class="form-group"><label class="form-label">Year</label><input class="form-control" id="f-year" value="${esc(d.year||'')}"/></div></div>
+            <div class="col-3"><div class="form-group"><label class="form-label">Volume</label><input class="form-control" id="f-vol" value="${esc(d.volume||'')}"/></div></div>
+            <div class="col-3"><div class="form-group"><label class="form-label">Issue</label><input class="form-control" id="f-iss" value="${esc(d.issue||'')}"/></div></div>
+            <div class="col-3"><div class="form-group"><label class="form-label">Pages</label><input class="form-control" id="f-pgs" value="${esc(d.pages||'')}"/></div></div>
+          </div>
+          <div class="form-group"><label class="form-label">DOI / URL</label><input class="form-control" id="f-doi" value="${esc(d.doi||'')}" placeholder="https://doi.org/…"/></div>
+          <div class="form-group"><label class="form-label">Authors</label>
+            <div id="author-chips">${authors.map(a=>`<span class="author-chip">${esc(a)}<button class="chip-rm" onclick="this.parentElement.remove()">×</button></span>`).join('')}</div>
+            <div class="d-flex gap-2 mt-2"><input class="form-control" id="f-author-inp" placeholder="Author name" style="flex:1;"/><button class="btn-primary" style="padding:6px 14px;" onclick="Modal.addAuthor()">Add</button></div>
+          </div>`;
+      }
+
+      case 'dept_other': {
+        const bullets=d.bullets||[];
+        return `
+          <p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor.name)}</strong>) will appear automatically in the report.</p>
+          <div class="form-group"><label class="form-label">Bullet Points *</label>
+            <div id="bullet-list">${bullets.map(b=>`<div class="bullet-item"><input class="form-control" value="${esc(b)}" placeholder="e.g. served as committee member in…"/><button class="btn-rm" onclick="this.parentElement.remove()">✕</button></div>`).join('')}</div>
+            <button class="btn-add-line" onclick="Modal.addBullet()"><i class="fas fa-plus me-1"></i> Add Bullet</button>
+          </div>`;
+      }
+
+      case 'new_issue':
+        return `
+          <p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor.name)}</strong>) will appear automatically in the report.</p>
+          <div class="form-group"><label class="form-label">Description *</label><textarea class="form-control" id="f-text" style="min-height:120px;">${esc(d.text||'')}</textarea></div>`;
+
+      default: return '<p class="text-muted">Unknown entry type.</p>';
+    }
+  },
+
+  addBullet() {
+    const li=document.createElement('div'); li.className='bullet-item';
+    li.innerHTML=`<input class="form-control" placeholder="e.g. served as committee member in…"/><button class="btn-rm" onclick="this.parentElement.remove()">✕</button>`;
+    el('bullet-list').appendChild(li);
+    li.querySelector('input').focus();
+  },
+
+  addAuthor() {
+    const inp=el('f-author-inp'); if(!inp.value.trim()) return;
+    const chip=document.createElement('span'); chip.className='author-chip';
+    chip.innerHTML=`${esc(inp.value.trim())}<button class="chip-rm" onclick="this.parentElement.remove()">×</button>`;
+    el('author-chips').appendChild(chip);
+    inp.value='';
+  },
+
+  async translate() {
+    const enEl=el('f-title-en')||el('f-title');
+    if (!enEl||!enEl.value.trim()){alert('Please enter the English title first.');return;}
+    const btn=el('btn-tr'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+    const ar=await translateToArabic(enEl.value);
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-language"></i> Translate';
+    if(ar) el('f-title-ar').value=ar;
+    else alert('Translation failed. Please enter Arabic title manually.');
+  },
+
+  getData() {
+    const v=id=>el(id)?.value?.trim()||'';
+    const t=Modal.type;
+    if (t==='master_award'||t==='phd_award')
+      return {student_name:v('f-name'),student_id:v('f-id'),program:v('f-prog'),thesis_title_en:v('f-title-en'),thesis_title_ar:v('f-title-ar')};
+    if (t==='master_defense'||t==='phd_defense') {
+      const jury=['Main Supervisor','Co-Supervisor','External Examiner','Internal Examiner'].map((role,i)=>({
+        role,
+        name:document.querySelectorAll('.jury-name')[i]?.value?.trim()||'',
+        rank:document.querySelectorAll('.jury-rank')[i]?.value?.trim()||'',
+        affiliation:document.querySelectorAll('.jury-affil')[i]?.value?.trim()||''
+      }));
+      return {student_name:v('f-name'),student_id:v('f-id'),program:v('f-prog'),thesis_title_en:v('f-title-en'),thesis_title_ar:v('f-title-ar'),jury};
+    }
+    if (t==='conference')
+      return {title:v('f-title'),conference_name:v('f-conf'),location:v('f-loc'),date:v('f-cdate'),author:v('f-author')};
+    if (t==='journal') {
+      const authors=[...document.querySelectorAll('#author-chips .author-chip')].map(c=>c.textContent.replace('×','').trim());
+      return {title:v('f-title'),journal_name:v('f-jname'),year:v('f-year'),volume:v('f-vol'),issue:v('f-iss'),pages:v('f-pgs'),doi:v('f-doi'),authors};
+    }
+    if (t==='dept_other') {
+      const bullets=[...document.querySelectorAll('#bullet-list .bullet-item input')].map(i=>i.value.trim()).filter(Boolean);
+      return {bullets};
+    }
+    return {text:v('f-text')};
+  },
+
+  validate(data) {
+    const t=Modal.type;
+    if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && (!data.student_name||!data.student_id||!data.program)) return 'Please fill Student Name, ID, and Program.';
+    if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && !data.thesis_title_en) return 'Please enter the thesis title in English.';
+    if (t==='conference' && (!data.title||!data.conference_name)) return 'Please enter the paper title and conference name.';
+    if (t==='journal' && (!data.title||!data.journal_name)) return 'Please enter the paper title and journal name.';
+    if (t==='dept_other' && (!data.bullets||!data.bullets.length)) return 'Please add at least one bullet point.';
+    if ((t==='student_other'||t==='course_mod'||t==='event'||t==='new_issue') && !data.text) return 'Please enter a description.';
+    return null;
+  },
+
+  async submit() {
+    const data=Modal.getData();
+    const err=Modal.validate(data);
+    if (err){alert(err);return;}
+    const btn=el('modal-save-btn'); btn.disabled=true; btn.textContent='Saving…';
+    let r;
+    if (Modal.editId) r=await api('updateMeetingEntry',Auth.token,Modal.editId,data);
+    else r=await api('addMeetingEntry',Auth.token,Session.id,Modal.section,Modal.type,data);
+    btn.disabled=false; btn.textContent=Modal.editId?'Update Entry':'Save Entry';
+    if (!r.success){alert(r.message||'Error saving entry.');return;}
+    Modal.close();
+    // Refresh entries
+    const re=await api('getMySessionEntries',Auth.token,Session.id);
+    Session.entries=re.success?re.entries:Session.entries;
+    Session.render();
+  }
+};
+
+// ── Export ─────────────────────────────────────────────────────────────────
+const Export = {
+  allSessions:[],
+  currentSessionId:null,
+
+  open() {
+    showScreen('export');
+    Export.allSessions=Dashboard.sessions||[];
+    Export.currentSessionId=Session.id;
+    const sel=el('exp-session');
+    sel.innerHTML=Export.allSessions.map(s=>`<option value="${s.id}"${s.id===Session.id?' selected':''}>${ordinal(s.session_number)} Session — ${s.academic_year}</option>`).join('');
+    Export.loadSession(Session.id);
+  },
+
+  onSessionChange() {
+    const id=parseInt(el('exp-session').value);
+    Export.currentSessionId=id;
+    Export.loadSession(id);
+  },
+
+  loadSession(id) {
+    const s=Export.allSessions.find(x=>x.id===id);
+    if (!s) return;
+    el('exp-date').value=s.meeting_date?s.meeting_date.split('T')[0]:'';
+    el('exp-time').value=s.meeting_time?s.meeting_time.substring(0,5):'';
+    el('exp-modified').textContent=fmtModified(s.last_modified_at);
+  },
+
+  async saveDetails() {
+    const id=Export.currentSessionId||Session.id;
+    const date=el('exp-date').value||null;
+    const time=el('exp-time').value||null;
+    await api('updateSessionDetails',Auth.token,id,date,time);
+    // Update local cache
+    const s=Dashboard.sessions.find(x=>x.id===id);
+    if (s){s.meeting_date=date;s.meeting_time=time;}
+  },
+
+  async getReportData() {
+    const id=Export.currentSessionId||Session.id;
+    await Export.saveDetails();
+    const r=await api('getReportData',Auth.token,id);
+    return r;
+  },
+
+  // ── Report content builder ──────────────────────────────────────────────
+  buildSections(entries) {
+    const sections={A:[],B:[],C:[]};
+    entries.forEach(e=>{
+      const sec=e.section;
+      if (sections[sec]) sections[sec].push(e);
+    });
+    return sections;
+  },
+
+  entryText(e, num) {
+    const d=e.entry_data||{};
+    const n=e.supervisor_name||'';
+    const label=`${e.section}.${num}. `;
+    switch(e.entry_type){
+      case 'master_award':
+        return {label, lines:[`A master's degree has been awarded to Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?`Thesis Title in Arabic: ${d.thesis_title_ar}`:null].filter(Boolean)};
+      case 'phd_award':
+        return {label, lines:[`A PhD degree has been awarded to Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?`Thesis Title in Arabic: ${d.thesis_title_ar}`:null].filter(Boolean)};
+      case 'master_defense': case 'phd_defense': {
+        const kind=e.entry_type==='master_defense'?'Master':'PhD';
+        const lines=[`${kind} Defense Committee proposal for Eng. ${d.student_name||'—'} (ID: ${d.student_id||'—'}) – ECE department – ${d.program||'—'} Program.`,`Thesis Title: ${d.thesis_title_en||'—'}`,d.thesis_title_ar?`Thesis Title in Arabic: ${d.thesis_title_ar}`:null,'Proposed Jury:'].filter(Boolean);
+        (d.jury||[]).forEach(j=>{if(j.name)lines.push(`   ${j.name} (${j.role}) – ${j.rank}${j.affiliation?' - '+j.affiliation:''}`)});
+        return {label, lines};
+      }
+      case 'student_other': case 'course_mod': case 'event':
+        return {label, lines:[d.text||'—']};
+      case 'conference':
+        return {label, lines:[`A conference paper titled "${d.title||'—'}" has been accepted in the ${d.conference_name||'—'}${d.location?', '+d.location:''}${d.date?', '+d.date:''}${d.author?', for the author '+d.author:''}.`]};
+      case 'journal': {
+        const auths=d.authors||[];
+        const authStr=auths.length>1?auths.slice(0,-1).join(', ')+', and '+auths[auths.length-1]:auths[0]||'—';
+        let pub=`${d.journal_name||''}`;
+        if(d.year)pub+=` ${d.year}`;
+        if(d.volume)pub+=`, ${d.volume}`;
+        if(d.issue)pub+=`(${d.issue})`;
+        if(d.pages)pub+=`, ${d.pages}`;
+        if(d.doi)pub+=`; ${d.doi}`;
+        return {label, lines:[`A journal paper titled "${d.title||'—'}", has been published in ${pub}, for the author${auths.length!==1?'s':''} ${authStr}.`]};
+      }
+      case 'dept_other': {
+        const lines=[`${n}:`];
+        (d.bullets||[]).forEach(b=>lines.push(`  • ${b}`));
+        return {label, lines};
+      }
+      case 'new_issue':
+        return {label, lines:[`${n} raised: ${d.text||'—'}`]};
+      default:
+        return {label, lines:[JSON.stringify(d)]};
+    }
+  },
+
+  // ── PDF ─────────────────────────────────────────────────────────────────
+  async generatePDF() {
+    const btn=el('btn-exp-pdf'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Generating…';
+    try {
+      const r=await Export.getReportData();
+      if (!r.success){alert(r.message||'Failed to load report data.');return;}
+      const sess=r.session, entries=r.entries||[];
+      const sections=Export.buildSections(entries);
+      const { jsPDF }=window.jspdf;
+      const doc=new jsPDF({unit:'mm',format:'a4'});
+      const margin=18, pageW=210, cW=pageW-2*margin;
+      const navy=[10,31,68];
+
+      // Load logo
+      const logoData=await new Promise(res=>{
+        const img=new Image(); img.crossOrigin='anonymous';
+        img.onload=()=>{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);res(c.toDataURL('image/png'));};
+        img.onerror=()=>res(null);
+        img.src='/assets/logo_meeting_report.png';
+      });
+
+      // ── Header ──
+      if (logoData) doc.addImage(logoData,'PNG',margin,6,30,15);
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...navy);
+      doc.text('Faculty of Engineering',pageW-margin,10,{align:'right'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      doc.text('ECE Department',pageW-margin,14.5,{align:'right'});
+      doc.setDrawColor(...navy); doc.setLineWidth(0.5);
+      doc.line(margin,23,pageW-margin,23);
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(12.5); doc.setTextColor(...navy);
+      doc.text('Electrical & Computer Engineering Department Meeting Agenda',pageW/2,30,{align:'center'});
+      doc.setFontSize(10);
+      const sessLine=`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year}`;
+      doc.text(sessLine,pageW/2,37,{align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60,60,60);
+      const dateStr=`To be held on ${meetingDateStr(sess.meeting_date,sess.meeting_time?sess.meeting_time.substring(0,5):null)}`;
+      doc.text(dateStr,pageW/2,43.5,{align:'center'});
+      doc.setDrawColor(...navy); doc.line(margin,48,pageW-margin,48);
+
+      let ys=55;
+      const pageH=doc.internal.pageSize.getHeight();
+
+      function addPageIfNeeded(needed){if(ys+needed>pageH-margin){doc.addPage();ys=margin;}}
+
+      function sectionHead(title) {
+        addPageIfNeeded(12);
+        doc.setFillColor(...navy);
+        doc.rect(margin,ys,cW,7,'F');
+        doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(255,255,255);
+        doc.text(title,margin+3,ys+5);
+        doc.setTextColor(0,0,0);
+        ys+=12;
+      }
+
+      function renderEntry(sec, num, e) {
+        const info=Export.entryText(e,num);
+        const numStr=`${sec}.${num}.`;
+        const allLines=[];
+        info.lines.forEach((line,li)=>{
+          const prefix=li===0?numStr+' ':'     ';
+          const wrapped=doc.splitTextToSize(prefix+line, cW-4);
+          wrapped.forEach(l=>allLines.push(l));
+        });
+        const blockH=allLines.length*4.5+4;
+        addPageIfNeeded(blockH);
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+        allLines.forEach((line,i)=>{
+          if (i===0){doc.setFont('helvetica','bold');}
+          else{doc.setFont('helvetica','normal');}
+          doc.text(line,margin+2,ys);
+          ys+=4.5;
+        });
+        ys+=3;
+      }
+
+      const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
+      ['A','B','C'].forEach(sec=>{
+        sectionHead(SECTION_TITLES[sec]);
+        const items=sections[sec]||[];
+        if (!items.length){
+          doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(150,150,150);
+          doc.text('No entries for this section.',margin+4,ys); ys+=8;
+        } else {
+          items.forEach((e,i)=>renderEntry(sec,i+1,e));
+        }
+        ys+=4;
+      });
+
+      // Footer
+      const pages=doc.getNumberOfPages();
+      for(let i=1;i<=pages;i++){
+        doc.setPage(i);
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,150);
+        doc.text(`ECE Department — Beirut Arab University — Page ${i} of ${pages}`,pageW/2,pageH-8,{align:'center'});
+      }
+
+      doc.save(`Meeting-Agenda-Session-${sess.session_number}.pdf`);
+    } finally {
+      btn.disabled=false; btn.innerHTML='<i class="fas fa-file-pdf"></i> Export PDF';
+    }
+  },
+
+  // ── Word ────────────────────────────────────────────────────────────────
+  async generateWord() {
+    const btn=el('btn-exp-word'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Generating…';
+    try {
+      const r=await Export.getReportData();
+      if (!r.success){alert(r.message||'Failed to load report data.');return;}
+      const sess=r.session, entries=r.entries||[];
+      const sections=Export.buildSections(entries);
+      const D=window.docx;
+      const navy={r:10,g:31,b:68};
+      const children=[];
+
+      // ── Header table (logo left | faculty right) ──
+      // Logo fetch
+      let logoBlob=null;
+      try{const resp=await fetch('/assets/logo_meeting_report.png');logoBlob=await resp.arrayBuffer();}catch{}
+
+      const logoCell=new D.TableCell({
+        children:[logoBlob?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:100,height:50},type:'png'})]}):new D.Paragraph({text:''})],
+        width:{size:30,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},
+      });
+      const facCell=new D.TableCell({
+        children:[
+          new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'Faculty of Engineering',bold:true,color:'0a1f44',size:20})]}),
+          new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})]})
+        ],
+        width:{size:70,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE}},verticalAlign:D.VerticalAlign.CENTER,
+      });
+      children.push(new D.Table({rows:[new D.TableRow({children:[logoCell,facCell]})],width:{size:100,type:D.WidthType.PERCENTAGE},borders:{top:{style:D.BorderStyle.NONE},bottom:{style:D.BorderStyle.NONE},left:{style:D.BorderStyle.NONE},right:{style:D.BorderStyle.NONE},insideH:{style:D.BorderStyle.NONE},insideV:{style:D.BorderStyle.NONE}}}));
+
+      children.push(new D.Paragraph({text:'',spacing:{after:80}}));
+
+      // ── Title block ──
+      children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:'Electrical & Computer Engineering Department Meeting Agenda',bold:true,color:'0a1f44',size:26})]}));
+      children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year}`,bold:true,color:'0a1f44',size:22})]}));
+      children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`To be held on ${meetingDateStr(sess.meeting_date,sess.meeting_time?sess.meeting_time.substring(0,5):null)}`,color:'444444',size:20})]}));
+      children.push(new D.Paragraph({text:'',border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'0a1f44'}},spacing:{after:200}}));
+
+      // ── Sections ──
+      const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
+      ['A','B','C'].forEach(sec=>{
+        children.push(new D.Paragraph({
+          children:[new D.TextRun({text:SECTION_TITLES[sec],bold:true,color:'FFFFFF',size:22})],
+          shading:{type:D.ShadingType.SOLID,color:'0a1f44'},
+          spacing:{before:200,after:120},indent:{left:100}
+        }));
+        const items=sections[sec]||[];
+        if (!items.length){
+          children.push(new D.Paragraph({children:[new D.TextRun({text:'No entries for this section.',italics:true,color:'999999',size:18})],indent:{left:200}}));
+        } else {
+          items.forEach((e,i)=>{
+            const info=Export.entryText(e,i+1);
+            info.lines.forEach((line,li)=>{
+              children.push(new D.Paragraph({
+                children:[new D.TextRun({text:li===0?`${sec}.${i+1}.  ${line}`:line,bold:li===0,size:18,color:li===0?'0a1f44':'333333'})],
+                indent:{left:li===0?100:400},spacing:{after:li===info.lines.length-1?160:40}
+              }));
+            });
+          });
+        }
+      });
+
+      const doc2=new D.Document({sections:[{properties:{},children}]});
+      const blob=await D.Packer.toBlob(doc2);
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url;
+      a.download=`Meeting-Agenda-Session-${sess.session_number}.docx`; a.click();
+      URL.revokeObjectURL(url);
+    } catch(err){
+      alert('Word generation failed: '+err.message);
+    } finally {
+      btn.disabled=false; btn.innerHTML='<i class="fas fa-file-word"></i> Export Word';
+    }
+  }
+};
+
+// Auto-load dashboard if already logged in
+window.addEventListener('DOMContentLoaded',()=>{
+  if (Auth.token && Auth.supervisor) {
+    el('dash-sup-name').textContent=Auth.supervisor.name||'';
+    showScreen('dash');
+    Dashboard.load();
+  }
+});
+</script>
+</body>
+</html>

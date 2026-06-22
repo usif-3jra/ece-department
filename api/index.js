@@ -219,6 +219,30 @@ async function getActiveBorders(sql) {
   } catch { return DEFAULT_BOOSTED; }
 }
 
+// ── Meeting Organizer table setup ─────────────────────────────────────────
+async function ensureMeetingTables(sql) {
+  await sql`CREATE TABLE IF NOT EXISTS meeting_sessions (
+    id               SERIAL PRIMARY KEY,
+    session_number   INT NOT NULL,
+    academic_year    VARCHAR(9) NOT NULL,
+    meeting_date     DATE,
+    meeting_time     TIME,
+    created_by       VARCHAR(50),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_modified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS meeting_entries (
+    id            SERIAL PRIMARY KEY,
+    session_id    INT NOT NULL,
+    supervisor_id VARCHAR(50) NOT NULL,
+    section       CHAR(1) NOT NULL,
+    entry_type    VARCHAR(50) NOT NULL,
+    entry_data    JSONB NOT NULL DEFAULT '{}',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
@@ -2274,6 +2298,92 @@ module.exports = async function handler(req, res) {
         await sql`DELETE FROM students WHERE project_id = ${projectId}`;
         await sql`DELETE FROM projects WHERE project_id = ${projectId}`;
         return ok({ success: true });
+      }
+
+      // ─── Meeting Organizer ───────────────────────────────────────────────
+
+      case 'getMeetingSessions': {
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMeetingTables(sql);
+        const rows = await sql`SELECT id, session_number, academic_year, meeting_date, meeting_time, last_modified_at FROM meeting_sessions ORDER BY session_number DESC`;
+        return ok({ success: true, sessions: rows });
+      }
+
+      case 'createMeetingSession': {
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMeetingTables(sql);
+        const maxRow = await sql`SELECT COALESCE(MAX(session_number), 13) AS mx FROM meeting_sessions`;
+        const nextNum = Number(maxRow[0].mx) + 1;
+        const now = new Date();
+        const acYear = now.getMonth() >= 8 ? `${now.getFullYear()}/${now.getFullYear()+1}` : `${now.getFullYear()-1}/${now.getFullYear()}`;
+        const rows = await sql`INSERT INTO meeting_sessions (session_number, academic_year, created_by) VALUES (${nextNum}, ${acYear}, ${session.supervisor_id}) RETURNING *`;
+        return ok({ success: true, session: rows[0] });
+      }
+
+      case 'getMySessionEntries': {
+        const [token, sessionId] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMeetingTables(sql);
+        const rows = await sql`SELECT * FROM meeting_entries WHERE session_id = ${Number(sessionId)} AND supervisor_id = ${session.supervisor_id} ORDER BY section, created_at`;
+        return ok({ success: true, entries: rows });
+      }
+
+      case 'addMeetingEntry': {
+        const [token, sessionId, section, entryType, entryData] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMeetingTables(sql);
+        const rows = await sql`INSERT INTO meeting_entries (session_id, supervisor_id, section, entry_type, entry_data) VALUES (${Number(sessionId)}, ${session.supervisor_id}, ${section}, ${entryType}, ${JSON.stringify(entryData)}) RETURNING *`;
+        await sql`UPDATE meeting_sessions SET last_modified_at = NOW() WHERE id = ${Number(sessionId)}`;
+        return ok({ success: true, entry: rows[0] });
+      }
+
+      case 'updateMeetingEntry': {
+        const [token, entryId, entryData] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const rows = await sql`UPDATE meeting_entries SET entry_data = ${JSON.stringify(entryData)}, updated_at = NOW() WHERE id = ${Number(entryId)} AND supervisor_id = ${session.supervisor_id} RETURNING session_id`;
+        if (rows.length) await sql`UPDATE meeting_sessions SET last_modified_at = NOW() WHERE id = ${rows[0].session_id}`;
+        return ok({ success: true });
+      }
+
+      case 'deleteMeetingEntry': {
+        const [token, entryId] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const rows = await sql`DELETE FROM meeting_entries WHERE id = ${Number(entryId)} AND supervisor_id = ${session.supervisor_id} RETURNING session_id`;
+        if (rows.length) await sql`UPDATE meeting_sessions SET last_modified_at = NOW() WHERE id = ${rows[0].session_id}`;
+        return ok({ success: true });
+      }
+
+      case 'updateSessionDetails': {
+        const [token, sessionId, meetingDate, meetingTime] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await sql`UPDATE meeting_sessions SET meeting_date = ${meetingDate || null}, meeting_time = ${meetingTime || null}, last_modified_at = NOW() WHERE id = ${Number(sessionId)}`;
+        return ok({ success: true });
+      }
+
+      case 'getReportData': {
+        const [token, sessionId] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMeetingTables(sql);
+        const sessionRows = await sql`SELECT * FROM meeting_sessions WHERE id = ${Number(sessionId)}`;
+        if (!sessionRows.length) return ok({ success: false, message: 'Session not found.' });
+        const entries = await sql`
+          SELECT me.*, s.name AS supervisor_name
+          FROM meeting_entries me
+          JOIN supervisors s ON s.supervisor_id = me.supervisor_id
+          WHERE me.session_id = ${Number(sessionId)}
+          ORDER BY me.section, me.created_at
+        `;
+        return ok({ success: true, session: sessionRows[0], entries });
       }
 
       default:
