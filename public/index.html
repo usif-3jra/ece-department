@@ -103,7 +103,7 @@
             <i class="fas fa-key me-2 text-primary"></i>Change Password
           </a></li>
           <li><hr class="dropdown-divider"/></li>
-          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.27-23-06 R27</span></li>
+          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03.01-23-06 R01</span></li>
         </ul>
       </div>
       <button class="btn btn-sm btn-danger" onclick="Auth.logout()" title="Logout">
@@ -592,6 +592,10 @@
           <button class="btn btn-sm btn-outline-success" id="btn-export-excel" disabled onclick="Res.exportExcelSummary()" title="Downloads the summary table currently visible — student list + grade stats. For full rubric detail use Export PDF."><i class="fas fa-file-excel me-1"></i>Export Excel <small class="opacity-75">(Summary)</small></button>
           <button class="btn btn-sm btn-outline-danger" id="btn-export-pdf" disabled onclick="Res.exportPDF()"><i class="fas fa-file-pdf me-1"></i>Export PDF <small class="opacity-75">(Detailed)</small></button>
           <button class="btn btn-sm btn-outline-info d-none" id="btn-export-distribution" onclick="Res.exportDistributionReport()"><i class="fas fa-chart-bar me-1"></i>Distribution Report</button>
+          <div class="form-check form-switch d-none align-items-center mb-0 ms-1" id="toggle-ex-names-wrap" style="display:none!important;">
+            <input class="form-check-input" type="checkbox" id="toggle-show-ex-names" checked>
+            <label class="form-check-label small text-muted ms-1" for="toggle-show-ex-names" style="font-size:11px;">Show examiner names in PDF</label>
+          </div>
         </div>
       </div>
       <div id="res-incomplete-warning" class="d-none"></div>

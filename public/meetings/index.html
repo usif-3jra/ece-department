@@ -435,7 +435,7 @@ function arabicTextToImg(text) {
   if (!text || !text.trim()) return null;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const px = 13;
+  const px = 28; // Higher resolution for crisp PDF embedding
   ctx.font = `${px}px Arial,"Segoe UI",Tahoma,sans-serif`;
   const w = Math.ceil(ctx.measureText(text).width) + 12;
   const h = Math.ceil(px * 1.7);
@@ -485,7 +485,9 @@ const _LAM_ALEF = {
   'ﻟ':{'ﺍ':'ﻻ','ﺎ':'ﻼ','ﺁ':'ﻵ','ﺂ':'ﻶ','ﺃ':'ﻷ','ﺄ':'ﻸ','ﺇ':'ﻹ','ﺈ':'ﻺ'},
   'ﻠ':{'ﺍ':'ﻼ','ﺎ':'ﻼ','ﺁ':'ﻶ','ﺂ':'ﻶ','ﺃ':'ﻸ','ﺄ':'ﻸ','ﺇ':'ﻺ','ﺈ':'ﻺ'},
 };
-function reshapeArabic(text) {
+// rtlMode=true: return shaped in logical order for use with doc.setR2L(true)
+// rtlMode=false (default): reverse string for LTR rendering
+function reshapeArabic(text, rtlMode = false) {
   if (!text) return '';
   const chars = [...text];
   const shaped = [];
@@ -495,7 +497,7 @@ function reshapeArabic(text) {
     if (!forms) { shaped.push(c); continue; }
     const pC = i > 0 ? chars[i-1] : null, nC = i < chars.length-1 ? chars[i+1] : null;
     const pJ = pC && _AR_FORMS[pC] && !_AR_NO_LEFT.has(pC);
-    const nJ = nC && _AR_FORMS[nC];
+    const nJ = !_AR_NO_LEFT.has(c) && nC && _AR_FORMS[nC];
     shaped.push(forms[pJ && nJ ? 3 : pJ ? 1 : nJ ? 2 : 0]);
   }
   const ligatured = [];
@@ -503,7 +505,7 @@ function reshapeArabic(text) {
     const lig = _LAM_ALEF[shaped[i]]?.[shaped[i+1]];
     if (lig) { ligatured.push(lig); i++; } else ligatured.push(shaped[i]);
   }
-  return ligatured.reverse().join('');
+  return rtlMode ? ligatured.join('') : ligatured.reverse().join('');
 }
 
 let _arabicFontCache = null;
@@ -1251,14 +1253,18 @@ const Export = {
             if(pdfHasArabic){
               try {
                 doc.setFont('Amiri','normal'); doc.setFontSize(11);
-                doc.text(reshapeArabic(line.arabic),txtX+txtW,ys,{align:'right'});
+                // Use RTL mode + shaped string (no reversal) — avoids double-reversal by PDF viewers
+                doc.setR2L(true);
+                doc.text(reshapeArabic(line.arabic,true),txtX+txtW,ys,{align:'right'});
+                doc.setR2L(false);
                 doc.setFontSize(9); doc.setFont('helvetica','normal');
                 arabicDone=true;
               } catch { pdfHasArabic=false; } // font failed; fall through to canvas
             }
             if(!arabicDone){
+              // High-quality canvas fallback — browser applies native Arabic shaping
               const img=arabicTextToImg(line.arabic);
-              if(img){const ih=lineH,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.2,iw,ih);}
+              if(img){const ih=lineH*1.15,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.5,iw,ih);}
             }
             ys+=lineH;
           } else if(li===0){

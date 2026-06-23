@@ -1647,8 +1647,8 @@ module.exports = async function handler(req, res) {
               return { num: idx + 1, question: q.question_text, avgScore: Math.round(avg * 10) / 10, maxGrade: parseFloat(q.max_grade || 10) };
             });
 
-            const repTable  = buildExTable(repExaminers,  repCfg,  'Report',       sid, session.is_admin);
-            const presTable = buildExTable(presExaminers, presCfg, 'Presentation', sid, session.is_admin);
+            const repTable  = buildExTable(repExaminers,  repCfg,  'Report',       sid, isAdminUser(session));
+            const presTable = buildExTable(presExaminers, presCfg, 'Presentation', sid, isAdminUser(session));
 
             // Compute raw and outlier-filtered pcts (mirrors getFinalResults logic)
             const rawRepAllG   = projGrades.filter(g => g.category === 'Report');

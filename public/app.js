@@ -2326,6 +2326,12 @@ const Res = {
       };
 
       const isAdminUser = Auth.supervisor && Auth.supervisor.isAdmin;
+      // Show examiner-name toggle for admin; read its state
+      const exNamesToggleWrap = document.getElementById('toggle-ex-names-wrap');
+      if (exNamesToggleWrap) {
+        exNamesToggleWrap.style.cssText = isAdminUser ? 'display:flex!important;' : 'display:none!important;';
+      }
+      const showExNames = isAdminUser && document.getElementById('toggle-show-ex-names')?.checked;
 
       if (!isAdminUser) {
         // ── Supervisor: one summary PDF ──────────────────────────────────────
@@ -2639,6 +2645,41 @@ const Res = {
             body: proj.students.map((s, i) => [i + 1, s.studentName, s.studentId]),
           });
 
+          // ── Teamwork Supervisor Grades — all students in one table ────────
+          y = doc.lastAutoTable.finalY + 5;
+          const _twFirst = proj.students[0];
+          if (_twFirst && _twFirst.twDetails && _twFirst.twDetails.length) {
+            y = sectionLabel(doc, y, 'Teamwork — Supervisor Grades (All Students)');
+            const _twCriteria = _twFirst.twDetails;
+            const _twNstu = proj.students.length;
+            const _twNumW = 7, _twMaxW = 12;
+            const _twStuW = Math.max(14, Math.min(28, (cW - _twNumW - cW * 0.38 - _twMaxW) / Math.max(_twNstu, 1)));
+            const _twCritW = cW - _twNumW - _twStuW * _twNstu - _twMaxW;
+            const _twColSty = { 0: { cellWidth: _twNumW, halign: 'center' }, 1: { cellWidth: _twCritW } };
+            for (let _i = 0; _i < _twNstu; _i++) _twColSty[2 + _i] = { cellWidth: _twStuW, halign: 'center' };
+            _twColSty[2 + _twNstu] = { cellWidth: _twMaxW, halign: 'center' };
+            const _twStuHeaders = proj.students.map(s => s.studentId);
+            doc.autoTable({
+              startY: y, margin: { left: margin, right: margin }, theme: 'grid',
+              headStyles: { fillColor: navy, textColor: 255, fontSize: 7.5, fontStyle: 'bold', cellPadding: 1.8, halign: 'center' },
+              bodyStyles: { fontSize: 7.5, cellPadding: 1.8 },
+              footStyles: { fillColor: [230, 240, 255], textColor: [...navy], fontSize: 7.5, fontStyle: 'bold', cellPadding: 1.8 },
+              columnStyles: _twColSty,
+              head: [['#', 'Criterion', ..._twStuHeaders, 'Max']],
+              body: _twCriteria.map((d, _idx) => [
+                d.num, d.criterion,
+                ...proj.students.map(s => s.twDetails[_idx]?.grade ?? '—'),
+                d.maxGrade,
+              ]),
+              foot: [[
+                { content: 'Teamwork Score', colSpan: 2, styles: { halign: 'right' } },
+                ...proj.students.map(s => ({ content: `${s.twScore}%`, styles: { halign: 'center' } })),
+                { content: '', styles: {} },
+              ]],
+            });
+            y = doc.lastAutoTable.finalY + 4;
+          }
+
           // ── Per-student pages ─────────────────────────────────────────────
           for (const stu of proj.students) {
             doc.addPage();
@@ -2688,9 +2729,9 @@ const Res = {
               y = doc.lastAutoTable.finalY + 3;
             }
 
-            // Examiner tables
-            y = drawExamTable(doc, y, 'Examiner — Report Grading',       stu.repTable,  dkBlue, 'Report');
-            y = drawExamTable(doc, y, 'Examiner — Presentation Grading', stu.presTable, dkBlue, 'Presentation');
+            // Examiner tables (anonymize = hide real names when toggle is OFF)
+            y = drawExamTable(doc, y, 'Examiner — Report Grading',       stu.repTable,  dkBlue, 'Report',       !showExNames);
+            y = drawExamTable(doc, y, 'Examiner — Presentation Grading', stu.presTable, dkBlue, 'Presentation', !showExNames);
 
             // Grade summary
             y = sectionLabel(doc, y, 'Grade Summary');
