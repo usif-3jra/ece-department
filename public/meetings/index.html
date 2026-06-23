@@ -174,7 +174,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R08</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R09</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -852,8 +852,8 @@ const Modal = {
     const juryMembers = (roles => roles.map((role,i)=>{
       const j=(d.jury||[])[i]||{};
       return `<div class="jury-row"><h5>${role}</h5><div class="jury-grid">
-        <div><label class="form-label">Full Name</label><input class="form-control jury-name" data-i="${i}" value="${esc(j.name||'')}" placeholder="Dr. / Prof. …"/></div>
-        <div><label class="form-label">Rank</label><select class="form-control jury-rank" data-i="${i}"><option value="">Select…</option>${RANKS.map(r=>`<option${j.rank===r?' selected':''}>${r}</option>`).join('')}</select></div>
+        <div><label class="form-label">Full Name *</label><input class="form-control jury-name" data-i="${i}" value="${esc(j.name||'')}" placeholder="Dr. / Prof. …"/></div>
+        <div><label class="form-label">Rank *</label><select class="form-control jury-rank" data-i="${i}"><option value="">Select…</option>${RANKS.map(r=>`<option${j.rank===r?' selected':''}>${r}</option>`).join('')}</select></div>
         <div><label class="form-label">Affiliation</label><input class="form-control jury-affil" data-i="${i}" value="${esc(j.affiliation||'')}" placeholder="BAU"/></div>
       </div></div>`;
     }).join(''))(['Main Supervisor','Co-Supervisor','External Examiner','Internal Examiner']);
@@ -1018,10 +1018,9 @@ const Modal = {
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && (!data.student_name||!data.student_id||!data.program)) return 'Please fill Student Name, ID, and Program.';
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && !data.thesis_title_en) return 'Please enter the thesis title in English.';
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && !data.thesis_title_ar) return 'Please enter the thesis title in Arabic.';
-    if ((t==='master_defense'||t==='phd_defense') && (!data.jury?.[0]?.name||!data.jury?.[0]?.rank)) return 'Please fill the Main Supervisor\'s name and rank.';
-    if (t==='phd_defense') {
+    if (t==='master_defense'||t==='phd_defense') {
       const allFilled = (data.jury||[]).every(j=>j.name&&j.rank);
-      if (!allFilled) return 'All four jury members (name and rank) are mandatory for PhD Defense.';
+      if (!allFilled) return 'All four jury members (name and rank) are mandatory.';
     }
     if ((t==='conf_accepted'||t==='conf_published') && (!data.title||!data.conference_name)) return 'Please enter the paper title and conference name.';
     if ((t==='conf_accepted'||t==='conf_published') && (!data.location||!data.date||!data.author)) return 'Please fill Location, Date, and Author(s).';
@@ -1412,7 +1411,7 @@ const Export = {
           res();
         };
         img.onerror=()=>res();
-        img.src='/assets/logo_meeting_report.png';
+        img.src='https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png';
         setTimeout(res,5000);
       });
     } catch{}
@@ -1453,8 +1452,8 @@ const Export = {
 
     // ── Entries — tab-stop hanging indent mirrors PDF layout ──
     // TAB_POS twips: "A.1.\t" aligns text; continuation lines indent to same column
-    // 1 inch = 1440 twips; 720 twips ≈ 12.7 mm — enough for "B.10."
-    const TAB_POS = 720;
+    // 0.28" × 1440 = 403 twips — Word dialog: Before text=0, Hanging by 0.28"
+    const TAB_POS = 403;
     const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
 
     ['A','B','C'].forEach(sec=>{
