@@ -174,7 +174,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R07</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R08</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -442,17 +442,19 @@ function arabicTextToImg(text) {
   if (!text || !text.trim()) return null;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const px = 28; // Higher resolution for crisp PDF embedding
-  ctx.font = `${px}px Arial,"Segoe UI",Tahoma,sans-serif`;
-  const w = Math.ceil(ctx.measureText(text).width) + 12;
-  const h = Math.ceil(px * 1.7);
+  const px = 48; // High resolution so PDF downscale stays crisp
+  const font = `${px}px Arial,"Segoe UI",Tahoma,sans-serif`;
+  ctx.font = font;
+  const w = Math.ceil(ctx.measureText(text).width) + 24;
+  const h = Math.ceil(px * 1.6);
   canvas.width = Math.max(w, 10); canvas.height = h;
-  ctx.font = `${px}px Arial,"Segoe UI",Tahoma,sans-serif`;
+  // Canvas resize resets context — re-apply all properties
+  ctx.font = font;
   ctx.fillStyle = '#1e1e1e';
   ctx.textAlign = 'right';
   ctx.direction = 'rtl';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, canvas.width - 3, h / 2);
+  ctx.fillText(text, canvas.width - 6, h / 2);
   return { dataURL: canvas.toDataURL('image/png'), w: canvas.width, h };
 }
 
@@ -465,83 +467,6 @@ function justifyTextLine(doc, line, x, y, maxW) {
   words.forEach(word => { doc.text(word, xPos, y); xPos += doc.getTextWidth(word) + spaceW; });
 }
 
-// ── Arabic reshaping for jsPDF real-text rendering ──────────────────────────
-const _AR_FORMS = {
-  'ء':['ﺀ','ﺀ','ﺀ','ﺀ'],'آ':['ﺁ','ﺂ','ﺁ','ﺂ'],
-  'أ':['ﺃ','ﺄ','ﺃ','ﺄ'],'ؤ':['ﺅ','ﺆ','ﺅ','ﺆ'],
-  'إ':['ﺇ','ﺈ','ﺇ','ﺈ'],'ئ':['ﺉ','ﺊ','ﺋ','ﺌ'],
-  'ا':['ﺍ','ﺎ','ﺍ','ﺎ'],'ب':['ﺏ','ﺐ','ﺑ','ﺒ'],
-  'ة':['ﺓ','ﺔ','ﺓ','ﺔ'],'ت':['ﺕ','ﺖ','ﺗ','ﺘ'],
-  'ث':['ﺙ','ﺚ','ﺛ','ﺜ'],'ج':['ﺝ','ﺞ','ﺟ','ﺠ'],
-  'ح':['ﺡ','ﺢ','ﺣ','ﺤ'],'خ':['ﺥ','ﺦ','ﺧ','ﺨ'],
-  'د':['ﺩ','ﺪ','ﺩ','ﺪ'],'ذ':['ﺫ','ﺬ','ﺫ','ﺬ'],
-  'ر':['ﺭ','ﺮ','ﺭ','ﺮ'],'ز':['ﺯ','ﺰ','ﺯ','ﺰ'],
-  'س':['ﺱ','ﺲ','ﺳ','ﺴ'],'ش':['ﺵ','ﺶ','ﺷ','ﺸ'],
-  'ص':['ﺹ','ﺺ','ﺻ','ﺼ'],'ض':['ﺽ','ﺾ','ﺿ','ﻀ'],
-  'ط':['ﻁ','ﻂ','ﻃ','ﻄ'],'ظ':['ﻅ','ﻆ','ﻇ','ﻈ'],
-  'ع':['ﻉ','ﻊ','ﻋ','ﻌ'],'غ':['ﻍ','ﻎ','ﻏ','ﻐ'],
-  'ف':['ﻑ','ﻒ','ﻓ','ﻔ'],'ق':['ﻕ','ﻖ','ﻗ','ﻘ'],
-  'ك':['ﻙ','ﻚ','ﻛ','ﻜ'],'ل':['ﻝ','ﻞ','ﻟ','ﻠ'],
-  'م':['ﻡ','ﻢ','ﻣ','ﻤ'],'ن':['ﻥ','ﻦ','ﻧ','ﻨ'],
-  'ه':['ﻩ','ﻪ','ﻫ','ﻬ'],'و':['ﻭ','ﻮ','ﻭ','ﻮ'],
-  'ى':['ﻯ','ﻰ','ﻯ','ﻰ'],'ي':['ﻱ','ﻲ','ﻳ','ﻴ'],
-};
-// Letters that do not connect to the left (so next char starts a new word group)
-const _AR_NO_LEFT = new Set('ءآأؤإادذرزوى');
-const _LAM_ALEF = {
-  'ﻟ':{'ﺍ':'ﻻ','ﺎ':'ﻼ','ﺁ':'ﻵ','ﺂ':'ﻶ','ﺃ':'ﻷ','ﺄ':'ﻸ','ﺇ':'ﻹ','ﺈ':'ﻺ'},
-  'ﻠ':{'ﺍ':'ﻼ','ﺎ':'ﻼ','ﺁ':'ﻶ','ﺂ':'ﻶ','ﺃ':'ﻸ','ﺄ':'ﻸ','ﺇ':'ﻺ','ﺈ':'ﻺ'},
-};
-// rtlMode=true: return shaped in logical order for use with doc.setR2L(true)
-// rtlMode=false (default): reverse string for LTR rendering
-function reshapeArabic(text, rtlMode = false) {
-  if (!text) return '';
-  const chars = [...text];
-  const shaped = [];
-  for (let i = 0; i < chars.length; i++) {
-    const c = chars[i];
-    const forms = _AR_FORMS[c];
-    if (!forms) { shaped.push(c); continue; }
-    const pC = i > 0 ? chars[i-1] : null, nC = i < chars.length-1 ? chars[i+1] : null;
-    const pJ = pC && _AR_FORMS[pC] && !_AR_NO_LEFT.has(pC);
-    const nJ = !_AR_NO_LEFT.has(c) && nC && _AR_FORMS[nC];
-    shaped.push(forms[pJ && nJ ? 3 : pJ ? 1 : nJ ? 2 : 0]);
-  }
-  const ligatured = [];
-  for (let i = 0; i < shaped.length; i++) {
-    const lig = _LAM_ALEF[shaped[i]]?.[shaped[i+1]];
-    if (lig) { ligatured.push(lig); i++; } else ligatured.push(shaped[i]);
-  }
-  return rtlMode ? ligatured.join('') : ligatured.reverse().join('');
-}
-
-let _arabicFontCache = null;
-async function loadArabicFont() {
-  if (_arabicFontCache !== null) return _arabicFontCache;
-  // jsPDF requires TTF (not woff2). Try local asset first, then CDN fallback.
-  const sources = [
-    '/assets/Amiri-Regular.ttf',
-    'https://cdn.jsdelivr.net/gh/aliftype/amiri@1.000/fonts/Amiri-Regular.ttf'
-  ];
-  for (const src of sources) {
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), src.startsWith('http') ? 10000 : 5000);
-    const resp = await fetch(src, { signal: ctrl.signal });
-    clearTimeout(tid);
-    if (resp.ok) {
-      const buf = await resp.arrayBuffer();
-      const u8 = new Uint8Array(buf);
-      let b64 = '';
-      for (let i = 0; i < u8.length; i += 4096) b64 += String.fromCharCode(...u8.subarray(i, i+4096));
-      _arabicFontCache = btoa(b64);
-      return _arabicFontCache;
-    }
-  } catch {}
-  } // end for
-  _arabicFontCache = false;
-  return false;
-}
 
 async function api(action, ...args) {
   const r = await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,args})});
@@ -1292,17 +1217,6 @@ const Export = {
       const margin=18, pageW=210, cW=pageW-2*margin;
       const navy=[10,31,68];
 
-      // ── Embed Arabic font (Amiri TTF from /assets/) for real text rendering ──
-      let pdfHasArabic = false;
-      try {
-        const fontB64 = await loadArabicFont();
-        if (fontB64) {
-          doc.addFileToVFS('Amiri-Regular.ttf', fontB64);
-          doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-          pdfHasArabic = true;
-        }
-      } catch {}
-
       // ── Load logo preserving aspect ratio ──
       const logoData=await new Promise(res=>{
         const img=new Image(); img.crossOrigin='anonymous';
@@ -1376,22 +1290,12 @@ const Export = {
         doc.setFontSize(9); doc.setTextColor(30,30,30);
         info.lines.forEach((line,li)=>{
           if (line&&typeof line==='object'&&line.arabic){
-            let arabicDone=false;
-            if(pdfHasArabic){
-              try {
-                doc.setFont('Amiri','normal'); doc.setFontSize(11);
-                // Use RTL mode + shaped string (no reversal) — avoids double-reversal by PDF viewers
-                doc.setR2L(true);
-                doc.text(reshapeArabic(line.arabic,true),txtX+txtW,ys,{align:'right'});
-                doc.setR2L(false);
-                doc.setFontSize(9); doc.setFont('helvetica','normal');
-                arabicDone=true;
-              } catch { pdfHasArabic=false; } // font failed; fall through to canvas
-            }
-            if(!arabicDone){
-              // High-quality canvas fallback — browser applies native Arabic shaping
-              const img=arabicTextToImg(line.arabic);
-              if(img){const ih=lineH*1.15,iw=Math.min(txtW,ih*(img.w/img.h));doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-3.5,iw,ih);}
+            // Browser canvas uses the OS Arabic shaping engine — letters connect correctly
+            const img=arabicTextToImg(line.arabic);
+            if(img){
+              const ih=lineH*1.5;
+              const iw=Math.min(txtW, ih*(img.w/img.h));
+              doc.addImage(img.dataURL,'PNG',txtX+txtW-iw,ys-4,iw,ih);
             }
             ys+=lineH;
           } else if(li===0){
@@ -1489,7 +1393,7 @@ const Export = {
   async _generateWordDocx(D, sess, sections, timeStr) {
     const children=[];
 
-    // ── Load logo for Word header via canvas (same method as PDF) ──
+    // ── Load logo via canvas ──
     let logoBlob=null; let logoNW=0, logoNH=0;
     try {
       await new Promise(res=>{
@@ -1504,79 +1408,96 @@ const Export = {
             const bin=atob(b64); const bytes=new Uint8Array(bin.length);
             for(let j=0;j<bin.length;j++) bytes[j]=bin.charCodeAt(j);
             logoBlob=bytes;
-          } catch{}
+          } catch(e){}
           res();
         };
         img.onerror=()=>res();
         img.src='/assets/logo_meeting_report.png';
-        setTimeout(res,4000);
+        setTimeout(res,5000);
       });
     } catch{}
 
-    // ── Build header table (logo + faculty text) ──
+    // ── Logo + faculty header table — always in document body (not Word Header section) ──
     const noBorder={style:D.BorderStyle.NONE,size:0,color:'FFFFFF'};
-    const hH=45, hW=logoNH>0?Math.round(hH*(logoNW/logoNH)):90;
-    const hLogoCell=new D.TableCell({
+    // Logo height 55px in docx image units (pixels at 96 DPI ≈ 1.45cm)
+    const logoPx=55, logoW=logoNH>0?Math.round(logoPx*(logoNW/logoNH)):110;
+    const logoCell=new D.TableCell({
       children:[logoBlob
-        ?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:hW,height:hH},type:'png'})]})
-        :new D.Paragraph({text:''})],
-      width:{size:38,type:D.WidthType.PERCENTAGE},
+        ?new D.Paragraph({children:[new D.ImageRun({data:logoBlob,transformation:{width:logoW,height:logoPx},type:'png'})],spacing:{before:0,after:0}})
+        :new D.Paragraph({children:[new D.TextRun({text:'BAU – ECE',bold:true,size:20,color:'0a1f44'})],spacing:{before:0,after:0}})],
+      width:{size:40,type:D.WidthType.PERCENTAGE},
       borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder},
       verticalAlign:D.VerticalAlign.CENTER,
     });
-    const hFacCell=new D.TableCell({
+    const facCell=new D.TableCell({
       children:[
-        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'Faculty of Engineering',bold:true,color:'0a1f44',size:20})]}),
-        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})]}),
+        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'Faculty of Engineering',bold:true,color:'0a1f44',size:20})],spacing:{before:0,after:60}}),
+        new D.Paragraph({alignment:D.AlignmentType.RIGHT,children:[new D.TextRun({text:'ECE Department',color:'0a1f44',size:18})],spacing:{before:0,after:0}}),
       ],
-      width:{size:62,type:D.WidthType.PERCENTAGE},
+      width:{size:60,type:D.WidthType.PERCENTAGE},
       borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder},
       verticalAlign:D.VerticalAlign.CENTER,
     });
-    const headerTable=new D.Table({
-      rows:[new D.TableRow({children:[hLogoCell,hFacCell]})],
+    children.push(new D.Table({
+      rows:[new D.TableRow({children:[logoCell,facCell]})],
       width:{size:100,type:D.WidthType.PERCENTAGE},
       borders:{top:noBorder,bottom:noBorder,left:noBorder,right:noBorder,insideH:noBorder,insideV:noBorder},
-    });
+    }));
+    children.push(new D.Paragraph({text:'',spacing:{before:80,after:160}}));
 
-    // ── Document body (title block + sections) ──
-    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:'Electrical & Computer Engineering Department Meeting Agenda',bold:true,color:'0a1f44',size:26})]}));
-    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year||'—'}`,bold:true,color:'0a1f44',size:22})]}));
-    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`To be held on ${meetingDateStr(sess.meeting_date, timeStr)}`,color:'444444',size:20})]}));
-    children.push(new D.Paragraph({text:'',border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'0a1f44'}},spacing:{after:200}}));
+    // ── Title block ──
+    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:'Electrical & Computer Engineering Department Meeting Agenda',bold:true,color:'0a1f44',size:26})],spacing:{after:80}}));
+    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`${ordinal(sess.session_number)} Session – Academic Year ${sess.academic_year||'—'}`,bold:true,color:'0a1f44',size:22})],spacing:{after:60}}));
+    children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[new D.TextRun({text:`To be held on ${meetingDateStr(sess.meeting_date, timeStr)}`,color:'444444',size:20})],spacing:{after:0}}));
+    children.push(new D.Paragraph({text:'',border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'0a1f44'}},spacing:{before:120,after:200}}));
 
+    // ── Entries — tab-stop hanging indent mirrors PDF layout ──
+    // TAB_POS twips: "A.1.\t" aligns text; continuation lines indent to same column
+    // 1 inch = 1440 twips; 720 twips ≈ 12.7 mm — enough for "B.10."
+    const TAB_POS = 720;
     const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
+
     ['A','B','C'].forEach(sec=>{
-      children.push(new D.Paragraph({children:[new D.TextRun({text:SECTION_TITLES[sec],bold:true,color:'FFFFFF',size:22})],shading:{type:D.ShadingType.SOLID,color:'0a1f44'},spacing:{before:200,after:120},indent:{left:100}}));
+      children.push(new D.Paragraph({
+        children:[new D.TextRun({text:SECTION_TITLES[sec],bold:true,color:'FFFFFF',size:22})],
+        shading:{type:D.ShadingType.SOLID,color:'0a1f44'},
+        spacing:{before:240,after:120},
+        indent:{left:100}
+      }));
       const items=sections[sec]||[];
       if (!items.length){
         children.push(new D.Paragraph({children:[new D.TextRun({text:'No entries for this section.',italics:true,color:'999999',size:18})],indent:{left:200}}));
       } else {
         items.forEach((e,i)=>{
           const info=Export.entryText(e,i+1);
+          const isLast=info.lines.length;
           info.lines.forEach((line,li)=>{
             if (line&&typeof line==='object'&&line.arabic){
               children.push(new D.Paragraph({
-                children:[new D.TextRun({text:line.arabic,size:18,color:'333333'})],
+                children:[new D.TextRun({text:line.arabic,size:20,color:'333333'})],
                 alignment:D.AlignmentType.RIGHT,
                 bidirectional:true,
-                indent:{left:400},spacing:{after:40}
+                indent:{left:TAB_POS},
+                spacing:{after:60}
               }));
             } else if (li===0) {
-              // Hanging indent: number starts at 100 twips, wrapped content aligns at 460
+              // Number + tab → text; hanging indent brings first-line number to left edge
               children.push(new D.Paragraph({
+                tabStops:[{type:D.TabStopType.LEFT,position:TAB_POS}],
+                indent:{left:TAB_POS, hanging:TAB_POS},
+                alignment:D.AlignmentType.JUSTIFIED,
                 children:[
-                  new D.TextRun({text:`${sec}.${i+1}. `,bold:true,size:18,color:'0a1f44'}),
+                  new D.TextRun({text:`${sec}.${i+1}.\t`,bold:true,size:18,color:'0a1f44'}),
                   new D.TextRun({text:String(line),bold:true,size:18,color:'0a1f44'})
                 ],
-                indent:{left:460,hanging:360},
-                spacing:{after:info.lines.length===1?160:40}
+                spacing:{after:isLast===1?180:50}
               }));
             } else {
               children.push(new D.Paragraph({
+                indent:{left:TAB_POS},
+                alignment:D.AlignmentType.JUSTIFIED,
                 children:[new D.TextRun({text:String(line),size:18,color:'333333'})],
-                indent:{left:460},
-                spacing:{after:li===info.lines.length-1?160:40}
+                spacing:{after:li===isLast-1?180:50}
               }));
             }
           });
@@ -1584,17 +1505,7 @@ const Export = {
       }
     });
 
-    // ── Assemble document with header ──
-    const sectionDef={properties:{},children};
-    if (D.Header) {
-      try { sectionDef.headers={default:new D.Header({children:[headerTable]})}; } catch{}
-    }
-    // Fallback: if header was not set, prepend logo table into document body
-    if (!sectionDef.headers) {
-      children.unshift(new D.Paragraph({text:'',spacing:{after:80}}));
-      children.unshift(headerTable);
-    }
-    const doc2=new D.Document({sections:[sectionDef]});
+    const doc2=new D.Document({sections:[{properties:{},children}]});
     const blob=await D.Packer.toBlob(doc2);
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url;
@@ -1605,14 +1516,36 @@ const Export = {
   _generateWordHTML(sess, sections, timeStr) {
     const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
     const dateStr=meetingDateStr(sess.meeting_date, timeStr);
+    // Indent size for hanging indent (must match number prefix width visually)
+    const IND='32pt', NEG='-32pt';
     let body='';
     ['A','B','C'].forEach(sec=>{
-      body+=`<div style="background:#0a1f44;color:#fff;padding:5pt 10pt;margin:14pt 0 6pt;"><b>${SECTION_TITLES[sec]}</b></div>`;
+      body+=`<div style="background:#0a1f44;color:#fff;padding:5pt 10pt;margin:14pt 0 6pt;font-size:11pt;font-weight:bold;">${SECTION_TITLES[sec]}</div>`;
       const items=sections[sec]||[];
-      if (!items.length){body+=`<p style="color:#999;font-style:italic;margin-left:20pt;">No entries for this section.</p>`;}
-      else{items.forEach((e,i)=>{const info=Export.entryText(e,i+1);info.lines.forEach((line,li)=>{if(line&&typeof line==='object'&&line.arabic){body+=`<p style="direction:rtl;text-align:right;margin:2pt 0 2pt 20pt;">${esc(line.arabic)}</p>`;}else{const txt=li===0?`${sec}.${i+1}.  ${String(line)}`:String(line);body+=`<p style="margin:2pt 0 2pt ${li===0?'8':'24'}pt;${li===0?'font-weight:bold;color:#0a1f44;':''}">${esc(txt)}</p>`;}});});}
+      if(!items.length){
+        body+=`<p style="color:#999;font-style:italic;margin-left:${IND};">No entries for this section.</p>`;
+      } else {
+        items.forEach((e,i)=>{
+          const info=Export.entryText(e,i+1);
+          info.lines.forEach((line,li)=>{
+            if(line&&typeof line==='object'&&line.arabic){
+              body+=`<p style="direction:rtl;text-align:right;margin:2pt 0 2pt ${IND};">${esc(line.arabic)}</p>`;
+            } else if(li===0){
+              // Hanging indent: number sticks to left, text wraps at IND
+              body+=`<p style="margin:3pt 0 6pt 0;padding-left:${IND};text-indent:${NEG};text-align:justify;font-weight:bold;color:#0a1f44;">${esc(`${sec}.${i+1}.  ${String(line)}`)}</p>`;
+            } else {
+              body+=`<p style="margin:2pt 0 3pt ${IND};text-align:justify;color:#1e1e1e;">${esc(String(line))}</p>`;
+            }
+          });
+        });
+      }
     });
-    const html=`<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Meeting Agenda</title><style>@page{margin:2.5cm;}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1e1e1e;}h1{font-size:13pt;color:#0a1f44;text-align:center;margin:0 0 4pt;}h2{font-size:11pt;color:#0a1f44;text-align:center;margin:2pt 0;}.sub{text-align:center;color:#555;font-size:10pt;margin-bottom:10pt;}hr{border:none;border-top:1.5px solid #0a1f44;margin:10pt 0;}p{margin:3pt 0;line-height:1.5;}</style></head><body><p style="text-align:right;font-size:9pt;color:#333;">Faculty of Engineering &nbsp;|&nbsp; ECE Department</p><h1>Electrical &amp; Computer Engineering Department Meeting Agenda</h1><h2>${ordinal(sess.session_number)} Session – Academic Year ${esc(sess.academic_year||'—')}</h2><p class="sub">To be held on ${esc(dateStr)}</p><hr/>${body}</body></html>`;
+    const css=`@page{margin:2.5cm;}body{font-family:Calibri,Arial,sans-serif;font-size:10pt;color:#1e1e1e;line-height:1.4;}h1{font-size:13pt;color:#0a1f44;text-align:center;margin:0 0 4pt;}h2{font-size:11pt;color:#0a1f44;text-align:center;margin:2pt 0;}.sub{text-align:center;color:#555;font-size:10pt;margin-bottom:10pt;}hr{border:none;border-top:2px solid #0a1f44;margin:10pt 0;}p{margin:3pt 0;}`;
+    const html=`<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Meeting Agenda</title><style>${css}</style></head><body>`
+      +`<table width="100%" cellspacing="0" cellpadding="0" style="border:none;margin-bottom:6pt;"><tr><td width="40%" style="border:none;vertical-align:middle;font-size:11pt;font-weight:bold;color:#0a1f44;">BAU – Faculty of Engineering</td><td width="60%" align="right" style="border:none;vertical-align:middle;font-size:9pt;color:#0a1f44;"><b>Faculty of Engineering</b><br>ECE Department</td></tr></table><hr/>`
+      +`<h1>Electrical &amp; Computer Engineering Department Meeting Agenda</h1>`
+      +`<h2>${ordinal(sess.session_number)} Session – Academic Year ${esc(sess.academic_year||'—')}</h2>`
+      +`<p class="sub">To be held on ${esc(dateStr)}</p><hr/>${body}</body></html>`;
     const blob=new Blob(['﻿',html],{type:'application/msword;charset=utf-8'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url;
