@@ -1582,6 +1582,16 @@ module.exports = async function handler(req, res) {
 
         let projects = await filterProjectsBySession(session, allProjects, allSups);
 
+        let showExNames = isAdminUser(session);
+        if (!showExNames) {
+          if (!_exNamesAccessReady) {
+            await sql`CREATE TABLE IF NOT EXISTS examiner_names_access (supervisor_id TEXT PRIMARY KEY, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+            _exNamesAccessReady = true;
+          }
+          const exRows = await sql`SELECT 1 FROM examiner_names_access WHERE supervisor_id = ${session.supervisor_id}`;
+          showExNames = exRows.length > 0;
+        }
+
         const projectDetails = projects.map(proj => {
           const pid      = proj.project_id;
           const projType = String(proj.type || 'FYP1');
@@ -1648,15 +1658,6 @@ module.exports = async function handler(req, res) {
               return { num: idx + 1, question: q.question_text, avgScore: Math.round(avg * 10) / 10, maxGrade: parseFloat(q.max_grade || 10) };
             });
 
-            let showExNames = isAdminUser(session);
-            if (!showExNames) {
-              if (!_exNamesAccessReady) {
-                await sql`CREATE TABLE IF NOT EXISTS examiner_names_access (supervisor_id TEXT PRIMARY KEY, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
-                _exNamesAccessReady = true;
-              }
-              const exRows = await sql`SELECT 1 FROM examiner_names_access WHERE supervisor_id = ${session.supervisor_id}`;
-              showExNames = exRows.length > 0;
-            }
             const repTable  = buildExTable(repExaminers,  repCfg,  'Report',       sid, showExNames);
             const presTable = buildExTable(presExaminers, presCfg, 'Presentation', sid, showExNames);
 
