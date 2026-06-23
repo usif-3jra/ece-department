@@ -509,11 +509,16 @@ function reshapeArabic(text) {
 let _arabicFontCache = null;
 async function loadArabicFont() {
   if (_arabicFontCache !== null) return _arabicFontCache;
-  // jsPDF requires TTF format; serve Amiri-Regular.ttf from /assets/ for real Arabic text
+  // jsPDF requires TTF (not woff2). Try local asset first, then CDN fallback.
+  const sources = [
+    '/assets/Amiri-Regular.ttf',
+    'https://cdn.jsdelivr.net/gh/aliftype/amiri@1.000/fonts/Amiri-Regular.ttf'
+  ];
+  for (const src of sources) {
   try {
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 5000);
-    const resp = await fetch('/assets/Amiri-Regular.ttf', { signal: ctrl.signal });
+    const tid = setTimeout(() => ctrl.abort(), src.startsWith('http') ? 10000 : 5000);
+    const resp = await fetch(src, { signal: ctrl.signal });
     clearTimeout(tid);
     if (resp.ok) {
       const buf = await resp.arrayBuffer();
@@ -524,6 +529,7 @@ async function loadArabicFont() {
       return _arabicFontCache;
     }
   } catch {}
+  } // end for
   _arabicFontCache = false;
   return false;
 }
@@ -1350,15 +1356,28 @@ const Export = {
   async _generateWordDocx(D, sess, sections, timeStr) {
     const children=[];
 
-    // ── Fetch logo for Word header ──
+    // ── Load logo for Word header via canvas (same method as PDF) ──
     let logoBlob=null; let logoNW=0, logoNH=0;
     try {
-      const resp=await fetch('/assets/logo_meeting_report.png');
-      if (resp.ok) {
-        const ab=await resp.arrayBuffer();
-        logoBlob=new Uint8Array(ab);
-        await new Promise(res=>{const img=new Image();img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};img.onerror=()=>res();img.src=URL.createObjectURL(new Blob([ab]));setTimeout(res,3000);});
-      }
+      await new Promise(res=>{
+        const img=new Image(); img.crossOrigin='anonymous';
+        img.onload=()=>{
+          logoNW=img.naturalWidth; logoNH=img.naturalHeight;
+          try {
+            const cnv=document.createElement('canvas');
+            cnv.width=logoNW||1; cnv.height=logoNH||1;
+            cnv.getContext('2d').drawImage(img,0,0);
+            const b64=cnv.toDataURL('image/png').split(',')[1];
+            const bin=atob(b64); const bytes=new Uint8Array(bin.length);
+            for(let j=0;j<bin.length;j++) bytes[j]=bin.charCodeAt(j);
+            logoBlob=bytes;
+          } catch{}
+          res();
+        };
+        img.onerror=()=>res();
+        img.src='/assets/logo_meeting_report.png';
+        setTimeout(res,4000);
+      });
     } catch{}
 
     // ── Build header table (logo + faculty text) ──
