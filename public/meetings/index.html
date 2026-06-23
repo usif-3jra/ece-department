@@ -141,6 +141,7 @@
     .btn-green{background:#15803d;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer;}
     .spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg);}}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
     @media(max-width:576px){
       .login-card{padding:32px 22px;}
       .page-body{padding:18px 14px;}
@@ -173,7 +174,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R07</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -199,7 +200,7 @@
 <!-- ═══ SESSION VIEW ══════════════════════════════════════════════════════════ -->
 <div id="scr-session" class="screen">
   <div class="topbar">
-    <button class="btn-topbar btn-back" onclick="showScreen('dash');Dashboard.load()"><i class="fas fa-arrow-left"></i></button>
+    <button class="btn-topbar btn-back" onclick="Session.stopPolling();showScreen('dash');Dashboard.load()"><i class="fas fa-arrow-left"></i></button>
     <div style="flex:1;margin-left:8px;">
       <div class="topbar-title" id="sess-topbar-title">Session</div>
       <span class="topbar-sub" id="sess-topbar-sub"></span>
@@ -207,11 +208,15 @@
     <div style="text-align:right;margin-right:14px;line-height:1.5;min-width:0;flex-shrink:1;">
       <div id="sess-info-date" style="font-size:11px;color:#cbd5e1;white-space:nowrap;"></div>
       <div id="sess-info-modified" style="font-size:10px;color:#94a3b8;white-space:nowrap;"></div>
+      <div id="sess-poll-indicator" style="display:none;font-size:9px;color:#4ade80;white-space:nowrap;"><span style="display:inline-block;width:6px;height:6px;background:#4ade80;border-radius:50%;margin-right:3px;vertical-align:middle;animation:pulse 2s ease-in-out infinite;"></span>Live</div>
     </div>
-    <button class="btn-topbar" style="flex-shrink:0;" onclick="Export.open()"><i class="fas fa-download me-1"></i> Export Report</button>
+    <button class="btn-topbar" style="flex-shrink:0;display:none;" id="btn-export-report" onclick="Export.open()"><i class="fas fa-download me-1"></i> Export Report</button>
     <button class="btn-topbar" style="flex-shrink:0;" onclick="Auth.logout()" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
   </div>
   <div class="page-body">
+    <div id="sess-new-entry-banner" style="display:none;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:8px 14px;font-size:12.5px;color:#92400e;margin-bottom:10px;display:none!important;">
+      <i class="fas fa-bell me-1"></i> New entries have been added. <button onclick="Session.refreshEntries()" style="background:none;border:none;color:#b45309;font-weight:700;cursor:pointer;text-decoration:underline;padding:0;">Refresh list</button>
+    </div>
     <div class="privacy-note mb-3"><i class="fas fa-lock me-1"></i> Your entries are <strong>private</strong> until the report is downloaded. All members' entries are combined at export time.</div>
 
     <!-- Section A -->
@@ -247,8 +252,10 @@
         <div class="add-entry-wrap">
           <button class="btn-topbar" onclick="toggleMenu('menu-b')"><i class="fas fa-plus me-1"></i> Add Entry</button>
           <div class="add-entry-menu" id="menu-b">
-            <div class="add-entry-item" onclick="Modal.open('B','conference')">Conference Paper<small>Paper accepted at a conference</small></div>
-            <div class="add-entry-item" onclick="Modal.open('B','journal')">Journal Paper<small>Paper published in a journal</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','conf_accepted')">Accepted Conference Paper<small>Conference paper accepted, awaiting publication</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','conf_published')">Published Conference Paper<small>Conference paper already published</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','journal_accepted')">Accepted Journal Paper<small>Journal paper accepted, awaiting publication</small></div>
+            <div class="add-entry-item" onclick="Modal.open('B','journal_published')">Published Journal Paper<small>Journal paper already published</small></div>
             <div class="add-entry-item" onclick="Modal.open('B','course_mod')">Course Modification<small>Changes to any course</small></div>
             <div class="add-entry-item" onclick="Modal.open('B','event')">Event / Activity<small>Event organized or participated in</small></div>
             <div class="add-entry-item" onclick="Modal.open('B','dept_other')">Others (Bullet Point List)<small>Committee roles, other activities</small></div>
@@ -279,7 +286,7 @@
 <!-- ═══ EXPORT SCREEN ════════════════════════════════════════════════════════ -->
 <div id="scr-export" class="screen">
   <div class="topbar">
-    <button class="btn-topbar btn-back" onclick="showScreen('session')"><i class="fas fa-arrow-left"></i></button>
+    <button class="btn-topbar btn-back" onclick="showScreen('session');Session.startPolling()"><i class="fas fa-arrow-left"></i></button>
     <div style="flex:1;margin-left:8px;">
       <div class="topbar-title">Export Meeting Report</div>
       <span class="topbar-sub">Generate PDF or Word document</span>
@@ -593,6 +600,7 @@ const Auth = {
   },
 
   async logout() {
+    Session.stopPolling();
     if (Auth.token) await api('logoutSession',Auth.token).catch(()=>{});
     sessionStorage.removeItem('mtg_token'); sessionStorage.removeItem('mtg_sup');
     Auth.token=null; Auth.supervisor=null; Auth.isDelegate=false; Auth.supervisorList=[];
@@ -606,7 +614,7 @@ async function loadDelegateInfo() {
   try {
     const r = await api('getIsDelegateInfo', Auth.token);
     Auth.isDelegate = r.isDelegate || false;
-    if (Auth.isDelegate) {
+    if (Auth.isDelegate || Auth.supervisor?.isAdmin) {
       const sl = await api('getMeetingSupervisors', Auth.token);
       if (sl.success) Auth.supervisorList = sl.supervisors || [];
     }
@@ -641,9 +649,10 @@ const Dashboard = {
     list.innerHTML = Dashboard.sessions.map(s=>{
       const canDelete = Auth.supervisor && (Auth.supervisor.isAdmin || s.created_by === Auth.supervisor.id);
       const delBtn = canDelete ? `<button class="btn-del-session" onclick="event.stopPropagation();Dashboard.deleteSession(${s.id})"><i class="fas fa-trash-alt"></i></button>` : '';
+      const suffix = ordinal(s.session_number).replace(String(s.session_number),'');
       return `
       <div class="session-card" onclick="Session.load(${s.id})">
-        <div class="session-num"><span>${s.session_number}</span>th</div>
+        <div class="session-num"><span>${s.session_number}</span>${suffix}</div>
         <div class="session-info">
           <h3>${ordinal(s.session_number)} Session &mdash; Academic Year ${esc(s.academic_year)}</h3>
           <p>${s.meeting_date ? 'Scheduled: '+fmtDate(s.meeting_date) : '<em>Date not set</em>'}</p>
@@ -653,11 +662,6 @@ const Dashboard = {
         <div class="session-arrow"><i class="fas fa-chevron-right"></i></div>
       </div>`;
     }).join('');
-    // Fix ordinal display
-    list.querySelectorAll('.session-num').forEach((el,i)=>{
-      const n=Dashboard.sessions[i].session_number;
-      el.innerHTML=`<span>${n}</span>${ordinal(n).replace(n,'')}`;
-    });
   },
 
   async deleteSession(sessionId) {
@@ -726,8 +730,10 @@ const Delegates = {
 // ── Session View ───────────────────────────────────────────────────────────
 const Session = {
   id:null, info:null, entries:[],
+  _pollTimer:null, _lastModified:null,
 
   async load(sessionId) {
+    Session.stopPolling();
     Session.id=sessionId;
     const s = Dashboard.sessions.find(x=>x.id===sessionId)||{session_number:'—',academic_year:'—'};
     Session.info=s;
@@ -736,9 +742,14 @@ const Session = {
     const mDate = s.meeting_date ? String(s.meeting_date).split('T')[0] : null;
     const mTime = s.meeting_time ? String(s.meeting_time).substring(0,5) : null;
     el('sess-info-date').textContent = 'Meeting Date: ' + (mDate ? fmtDate(mDate) + (mTime ? ' at ' + fmtTime(mTime) : '') : 'Not Scheduled');
+    Session._lastModified = s.last_modified_at || null;
     el('sess-info-modified').textContent = 'Last Entry Made: ' + fmtModified(s.last_modified_at);
-    showScreen('session');
     const isSuperUser = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
+    const exportBtn = el('btn-export-report');
+    if (exportBtn) exportBtn.style.display = isSuperUser ? '' : 'none';
+    const banner = el('sess-new-entry-banner');
+    if (banner) banner.style.setProperty('display','none','important');
+    showScreen('session');
     const r = isSuperUser
       ? await api('getAllSessionEntries',Auth.token,sessionId)
       : await api('getMySessionEntries',Auth.token,sessionId);
@@ -748,10 +759,56 @@ const Session = {
     }
     Session.entries = r.success ? (r.entries||[]) : [];
     Session.render();
+    if (isSuperUser) Session.startPolling();
+  },
+
+  startPolling() {
+    Session.stopPolling();
+    Session._pollTimer = setInterval(Session.checkForUpdates, 30000);
+    const ind = el('sess-poll-indicator');
+    if (ind) ind.style.display = '';
+  },
+
+  stopPolling() {
+    if (Session._pollTimer) { clearInterval(Session._pollTimer); Session._pollTimer = null; }
+    const ind = el('sess-poll-indicator');
+    if (ind) ind.style.display = 'none';
+  },
+
+  async checkForUpdates() {
+    if (!Session.id || !Auth.token) return;
+    try {
+      const r = await api('getMeetingSessions', Auth.token);
+      if (!r.success) return;
+      const s = (r.sessions||[]).find(x=>x.id===Session.id);
+      if (!s) return;
+      if (s.last_modified_at && s.last_modified_at !== Session._lastModified) {
+        const banner = el('sess-new-entry-banner');
+        if (banner) banner.style.removeProperty('display');
+      }
+    } catch(_) {}
+  },
+
+  async refreshEntries() {
+    const banner = el('sess-new-entry-banner');
+    if (banner) banner.style.setProperty('display','none','important');
+    const r = await api('getAllSessionEntries',Auth.token,Session.id);
+    if (!r.success) { alert('Could not refresh entries.'); return; }
+    Session.entries = r.entries||[];
+    // Refresh last_modified_at display
+    const rs = await api('getMeetingSessions', Auth.token);
+    if (rs.success) {
+      const s = (rs.sessions||[]).find(x=>x.id===Session.id);
+      if (s) {
+        Session._lastModified = s.last_modified_at||null;
+        el('sess-info-modified').textContent = 'Last Entry Made: ' + fmtModified(s.last_modified_at);
+      }
+    }
+    Session.render();
   },
 
   render() {
-    const isSuperUser = Auth.isDelegate || Auth.supervisor?.isAdmin;
+    const isSuperUser = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
     ['A','B','C'].forEach(sec=>{
       const secEntries = Session.entries.filter(e=>e.section===sec);
       const container = el('entries-'+sec);
@@ -798,7 +855,7 @@ const Session = {
 };
 
 function entryTypeLabel(t) {
-  const map={master_award:"Master's Award",phd_award:"PhD Award",master_defense:"Master Defense",phd_defense:"PhD Defense",student_other:"Other (Student)",conference:"Conference Paper",journal:"Journal Paper",course_mod:"Course Modification",event:"Event/Activity",dept_other:"Others (Bullet Point List)",new_issue:"New Issue"};
+  const map={master_award:"Master's Award",phd_award:"PhD Award",master_defense:"Master Defense",phd_defense:"PhD Defense",student_other:"Other (Student)",conference:"Conference Paper",journal:"Journal Paper",conf_accepted:"Accepted Conference Paper",conf_published:"Published Conference Paper",journal_accepted:"Accepted Journal Paper",journal_published:"Published Journal Paper",course_mod:"Course Modification",event:"Event/Activity",dept_other:"Others (Bullet Point List)",new_issue:"New Issue"};
   return map[t]||t;
 }
 
@@ -809,14 +866,16 @@ function entryPreview(e) {
       return esc(`${d.student_name||'—'} (${d.student_id||'—'}) — ${d.program||'—'}`);
     case 'master_defense': case 'phd_defense':
       return esc(`${d.student_name||'—'} — ${d.thesis_title_en||'—'}`);
-    case 'conference':
-      return esc(d.title||'—');
-    case 'journal':
+    case 'conference': case 'conf_accepted': case 'conf_published':
+    case 'journal': case 'journal_accepted': case 'journal_published':
       return esc(d.title||'—');
     case 'dept_other': {
       const dispName = e.supervisor_name || d.__attributedName || Auth.supervisor?.name || '—';
       return `${esc(dispName)}: ${(d.bullets||[]).map(b=>`• ${esc(b)}`).join(' ')||'(no bullets)'}`;
     }
+    case 'course_mod':
+      if (d.old_description||d.new_description) return esc(`${d.old_description||'—'} → ${d.new_description||'—'}`);
+      return esc(d.text||'—');
     case 'new_issue':
       return esc(d.text||'—');
     default:
@@ -857,7 +916,7 @@ const Modal = {
       <div class="row g-2"><div class="col-6"><div class="form-group"><label class="form-label">Student ID *</label><input class="form-control" id="f-id" value="${esc(d.student_id||'')}" placeholder="e.g. E20070306"/></div></div>
       <div class="col-6"><div class="form-group"><label class="form-label">Program *</label><select class="form-control" id="f-prog"><option value="">Select…</option>${prog}</select></div></div></div>
       <div class="form-group"><label class="form-label">Thesis Title (English) *</label><textarea class="form-control" id="f-title-en">${esc(d.thesis_title_en||'')}</textarea></div>
-      <div class="form-group"><label class="form-label">Thesis Title (Arabic)</label>
+      <div class="form-group"><label class="form-label">Thesis Title (Arabic) *</label>
         <div class="translate-row">
           <textarea class="form-control" id="f-title-ar" dir="rtl" placeholder="اكتب أو ترجم تلقائياً">${esc(d.thesis_title_ar||'')}</textarea>
           <button class="btn-translate" id="btn-tr" onclick="Modal.translate()"><i class="fas fa-language"></i> Translate</button>
@@ -881,10 +940,15 @@ const Modal = {
       case 'master_defense': case 'phd_defense':
         return studentFields+`<hr style="margin:16px 0;border-color:#e2e8f0;"><p class="form-label mb-2" style="font-size:13px;font-weight:700;color:var(--navy);">Proposed Jury</p>`+juryMembers;
 
-      case 'student_other': case 'course_mod': case 'event':
+      case 'student_other': case 'event':
         return `<div class="form-group"><label class="form-label">Description *</label><textarea class="form-control" id="f-text" style="min-height:120px;">${esc(d.text||'')}</textarea></div>`;
 
-      case 'conference':
+      case 'course_mod':
+        return `
+          <div class="form-group"><label class="form-label">Old Description *</label><textarea class="form-control" id="f-text-old" style="min-height:90px;" placeholder="Describe the current state of the course (what is being changed)">${esc(d.old_description||d.text||'')}</textarea></div>
+          <div class="form-group"><label class="form-label">New Description *</label><textarea class="form-control" id="f-text-new" style="min-height:90px;" placeholder="Describe the proposed change">${esc(d.new_description||'')}</textarea></div>`;
+
+      case 'conf_accepted':
         return `
           <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
           <div class="form-group"><label class="form-label">Conference Name * <span class="form-hint d-inline">(include ordinal, e.g. "4th International Conference on…")</span></label><input class="form-control" id="f-conf" value="${esc(d.conference_name||'')}"/></div>
@@ -892,10 +956,27 @@ const Modal = {
             <div class="col-6"><div class="form-group"><label class="form-label">Location *</label><input class="form-control" id="f-loc" value="${esc(d.location||'')}" placeholder="Tokyo - Japan"/></div></div>
             <div class="col-6"><div class="form-group"><label class="form-label">Date *</label><input class="form-control" id="f-cdate" value="${esc(d.date||'')}" placeholder="October 2026"/></div></div>
           </div>
-          <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}"/></div>`;
+          <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}" placeholder="e.g. Youssef Ajra, Ahmad Khalil"/></div>`;
 
-      case 'journal': {
-        const authors=d.authors||[];
+      case 'conf_published':
+        return `
+          <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
+          <div class="form-group"><label class="form-label">Conference Name / Proceedings * <span class="form-hint d-inline">(include ordinal)</span></label><input class="form-control" id="f-conf" value="${esc(d.conference_name||'')}"/></div>
+          <div class="row g-2">
+            <div class="col-6"><div class="form-group"><label class="form-label">Location *</label><input class="form-control" id="f-loc" value="${esc(d.location||'')}" placeholder="Tokyo - Japan"/></div></div>
+            <div class="col-6"><div class="form-group"><label class="form-label">Date *</label><input class="form-control" id="f-cdate" value="${esc(d.date||'')}" placeholder="October 2026"/></div></div>
+          </div>
+          <div class="form-group"><label class="form-label">DOI / URL</label><input class="form-control" id="f-doi" value="${esc(d.doi||'')}" placeholder="https://doi.org/…"/></div>
+          <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}" placeholder="e.g. Youssef Ajra, Ahmad Khalil"/></div>`;
+
+      case 'journal_accepted':
+        return `
+          <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
+          <div class="form-group"><label class="form-label">Journal Name *</label><input class="form-control" id="f-jname" value="${esc(d.journal_name||'')}"/></div>
+          <div class="form-group"><label class="form-label">Year *</label><input class="form-control" id="f-year" value="${esc(d.year||'')}" placeholder="2026"/></div>
+          <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}" placeholder="e.g. Youssef Ajra, Ahmad Khalil"/></div>`;
+
+      case 'journal_published':
         return `
           <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
           <div class="form-group"><label class="form-label">Journal Name *</label><input class="form-control" id="f-jname" value="${esc(d.journal_name||'')}"/></div>
@@ -903,18 +984,15 @@ const Modal = {
             <div class="col-3"><div class="form-group"><label class="form-label">Year *</label><input class="form-control" id="f-year" value="${esc(d.year||'')}"/></div></div>
             <div class="col-3"><div class="form-group"><label class="form-label">Volume</label><input class="form-control" id="f-vol" value="${esc(d.volume||'')}"/></div></div>
             <div class="col-3"><div class="form-group"><label class="form-label">Issue</label><input class="form-control" id="f-iss" value="${esc(d.issue||'')}"/></div></div>
-            <div class="col-3"><div class="form-group"><label class="form-label">Pages</label><input class="form-control" id="f-pgs" value="${esc(d.pages||'')}"/></div></div>
+            <div class="col-3"><div class="form-group"><label class="form-label">Pages / Article No.</label><input class="form-control" id="f-pgs" value="${esc(d.pages||'')}"/></div></div>
           </div>
           <div class="form-group"><label class="form-label">DOI / URL</label><input class="form-control" id="f-doi" value="${esc(d.doi||'')}" placeholder="https://doi.org/…"/></div>
-          <div class="form-group"><label class="form-label">Authors *</label>
-            <div id="author-chips">${authors.map(a=>`<span class="author-chip">${esc(a)}<button class="chip-rm" onclick="this.parentElement.remove()">×</button></span>`).join('')}</div>
-            <div class="d-flex gap-2 mt-2"><input class="form-control" id="f-author-inp" placeholder="Author name" style="flex:1;"/><button class="btn-primary" style="padding:6px 14px;" onclick="Modal.addAuthor()">Add</button></div>
-          </div>`;
-      }
+          <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}" placeholder="e.g. Youssef Ajra, Ahmad Khalil"/></div>`;
 
       case 'dept_other': {
         const bullets=d.bullets||[];
-        const behalfHtml = Auth.isDelegate ? Modal._behalfDropdown(d) :
+        const canBehalf = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
+        const behalfHtml = canBehalf ? Modal._behalfDropdown(d) :
           `<p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor?.name)}</strong>) will appear automatically in the report.</p>`;
         return `${behalfHtml}
           <div class="form-group"><label class="form-label">Bullet Points *</label>
@@ -924,7 +1002,8 @@ const Modal = {
       }
 
       case 'new_issue': {
-        const behalfHtml2 = Auth.isDelegate ? Modal._behalfDropdown(d) :
+        const canBehalf2 = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
+        const behalfHtml2 = canBehalf2 ? Modal._behalfDropdown(d) :
           `<p class="form-hint mb-2">Your name (<strong>${esc(Auth.supervisor?.name)}</strong>) will appear automatically in the report.</p>`;
         return `${behalfHtml2}
           <div class="form-group"><label class="form-label">Description *</label><textarea class="form-control" id="f-text" style="min-height:120px;">${esc(d.text||'')}</textarea></div>`;
@@ -947,14 +1026,6 @@ const Modal = {
     li.innerHTML=`<input class="form-control" placeholder="e.g. served as committee member in…"/><button class="btn-rm" onclick="this.parentElement.remove()">✕</button>`;
     el('bullet-list').appendChild(li);
     li.querySelector('input').focus();
-  },
-
-  addAuthor() {
-    const inp=el('f-author-inp'); if(!inp.value.trim()) return;
-    const chip=document.createElement('span'); chip.className='author-chip';
-    chip.innerHTML=`${esc(inp.value.trim())}<button class="chip-rm" onclick="this.parentElement.remove()">×</button>`;
-    el('author-chips').appendChild(chip);
-    inp.value='';
   },
 
   async translate() {
@@ -992,12 +1063,23 @@ const Modal = {
       }));
       return {student_name:v('f-name'),student_id:v('f-id'),program:v('f-prog'),thesis_title_en:v('f-title-en'),thesis_title_ar:v('f-title-ar'),jury};
     }
+    if (t==='conf_accepted')
+      return {title:v('f-title'),conference_name:v('f-conf'),location:v('f-loc'),date:v('f-cdate'),author:v('f-author')};
+    if (t==='conf_published')
+      return {title:v('f-title'),conference_name:v('f-conf'),location:v('f-loc'),date:v('f-cdate'),doi:v('f-doi'),author:v('f-author')};
+    if (t==='journal_accepted')
+      return {title:v('f-title'),journal_name:v('f-jname'),year:v('f-year'),author:v('f-author')};
+    if (t==='journal_published')
+      return {title:v('f-title'),journal_name:v('f-jname'),year:v('f-year'),volume:v('f-vol'),issue:v('f-iss'),pages:v('f-pgs'),doi:v('f-doi'),author:v('f-author')};
+    // legacy
     if (t==='conference')
       return {title:v('f-title'),conference_name:v('f-conf'),location:v('f-loc'),date:v('f-cdate'),author:v('f-author')};
     if (t==='journal') {
       const authors=[...document.querySelectorAll('#author-chips .author-chip')].map(c=>c.textContent.replace('×','').trim());
       return {title:v('f-title'),journal_name:v('f-jname'),year:v('f-year'),volume:v('f-vol'),issue:v('f-iss'),pages:v('f-pgs'),doi:v('f-doi'),authors};
     }
+    if (t==='course_mod')
+      return {old_description:v('f-text-old'), new_description:v('f-text-new')};
     if (t==='dept_other') {
       const bullets=[...document.querySelectorAll('#bullet-list .bullet-item input')].map(i=>i.value.trim()).filter(Boolean);
       return {...meta, bullets};
@@ -1010,14 +1092,27 @@ const Modal = {
     const t=Modal.type;
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && (!data.student_name||!data.student_id||!data.program)) return 'Please fill Student Name, ID, and Program.';
     if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && !data.thesis_title_en) return 'Please enter the thesis title in English.';
+    if ((t==='master_award'||t==='phd_award'||t==='master_defense'||t==='phd_defense') && !data.thesis_title_ar) return 'Please enter the thesis title in Arabic.';
     if ((t==='master_defense'||t==='phd_defense') && (!data.jury?.[0]?.name||!data.jury?.[0]?.rank)) return 'Please fill the Main Supervisor\'s name and rank.';
+    if (t==='phd_defense') {
+      const allFilled = (data.jury||[]).every(j=>j.name&&j.rank);
+      if (!allFilled) return 'All four jury members (name and rank) are mandatory for PhD Defense.';
+    }
+    if ((t==='conf_accepted'||t==='conf_published') && (!data.title||!data.conference_name)) return 'Please enter the paper title and conference name.';
+    if ((t==='conf_accepted'||t==='conf_published') && (!data.location||!data.date||!data.author)) return 'Please fill Location, Date, and Author(s).';
+    if ((t==='journal_accepted'||t==='journal_published') && (!data.title||!data.journal_name)) return 'Please enter the paper title and journal name.';
+    if ((t==='journal_accepted'||t==='journal_published') && !data.year) return 'Please enter the publication year.';
+    if ((t==='journal_accepted'||t==='journal_published') && !data.author) return 'Please fill Author(s).';
+    // legacy
     if (t==='conference' && (!data.title||!data.conference_name)) return 'Please enter the paper title and conference name.';
     if (t==='conference' && (!data.location||!data.date||!data.author)) return 'Please fill Location, Date, and Author(s).';
     if (t==='journal' && (!data.title||!data.journal_name)) return 'Please enter the paper title and journal name.';
     if (t==='journal' && !data.year) return 'Please enter the publication year.';
     if (t==='journal' && (!data.authors||!data.authors.length)) return 'Please add at least one author.';
+    if (t==='course_mod' && !data.old_description) return 'Please enter the old description.';
+    if (t==='course_mod' && !data.new_description) return 'Please enter the new description.';
     if (t==='dept_other' && (!data.bullets||!data.bullets.length)) return 'Please add at least one bullet point.';
-    if ((t==='student_other'||t==='course_mod'||t==='event'||t==='new_issue') && !data.text) return 'Please enter a description.';
+    if ((t==='student_other'||t==='event'||t==='new_issue') && !data.text) return 'Please enter a description.';
     return null;
   },
 
@@ -1034,9 +1129,21 @@ const Modal = {
     btn.disabled=false; btn.textContent=Modal.editId?'Update Entry':'Save Entry';
     if (!r.success){alert(r.message||'Error saving entry.');return;}
     Modal.close();
-    // Refresh entries
-    const re=await api('getMySessionEntries',Auth.token,Session.id);
-    Session.entries=re.success?re.entries:Session.entries;
+    // Refresh entries using the same scope as the initial load
+    const isSuperUser = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
+    const [re, rs] = await Promise.all([
+      isSuperUser ? api('getAllSessionEntries',Auth.token,Session.id) : api('getMySessionEntries',Auth.token,Session.id),
+      isSuperUser ? api('getMeetingSessions',Auth.token) : Promise.resolve(null)
+    ]);
+    if (re.success) Session.entries = re.entries||[];
+    // Sync _lastModified so our own submit doesn't trigger the "new entries" banner on next poll
+    if (rs && rs.success) {
+      const updated = (rs.sessions||[]).find(x=>x.id===Session.id);
+      if (updated) {
+        Session._lastModified = updated.last_modified_at||null;
+        el('sess-info-modified').textContent = 'Last Entry Made: ' + fmtModified(updated.last_modified_at);
+      }
+    }
     Session.render();
   }
 };
@@ -1047,16 +1154,20 @@ const Export = {
   currentSessionId:null,
 
   async open() {
+    const isSuperUser = Auth.isDelegate || !!Auth.supervisor?.isAdmin;
+    if (!isSuperUser) { alert('Only the admin or a meeting delegate can export the report.'); return; }
+    Session.stopPolling();
     showScreen('export');
     if (!Dashboard.sessions || !Dashboard.sessions.length) {
       const r = await api('getMeetingSessions', Auth.token);
       if (r.success) Dashboard.sessions = r.sessions || [];
     }
     Export.allSessions=Dashboard.sessions||[];
-    Export.currentSessionId=Session.id;
+    const defaultId = Session.id || (Export.allSessions[0]?.id ?? null);
+    Export.currentSessionId=defaultId;
     const sel=el('exp-session');
-    sel.innerHTML=Export.allSessions.map(s=>`<option value="${s.id}"${s.id===Session.id?' selected':''}>${ordinal(s.session_number)} Session — ${s.academic_year}</option>`).join('');
-    Export.loadSession(Session.id);
+    sel.innerHTML=Export.allSessions.map(s=>`<option value="${s.id}"${s.id===defaultId?' selected':''}>${ordinal(s.session_number)} Session — ${s.academic_year}</option>`).join('');
+    if (defaultId) Export.loadSession(defaultId);
   },
 
   onSessionChange() {
@@ -1068,8 +1179,8 @@ const Export = {
   loadSession(id) {
     const s=Export.allSessions.find(x=>x.id===id);
     if (!s) return;
-    el('exp-date').value=s.meeting_date?s.meeting_date.split('T')[0]:'';
-    el('exp-time').value=s.meeting_time?s.meeting_time.substring(0,5):'';
+    el('exp-date').value=s.meeting_date?String(s.meeting_date).split('T')[0]:'';
+    el('exp-time').value=s.meeting_time?String(s.meeting_time).substring(0,5):'';
     el('exp-modified').textContent=fmtModified(s.last_modified_at);
   },
 
@@ -1115,20 +1226,36 @@ const Export = {
         (d.jury||[]).forEach(j=>{if(j.name)lines.push(`   ${j.name} (${j.role}) – ${j.rank}${j.affiliation?' - '+j.affiliation:''}`)});
         return {label, lines};
       }
-      case 'student_other': case 'course_mod': case 'event':
+      case 'student_other': case 'event':
         return {label, lines:[d.text||'—']};
-      case 'conference':
+      case 'course_mod':
+        if (d.old_description||d.new_description) {
+          return {label, lines:[`Course Modification:`, `   Previous: ${d.old_description||'—'}`, `   Proposed: ${d.new_description||'—'}`]};
+        }
+        return {label, lines:[d.text||'—']};
+      case 'conf_accepted': case 'conference':
         return {label, lines:[`A conference paper titled "${d.title||'—'}" has been accepted in the ${d.conference_name||'—'}${d.location?', '+d.location:''}${d.date?', '+d.date:''}${d.author?', for the author '+d.author:''}.`]};
-      case 'journal': {
-        const auths=d.authors||[];
-        const authStr=auths.length>1?auths.slice(0,-1).join(', ')+', and '+auths[auths.length-1]:auths[0]||'—';
+      case 'conf_published': {
+        let confPub=`${d.conference_name||'—'}`;
+        if(d.location)confPub+=`, ${d.location}`;
+        if(d.date)confPub+=`, ${d.date}`;
+        if(d.doi)confPub+=`; ${d.doi}`;
+        const confPlural = d.author && (d.author.includes(',') || /\band\b/i.test(d.author)) ? 'authors' : 'author';
+        return {label, lines:[`A Conference paper titled "${d.title||'—'}", has been published in ${confPub}, for the ${confPlural} ${d.author||'—'}.`]};
+      }
+      case 'journal_accepted':
+        return {label, lines:[`A journal paper titled "${d.title||'—'}" has been accepted in ${d.journal_name||'—'}${d.year?', '+d.year:''}${d.author?', for the author '+d.author:''}.`]};
+      case 'journal_published': case 'journal': {
+        const auths=d.authors||(d.author?[d.author]:[]);
+        const authStr=auths.length>1?auths.slice(0,-1).join(', ')+', and '+auths[auths.length-1]:auths[0]||d.author||'—';
+        const jPlural = (auths.length>1 || (d.author && (d.author.includes(',') || /\band\b/i.test(d.author)))) ? 'authors' : 'author';
         let pub=`${d.journal_name||''}`;
         if(d.year)pub+=` ${d.year}`;
         if(d.volume)pub+=`, ${d.volume}`;
         if(d.issue)pub+=`(${d.issue})`;
         if(d.pages)pub+=`, ${d.pages}`;
         if(d.doi)pub+=`; ${d.doi}`;
-        return {label, lines:[`A journal paper titled "${d.title||'—'}", has been published in ${pub}, for the author${auths.length!==1?'s':''} ${authStr}.`]};
+        return {label, lines:[`A journal paper titled "${d.title||'—'}", has been published in ${pub}, for the ${jPlural} ${authStr}.`]};
       }
       case 'dept_other': {
         const lines=[`${n}:`];
