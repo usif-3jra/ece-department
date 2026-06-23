@@ -174,7 +174,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R10</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v03-24.06.2026 R11</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -1230,7 +1230,7 @@ const Export = {
           res({dataURL:c.toDataURL('image/png'),w:img.naturalWidth,h:img.naturalHeight});
         };
         img.onerror=()=>res(null);
-        img.src='https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png';
+        img.src='/assets/logo_meeting_report.png';
       });
 
       // ── Header ──
@@ -1396,28 +1396,23 @@ const Export = {
   async _generateWordDocx(D, sess, sections, timeStr) {
     const children=[];
 
-    // ── Load logo via canvas ──
+    // ── Load logo via fetch (ArrayBuffer — required by docx ImageRun) ──
+    const LOGO_URL='https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png';
     let logoBlob=null; let logoNW=0, logoNH=0;
     try {
-      await new Promise(res=>{
-        const img=new Image(); img.crossOrigin='anonymous';
-        img.onload=()=>{
-          logoNW=img.naturalWidth; logoNH=img.naturalHeight;
-          try {
-            const cnv=document.createElement('canvas');
-            cnv.width=logoNW||1; cnv.height=logoNH||1;
-            cnv.getContext('2d').drawImage(img,0,0);
-            const b64=cnv.toDataURL('image/png').split(',')[1];
-            const bin=atob(b64); const bytes=new Uint8Array(bin.length);
-            for(let j=0;j<bin.length;j++) bytes[j]=bin.charCodeAt(j);
-            logoBlob=bytes;
-          } catch(e){}
-          res();
-        };
-        img.onerror=()=>res();
-        img.src='https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png';
-        setTimeout(res,5000);
-      });
+      const [,fetchRes]=await Promise.allSettled([
+        // Get natural dimensions from Image element
+        new Promise(res=>{
+          const img=new Image();
+          img.onload=()=>{logoNW=img.naturalWidth;logoNH=img.naturalHeight;res();};
+          img.onerror=()=>res();
+          img.src=LOGO_URL;
+          setTimeout(res,4000);
+        }),
+        // Get binary via fetch (ArrayBuffer — CORS-safe, no canvas taint)
+        fetch(LOGO_URL).then(r=>r.ok?r.arrayBuffer():null).catch(()=>null)
+      ]);
+      if(fetchRes.status==='fulfilled'&&fetchRes.value) logoBlob=fetchRes.value;
     } catch{}
 
     // ── Logo + faculty header table — always in document body (not Word Header section) ──
@@ -1519,8 +1514,8 @@ const Export = {
   _generateWordHTML(sess, sections, timeStr) {
     const SECTION_TITLES={A:'A.  Student Affairs',B:'B.  Department Affairs',C:'C.  New Issues'};
     const dateStr=meetingDateStr(sess.meeting_date, timeStr);
-    // Indent size for hanging indent (must match number prefix width visually)
-    const IND='32pt', NEG='-32pt';
+    // Indent size for hanging indent: 20pt ≈ 0.28" to match docx TAB_POS=403 twips
+    const IND='20pt', NEG='-20pt';
     let body='';
     ['A','B','C'].forEach(sec=>{
       body+=`<div style="background:#0a1f44;color:#fff;padding:5pt 10pt;margin:14pt 0 6pt;font-size:11pt;font-weight:bold;">${SECTION_TITLES[sec]}</div>`;
