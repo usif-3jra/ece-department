@@ -224,6 +224,7 @@ let _meetingTablesReady  = false;
 let _pubSettingsReady    = false;
 let _feedbackTableReady  = false;
 let _distAccessReady     = false;
+let _exNamesAccessReady  = false;
 let _delegateTablesReady = false;
 async function ensureMeetingTables(sql) {
   if (_meetingTablesReady) return;
@@ -1647,8 +1648,17 @@ module.exports = async function handler(req, res) {
               return { num: idx + 1, question: q.question_text, avgScore: Math.round(avg * 10) / 10, maxGrade: parseFloat(q.max_grade || 10) };
             });
 
-            const repTable  = buildExTable(repExaminers,  repCfg,  'Report',       sid, isAdminUser(session));
-            const presTable = buildExTable(presExaminers, presCfg, 'Presentation', sid, isAdminUser(session));
+            let showExNames = isAdminUser(session);
+            if (!showExNames) {
+              if (!_exNamesAccessReady) {
+                await sql`CREATE TABLE IF NOT EXISTS examiner_names_access (supervisor_id TEXT PRIMARY KEY, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+                _exNamesAccessReady = true;
+              }
+              const exRows = await sql`SELECT 1 FROM examiner_names_access WHERE supervisor_id = ${session.supervisor_id}`;
+              showExNames = exRows.length > 0;
+            }
+            const repTable  = buildExTable(repExaminers,  repCfg,  'Report',       sid, showExNames);
+            const presTable = buildExTable(presExaminers, presCfg, 'Presentation', sid, showExNames);
 
             // Compute raw and outlier-filtered pcts (mirrors getFinalResults logic)
             const rawRepAllG   = projGrades.filter(g => g.category === 'Report');
@@ -2449,6 +2459,40 @@ module.exports = async function handler(req, res) {
         for (const id of (allowedIds || [])) {
           if (id) await sql`INSERT INTO distribution_report_access (supervisor_id)
                             VALUES (${String(id)}) ON CONFLICT DO NOTHING`;
+        }
+        return ok({ success: true });
+      }
+
+      case 'getExNamesAccess': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        if (!_exNamesAccessReady) {
+          await sql`CREATE TABLE IF NOT EXISTS examiner_names_access (supervisor_id TEXT PRIMARY KEY, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+          _exNamesAccessReady = true;
+        }
+        const allSups = await sql`SELECT * FROM supervisors WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
+        const granted = await sql`SELECT supervisor_id FROM examiner_names_access`;
+        const grantSet = new Set(granted.map(r => r.supervisor_id));
+        return ok({
+          success: true,
+          supervisors: allSups.map(r => ({
+            id: r.supervisor_id, name: r.name, program: r.program || '', hasAccess: grantSet.has(r.supervisor_id),
+          })),
+        });
+      }
+
+      case 'setExNamesAccess': {
+        const [sessionToken, allowedIds] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        if (!_exNamesAccessReady) {
+          await sql`CREATE TABLE IF NOT EXISTS examiner_names_access (supervisor_id TEXT PRIMARY KEY, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+          _exNamesAccessReady = true;
+        }
+        await sql`DELETE FROM examiner_names_access`;
+        for (const id of (allowedIds || [])) {
+          if (id) await sql`INSERT INTO examiner_names_access (supervisor_id) VALUES (${String(id)}) ON CONFLICT DO NOTHING`;
         }
         return ok({ success: true });
       }

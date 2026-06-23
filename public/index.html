@@ -103,7 +103,7 @@
             <i class="fas fa-key me-2 text-primary"></i>Change Password
           </a></li>
           <li><hr class="dropdown-divider"/></li>
-          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03-23.06.2026 R01</span></li>
+          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v03-23.06.2026 R02</span></li>
         </ul>
       </div>
       <button class="btn btn-sm btn-danger" onclick="Auth.logout()" title="Logout">
@@ -592,10 +592,6 @@
           <button class="btn btn-sm btn-outline-success" id="btn-export-excel" disabled onclick="Res.exportExcelSummary()" title="Downloads the summary table currently visible — student list + grade stats. For full rubric detail use Export PDF."><i class="fas fa-file-excel me-1"></i>Export Excel <small class="opacity-75">(Summary)</small></button>
           <button class="btn btn-sm btn-outline-danger" id="btn-export-pdf" disabled onclick="Res.exportPDF()"><i class="fas fa-file-pdf me-1"></i>Export PDF <small class="opacity-75">(Detailed)</small></button>
           <button class="btn btn-sm btn-outline-info d-none" id="btn-export-distribution" onclick="Res.exportDistributionReport()"><i class="fas fa-chart-bar me-1"></i>Distribution Report</button>
-          <div class="form-check form-switch d-none align-items-center mb-0 ms-1" id="toggle-ex-names-wrap" style="display:none!important;">
-            <input class="form-check-input" type="checkbox" id="toggle-show-ex-names" checked>
-            <label class="form-check-label small text-muted ms-1" for="toggle-show-ex-names" style="font-size:11px;">Show examiner names in PDF</label>
-          </div>
         </div>
       </div>
       <div id="res-incomplete-warning" class="d-none"></div>
@@ -745,6 +741,32 @@
           </div>
           <button class="btn btn-info btn-sm mt-2" onclick="Admin.saveDistributionAccess()">
             <i class="fas fa-shield-alt me-1"></i>Save Access Permissions
+          </button>
+        </div>
+
+        <!-- ── Examiner Names in PDF Access ── -->
+        <hr class="my-4"/>
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <h6 class="mb-0 fw-bold">
+              <i class="fas fa-user-tag me-2 text-success"></i>Examiner Names in PDF Report
+            </h6>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="Admin.exNamesAccessSelectAll(true)">All</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="Admin.exNamesAccessSelectAll(false)">None</button>
+            </div>
+          </div>
+          <p class="text-muted small mb-2">
+            Choose which supervisors see real examiner names in the detailed PDF report. The admin always sees real names regardless.
+          </p>
+          <div id="exNamesAccessList"
+               style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:6px 10px;">
+            <div class="text-center text-muted py-3 small">
+              <span class="spinner-border spinner-border-sm me-2"></span>Loading…
+            </div>
+          </div>
+          <button class="btn btn-success btn-sm mt-2" onclick="Admin.saveExNamesAccess()">
+            <i class="fas fa-eye me-1"></i>Save Access Permissions
           </button>
         </div>
 

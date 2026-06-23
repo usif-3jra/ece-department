@@ -2326,12 +2326,6 @@ const Res = {
       };
 
       const isAdminUser = Auth.supervisor && Auth.supervisor.isAdmin;
-      // Show examiner-name toggle for admin; read its state
-      const exNamesToggleWrap = document.getElementById('toggle-ex-names-wrap');
-      if (exNamesToggleWrap) {
-        exNamesToggleWrap.style.cssText = isAdminUser ? 'display:flex!important;' : 'display:none!important;';
-      }
-      const showExNames = isAdminUser && document.getElementById('toggle-show-ex-names')?.checked;
 
       if (!isAdminUser) {
         // ── Supervisor: one summary PDF ──────────────────────────────────────
@@ -2729,9 +2723,9 @@ const Res = {
               y = doc.lastAutoTable.finalY + 3;
             }
 
-            // Examiner tables (anonymize = hide real names when toggle is OFF)
-            y = drawExamTable(doc, y, 'Examiner — Report Grading',       stu.repTable,  dkBlue, 'Report',       !showExNames);
-            y = drawExamTable(doc, y, 'Examiner — Presentation Grading', stu.presTable, dkBlue, 'Presentation', !showExNames);
+            // Examiner tables (names resolved by API based on per-supervisor access)
+            y = drawExamTable(doc, y, 'Examiner — Report Grading',       stu.repTable,  dkBlue, 'Report',       false);
+            y = drawExamTable(doc, y, 'Examiner — Presentation Grading', stu.presTable, dkBlue, 'Presentation', false);
 
             // Grade summary
             y = sectionLabel(doc, y, 'Grade Summary');
@@ -3391,6 +3385,7 @@ const Admin = {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
     this.loadDistributionAccess();
+    this.loadExNamesAccess();
     this.loadBoostConfig();
     this.loadOutlierRule();
     try {
@@ -3490,6 +3485,42 @@ const Admin = {
       const res = await gsrAuth('setDistributionReportAccess', allowedIds);
       if (!res.success) { Toast.show(res.message || 'Failed to save.', 'error'); return; }
       Toast.show(`Distribution report access saved — ${allowedIds.length} supervisor(s) granted.`);
+    } catch(e) { Toast.show(e.message || e, 'error'); }
+    finally { Spinner.hide(); }
+  },
+
+  async loadExNamesAccess() {
+    const el = document.getElementById('exNamesAccessList');
+    if (!el) return;
+    el.innerHTML = '<div class="text-center text-muted py-3 small"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>';
+    try {
+      const res = await gsrAuth('getExNamesAccess');
+      if (!res.success) { el.innerHTML = `<p class="text-danger small mb-0 py-2">${escHtml(res.message || 'Failed to load.')}</p>`; return; }
+      if (!res.supervisors || !res.supervisors.length) { el.innerHTML = '<p class="text-muted small mb-0 py-2">No supervisors found.</p>'; return; }
+      el.innerHTML = res.supervisors.map(s => `
+        <div class="d-flex align-items-center py-1 border-bottom" style="gap:10px;">
+          <input class="form-check-input ex-names-chk flex-shrink-0" type="checkbox"
+                 value="${escHtml(s.id)}" id="enc_${escHtml(s.id)}" ${s.hasAccess ? 'checked' : ''}>
+          <label class="form-check-label mb-0 w-100" for="enc_${escHtml(s.id)}" style="font-size:13px;cursor:pointer;">
+            <span class="fw-medium">${escHtml(s.name)}</span>
+            <span class="text-muted ms-2 small">${escHtml(s.program)}</span>
+            <code class="ms-2 text-muted" style="font-size:11px;">${escHtml(s.id)}</code>
+          </label>
+        </div>`).join('');
+    } catch(e) { el.innerHTML = '<p class="text-danger small mb-0 py-2">Error loading access list.</p>'; }
+  },
+
+  exNamesAccessSelectAll(checked) {
+    document.querySelectorAll('.ex-names-chk').forEach(el => { el.checked = checked; });
+  },
+
+  async saveExNamesAccess() {
+    const allowedIds = [...document.querySelectorAll('.ex-names-chk:checked')].map(el => el.value);
+    Spinner.show();
+    try {
+      const res = await gsrAuth('setExNamesAccess', allowedIds);
+      if (!res.success) { Toast.show(res.message || 'Failed to save.', 'error'); return; }
+      Toast.show(`Examiner names access saved — ${allowedIds.length} supervisor(s) granted.`);
     } catch(e) { Toast.show(e.message || e, 'error'); }
     finally { Spinner.hide(); }
   },
