@@ -2452,10 +2452,63 @@ const Res = {
           ys = chartTop + chartH2 + 16;
         }
 
-        // Per-student examiner grading pages (anonymized)
+        // Per-project pages: Teamwork Supervisor Grades + Examiner Grading
         for (const fypType of fypTypesToExport) {
           const examProjects = res.projects.filter(p => p.type === fypType);
           for (const proj of examProjects) {
+            // ── Teamwork combined table ──────────────────────────────────────
+            const _twFirst = proj.students[0];
+            if (_twFirst && _twFirst.twDetails && _twFirst.twDetails.length) {
+              doc.addPage();
+              ys = drawHdr(doc, `${fypType} — Teamwork Supervisor Grades`);
+              const titleLines = doc.splitTextToSize(proj.title, cW - 6);
+              const bannerH = titleLines.length > 1 ? 20 : 14;
+              doc.setFillColor(235, 242, 255);
+              doc.roundedRect(margin, ys, cW, bannerH, 2, 2, 'F');
+              doc.setFont('helvetica', 'bold'); doc.setFontSize(titleLines.length > 1 ? 8.5 : 10); doc.setTextColor(...navy);
+              doc.text(titleLines.slice(0, 2), margin + 3, ys + 5);
+              doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
+              doc.text(`Supervisor(s): ${proj.supervisors.join(', ')}`, margin + 3, ys + bannerH - 3);
+              doc.setTextColor(0, 0, 0);
+              ys += bannerH + 3;
+              doc.autoTable({
+                startY: ys, margin: { left: margin, right: margin }, theme: 'grid',
+                headStyles: { fillColor: navy, textColor: 255, fontSize: 8, fontStyle: 'bold', cellPadding: 2, halign: 'center' },
+                bodyStyles: { fontSize: 8, cellPadding: 2 },
+                columnStyles: { 0:{cellWidth:10,halign:'center'}, 1:{cellWidth:cW*0.6}, 2:{cellWidth:cW-10-cW*0.6,halign:'center'} },
+                head: [['#', 'Student Name', 'Student ID']],
+                body: proj.students.map((s, i) => [i + 1, s.studentName, s.studentId]),
+              });
+              ys = doc.lastAutoTable.finalY + 4;
+              ys = sectionLabel(doc, ys, 'Teamwork — Supervisor Grades (All Students)');
+              const _twNstu = proj.students.length;
+              const _twNumW = 7, _twMaxW = 12;
+              const _twStuW = Math.max(14, Math.min(28, (cW - _twNumW - cW * 0.38 - _twMaxW) / Math.max(_twNstu, 1)));
+              const _twCritW = cW - _twNumW - _twStuW * _twNstu - _twMaxW;
+              const _twColSty = { 0:{cellWidth:_twNumW,halign:'center'}, 1:{cellWidth:_twCritW} };
+              for (let _i = 0; _i < _twNstu; _i++) _twColSty[2 + _i] = { cellWidth: _twStuW, halign: 'center' };
+              _twColSty[2 + _twNstu] = { cellWidth: _twMaxW, halign: 'center' };
+              doc.autoTable({
+                startY: ys, margin: { left: margin, right: margin }, theme: 'grid',
+                headStyles: { fillColor: [...navy], textColor: 255, fontSize: 7.5, fontStyle: 'bold', cellPadding: 1.8, halign: 'center' },
+                bodyStyles: { fontSize: 7.5, cellPadding: 1.8 },
+                footStyles: { fillColor: [230, 240, 255], textColor: [...navy], fontSize: 7.5, fontStyle: 'bold', cellPadding: 1.8 },
+                columnStyles: _twColSty,
+                head: [['#', 'Criterion', ...proj.students.map(s => s.studentId), 'Max']],
+                body: _twFirst.twDetails.map((d, _idx) => [
+                  d.num, d.criterion,
+                  ...proj.students.map(s => s.twDetails[_idx]?.grade ?? '—'),
+                  d.maxGrade,
+                ]),
+                foot: [[
+                  { content: 'Teamwork Score', colSpan: 2, styles: { halign: 'right' } },
+                  ...proj.students.map(s => ({ content: `${s.twScore}%`, styles: { halign: 'center' } })),
+                  { content: '', styles: {} },
+                ]],
+              });
+              ys = doc.lastAutoTable.finalY + 4;
+            }
+            // ── Per-student examiner grading pages ───────────────────────────
             for (const stu of proj.students) {
               if ((!stu.repTable || !stu.repTable.rows.length) && (!stu.presTable || !stu.presTable.rows.length)) continue;
               doc.addPage();
@@ -2467,8 +2520,8 @@ const Res = {
               doc.setTextColor(0, 0, 0);
               ys += 11;
               ys = sectionLabel(doc, ys, `Project: ${proj.title}`);
-              ys = drawExamTable(doc, ys, 'Examiner — Report Grading',       stu.repTable,  dkBlue, 'Report',       true);
-              ys = drawExamTable(doc, ys, 'Examiner — Presentation Grading', stu.presTable, dkBlue, 'Presentation', true);
+              ys = drawExamTable(doc, ys, 'Examiner — Report Grading',       stu.repTable,  dkBlue, 'Report',       false);
+              ys = drawExamTable(doc, ys, 'Examiner — Presentation Grading', stu.presTable, dkBlue, 'Presentation', false);
             }
           }
         }
