@@ -174,7 +174,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R09</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v03-23.06.2026 R10</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -873,6 +873,7 @@ const Modal = {
           <div class="form-group"><label class="form-label">Old Description *</label><textarea class="form-control" id="f-text-old" style="min-height:90px;" placeholder="Describe the current state of the course (what is being changed)">${esc(d.old_description||d.text||'')}</textarea></div>
           <div class="form-group"><label class="form-label">New Description *</label><textarea class="form-control" id="f-text-new" style="min-height:90px;" placeholder="Describe the proposed change">${esc(d.new_description||'')}</textarea></div>`;
 
+      case 'conference':  // legacy type — same field names as conf_accepted
       case 'conf_accepted':
         return `
           <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
@@ -901,6 +902,11 @@ const Modal = {
           <div class="form-group"><label class="form-label">Year *</label><input class="form-control" id="f-year" value="${esc(d.year||'')}" placeholder="2026"/></div>
           <div class="form-group"><label class="form-label">Author(s) *</label><input class="form-control" id="f-author" value="${esc(d.author||'')}" placeholder="e.g. Youssef Ajra, Ahmad Khalil"/></div>`;
 
+      case 'journal': {
+        // Legacy type — old entries stored authors as array; normalize to string for the form
+        const legacyAuthor = Array.isArray(d.authors) ? d.authors.join(', ') : (d.author||'');
+        d = {...d, author: legacyAuthor};
+      } // falls through ↓
       case 'journal_published':
         return `
           <div class="form-group"><label class="form-label">Paper Title *</label><textarea class="form-control" id="f-title">${esc(d.title||'')}</textarea></div>
@@ -999,10 +1005,8 @@ const Modal = {
     // legacy
     if (t==='conference')
       return {title:v('f-title'),conference_name:v('f-conf'),location:v('f-loc'),date:v('f-cdate'),author:v('f-author')};
-    if (t==='journal') {
-      const authors=[...document.querySelectorAll('#author-chips .author-chip')].map(c=>c.textContent.replace('×','').trim());
-      return {title:v('f-title'),journal_name:v('f-jname'),year:v('f-year'),volume:v('f-vol'),issue:v('f-iss'),pages:v('f-pgs'),doi:v('f-doi'),authors};
-    }
+    if (t==='journal')
+      return {title:v('f-title'),journal_name:v('f-jname'),year:v('f-year'),volume:v('f-vol'),issue:v('f-iss'),pages:v('f-pgs'),doi:v('f-doi'),author:v('f-author')};
     if (t==='course_mod')
       return {old_description:v('f-text-old'), new_description:v('f-text-new')};
     if (t==='dept_other') {
@@ -1032,7 +1036,7 @@ const Modal = {
     if (t==='conference' && (!data.location||!data.date||!data.author)) return 'Please fill Location, Date, and Author(s).';
     if (t==='journal' && (!data.title||!data.journal_name)) return 'Please enter the paper title and journal name.';
     if (t==='journal' && !data.year) return 'Please enter the publication year.';
-    if (t==='journal' && (!data.authors||!data.authors.length)) return 'Please add at least one author.';
+    if (t==='journal' && !data.author) return 'Please fill Author(s).';
     if (t==='course_mod' && !data.old_description) return 'Please enter the old description.';
     if (t==='course_mod' && !data.new_description) return 'Please enter the new description.';
     if (t==='dept_other' && (!data.bullets||!data.bullets.length)) return 'Please add at least one bullet point.';
@@ -1226,7 +1230,7 @@ const Export = {
           res({dataURL:c.toDataURL('image/png'),w:img.naturalWidth,h:img.naturalHeight});
         };
         img.onerror=()=>res(null);
-        img.src='/assets/logo_meeting_report.png';
+        img.src='https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png';
       });
 
       // ── Header ──
