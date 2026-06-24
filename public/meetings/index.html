@@ -174,7 +174,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v03-24.06.2026 R11</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v03-24.06.2026 R12</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -1161,8 +1161,10 @@ const Export = {
           return {label, lines:[`Course Modification:`, `   Previous: ${d.old_description||'—'}`, `   Proposed: ${d.new_description||'—'}`]};
         }
         return {label, lines:[d.text||'—']};
-      case 'conf_accepted': case 'conference':
-        return {label, lines:[`A conference paper titled "${d.title||'—'}" has been accepted in the ${d.conference_name||'—'}${d.location?', '+d.location:''}${d.date?', '+d.date:''}${d.author?', for the author '+d.author:''}.`]};
+      case 'conf_accepted': case 'conference': {
+        const caPlural = d.author && (d.author.includes(',') || /\band\b/i.test(d.author)) ? 'authors' : 'author';
+        return {label, lines:[`A conference paper titled "${d.title||'—'}" has been accepted in the ${d.conference_name||'—'}${d.location?', '+d.location:''}${d.date?', '+d.date:''}${d.author?', for the '+caPlural+' '+d.author:''}.`]};
+      }
       case 'conf_published': {
         let confPub=`${d.conference_name||'—'}`;
         if(d.location)confPub+=`, ${d.location}`;
@@ -1171,8 +1173,10 @@ const Export = {
         const confPlural = d.author && (d.author.includes(',') || /\band\b/i.test(d.author)) ? 'authors' : 'author';
         return {label, lines:[`A Conference paper titled "${d.title||'—'}", has been published in ${confPub}, for the ${confPlural} ${d.author||'—'}.`]};
       }
-      case 'journal_accepted':
-        return {label, lines:[`A journal paper titled "${d.title||'—'}" has been accepted in ${d.journal_name||'—'}${d.year?', '+d.year:''}${d.author?', for the author '+d.author:''}.`]};
+      case 'journal_accepted': {
+        const jaPlural = d.author && (d.author.includes(',') || /\band\b/i.test(d.author)) ? 'authors' : 'author';
+        return {label, lines:[`A journal paper titled "${d.title||'—'}" has been accepted in ${d.journal_name||'—'}${d.year?', '+d.year:''}${d.author?', for the '+jaPlural+' '+d.author:''}.`]};
+      }
       case 'journal_published': case 'journal': {
         const auths=d.authors||(d.author?[d.author]:[]);
         const authStr=auths.length>1?auths.slice(0,-1).join(', ')+', and '+auths[auths.length-1]:auths[0]||d.author||'—';
