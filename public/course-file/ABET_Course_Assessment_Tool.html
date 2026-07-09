@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instructor Course Assessment — ABET Outcomes Tool</title>
+<!-- v2: autosave, thresholds, finals+grades, charts, roster import, keyboard nav -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --ink:#101826;
+  --ink-soft:#1c2534;
+  --paper:#F4F6F5;
+  --panel:#FFFFFF;
+  --line:#DBE2E2;
+  --line-soft:#EAEFEE;
+  --slate:#55606B;
+  --slate-soft:#8A939B;
+
+  --teal:#0F7A73;
+  --teal-dim:#E4F0EE;
+  --amber:#C98A2C;
+  --amber-dim:#FBF1DF;
+  --olive:#4C7A3F;
+  --olive-dim:#E9F1E4;
+  --rust:#B5482F;
+  --rust-dim:#FBE9E4;
+
+  --l1:#B5482F; --l1-dim:#FBE9E4;
+  --l2:#C98A2C; --l2-dim:#FBF1DF;
+  --l3:#4C7A3F; --l3-dim:#E9F1E4;
+  --l4:#0F7A73; --l4-dim:#E4F0EE;
+
+  --radius:10px;
+  --shadow:0 1px 2px rgba(16,24,38,.04), 0 6px 20px rgba(16,24,38,.05);
+  --font-display:"Fraunces", Georgia, serif;
+  --font-body:"Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:"IBM Plex Mono", monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--teal); color:#fff;}
+:focus-visible{outline:2px solid var(--teal); outline-offset:2px;}
+
+h1,h2,h3,h4{font-family:var(--font-display); font-weight:600; margin:0; letter-spacing:-0.01em;}
+.mono{font-family:var(--font-mono);}
+
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit; font-size:13px;}
+
+/* ============ APP SHELL ============ */
+#app{display:flex; min-height:100vh;}
+
+/* ---- Sidebar ---- */
+#sidebar{
+  width:248px; flex:0 0 248px;
+  background:var(--ink);
+  color:#EDEFF2;
+  display:flex; flex-direction:column;
+  position:sticky; top:0; height:100vh;
+}
+.brand{
+  padding:22px 20px 16px 20px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.brand .kicker{
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:#7FA89F; margin-bottom:6px;
+}
+.brand h1{font-size:19px; color:#fff; line-height:1.25;}
+.brand .sub{font-size:11.5px; color:#8992A0; margin-top:6px;}
+
+.steps{list-style:none; margin:14px 0; padding:0; flex:1;}
+.step{
+  display:flex; align-items:center; gap:11px;
+  padding:11px 20px;
+  cursor:pointer;
+  color:#B7BEC9;
+  border-left:3px solid transparent;
+  transition:background .12s ease, color .12s ease;
+}
+.step:hover{background:rgba(255,255,255,.04); color:#fff;}
+.step.active{
+  background:rgba(15,122,115,.18);
+  color:#fff;
+  border-left-color:var(--teal);
+}
+.step .num{
+  font-family:var(--font-mono); font-size:11px;
+  width:20px; height:20px; border-radius:50%;
+  border:1px solid #4A5566;
+  display:flex; align-items:center; justify-content:center;
+  flex:0 0 20px;
+  color:#9CA6B2;
+}
+.step.active .num{background:var(--teal); border-color:var(--teal); color:#fff;}
+.step .label{font-size:13px; font-weight:500;}
+.step .desc{display:none;}
+
+.sidebar-foot{
+  padding:16px 20px; border-top:1px solid rgba(255,255,255,.08);
+  display:flex; flex-direction:column; gap:8px;
+}
+.ghost-btn{
+  background:transparent; border:1px solid rgba(255,255,255,.18); color:#C9CFDA;
+  border-radius:8px; padding:8px 10px; font-size:12px; text-align:left;
+  display:flex; align-items:center; gap:8px;
+}
+.ghost-btn:hover{border-color:var(--teal); color:#fff;}
+#fileImport{display:none;}
+
+/* ---- Main ---- */
+#main{flex:1; min-width:0; display:flex; flex-direction:column;}
+#topbar{
+  position:sticky; top:0; z-index:5;
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+  padding:16px 32px;
+  display:flex; align-items:baseline; justify-content:space-between; gap:20px;
+}
+#topbar .title h2{font-size:21px;}
+#topbar .title .meta{font-family:var(--font-mono); font-size:11.5px; color:var(--slate); margin-top:3px;}
+#content{padding:28px 32px 64px 32px; max-width:1180px;}
+
+.panel{display:none;}
+.panel.active{display:block; animation:fadeIn .18s ease;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+/* ============ COMPONENTS ============ */
+.card{
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+  padding:22px 24px; margin-bottom:20px; box-shadow:var(--shadow);
+}
+.card h3{font-size:15.5px; margin-bottom:2px;}
+.card .hint{color:var(--slate); font-size:12.5px; margin-top:2px; margin-bottom:14px;}
+.section-label{
+  font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--teal); margin-bottom:8px; font-weight:600;
+}
+
+.grid-2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.grid-4{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+.field label{display:block; font-size:12px; color:var(--slate); margin-bottom:5px; font-weight:500;}
+.field input, .field select{
+  width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+  background:#fff; color:var(--ink);
+}
+.field input:focus, .field select:focus{border-color:var(--teal);}
+
+.btn{
+  border:none; border-radius:8px; padding:9px 15px; font-size:13px; font-weight:600;
+  display:inline-flex; align-items:center; gap:7px;
+}
+.btn-primary{background:var(--ink); color:#fff;}
+.btn-primary:hover{background:var(--ink-soft);}
+.btn-accent{background:var(--teal); color:#fff;}
+.btn-accent:hover{background:#0C635D;}
+.btn-line{background:#fff; border:1px solid var(--line); color:var(--ink);}
+.btn-line:hover{border-color:var(--slate-soft);}
+.btn-danger-line{background:#fff; border:1px solid var(--line); color:var(--rust);}
+.btn-danger-line:hover{border-color:var(--rust);}
+.btn-sm{padding:6px 10px; font-size:12px; border-radius:6px;}
+.btn[disabled]{opacity:.45; cursor:not-allowed;}
+
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center;}
+.spacer{flex:1;}
+
+table{border-collapse:collapse; width:100%;}
+.datatable{font-size:12.5px;}
+.datatable th{
+  font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--slate); background:var(--line-soft); text-align:left; padding:8px 8px; white-space:nowrap;
+  border-bottom:1px solid var(--line); position:sticky; top:0;
+}
+.datatable td{padding:5px 6px; border-bottom:1px solid var(--line-soft); white-space:nowrap;}
+.datatable tr:hover td{background:#FAFBFB;}
+.datatable input{
+  width:100%; border:1px solid transparent; background:transparent; padding:5px 6px; border-radius:5px;
+  font-family:var(--font-mono); font-size:12.5px;
+}
+.datatable input:hover{border-color:var(--line);}
+.datatable input:focus{border-color:var(--teal); background:#fff;}
+.table-scroll{overflow:auto; max-height:520px; border:1px solid var(--line); border-radius:8px;}
+.icon-btn{
+  background:transparent; border:none; color:var(--slate-soft); padding:2px 6px; border-radius:5px; font-size:13px;
+}
+.icon-btn:hover{color:var(--rust); background:var(--rust-dim);}
+
+.chk{width:17px; height:17px; accent-color:var(--teal); cursor:pointer;}
+
+.pill{
+  display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10.5px;
+  padding:3px 9px; border-radius:100px; font-weight:600;
+}
+.pill-1{background:var(--l1-dim); color:var(--l1);}
+.pill-2{background:var(--l2-dim); color:var(--l2);}
+.pill-3{background:var(--l3-dim); color:var(--l3);}
+.pill-4{background:var(--l4-dim); color:var(--l4);}
+.pill-none{background:var(--line-soft); color:var(--slate-soft);}
+
+/* ---- Achievement meter (signature element) ---- */
+.meter-wrap{display:flex; align-items:center; gap:12px;}
+.meter{
+  position:relative; flex:1; height:10px; border-radius:6px; overflow:hidden;
+  display:flex; background:var(--line-soft);
+}
+.meter i{display:block; height:100%;}
+.meter i.z1{background:var(--l1-dim);}
+.meter i.z2{background:var(--l2-dim);}
+.meter i.z3{background:var(--l3-dim);}
+.meter i.z4{background:var(--l4-dim);}
+.meter .marker{
+  position:absolute; top:-3px; width:3px; height:16px; border-radius:2px; background:var(--ink);
+  transform:translateX(-1.5px);
+}
+.meter .marker::after{
+  content:''; position:absolute; top:-4px; left:50%; transform:translateX(-50%);
+  border-left:4px solid transparent; border-right:4px solid transparent; border-top:4px solid var(--ink);
+}
+.meter-figs{display:flex; align-items:baseline; gap:6px; flex:0 0 auto;}
+.meter-figs .pct{font-family:var(--font-mono); font-weight:600; font-size:14px;}
+.badge-level{
+  width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-weight:700; font-size:12.5px; flex:0 0 26px;
+}
+
+.outcome-card{border:1px solid var(--line); border-radius:9px; padding:14px 16px; margin-bottom:10px; background:#fff;}
+.outcome-card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:10px;}
+.outcome-card .oc-id{font-family:var(--font-mono); font-size:11px; color:var(--teal); font-weight:700; letter-spacing:.03em;}
+.outcome-card .oc-text{font-size:13.5px; margin-top:2px; max-width:640px;}
+.outcome-card .oc-meta{font-size:11px; color:var(--slate-soft); margin-top:6px; font-family:var(--font-mono);}
+
+.tier-tabs{display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--line);}
+.tier-tab{
+  padding:9px 16px; font-size:13px; font-weight:600; color:var(--slate); background:none; border:none;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tier-tab.active{color:var(--ink); border-bottom-color:var(--teal);}
+
+.matrix-wrap{overflow:auto; border:1px solid var(--line); border-radius:8px; max-height:560px;}
+.matrix{font-size:12px; border-collapse:collapse;}
+.matrix th, .matrix td{border:1px solid var(--line-soft); text-align:center; padding:4px;}
+.matrix th{background:var(--line-soft); font-family:var(--font-mono); font-size:10px; font-weight:600;}
+.matrix .rowhead{
+  text-align:left; font-size:12px; background:#fff; position:sticky; left:0; z-index:2;
+  max-width:280px; white-space:normal; padding:8px 10px; border-right:2px solid var(--line);
+}
+.matrix .colhead-group{background:var(--ink); color:#fff; font-family:var(--font-mono); font-size:10px;}
+.matrix th.rowhead-corner{position:sticky; left:0; top:0; z-index:3; background:var(--line-soft);}
+
+.empty-state{
+  text-align:center; padding:48px 20px; color:var(--slate-soft);
+}
+.empty-state .glyph{font-size:28px; margin-bottom:10px;}
+.empty-state h4{color:var(--slate); font-size:14px; margin-bottom:6px;}
+.empty-state p{font-size:12.5px; max-width:360px; margin:0 auto;}
+
+.stat-row{display:flex; gap:14px; margin-bottom:20px; flex-wrap:wrap;}
+.stat-box{
+  flex:1; min-width:150px; background:#fff; border:1px solid var(--line); border-radius:9px; padding:14px 16px;
+}
+.stat-box .num{font-family:var(--font-display); font-size:26px; font-weight:600;}
+.stat-box .lbl{font-size:11.5px; color:var(--slate); margin-top:2px;}
+
+.report-controls{display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;}
+.summary-line{
+  display:flex; gap:22px; padding:14px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  margin:16px 0 20px 0; flex-wrap:wrap;
+}
+.summary-line div{font-size:12px; color:var(--slate);}
+.summary-line b{font-family:var(--font-mono); font-size:15px; color:var(--ink); display:block;}
+
+.toast{
+  position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(12px);
+  background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:12.5px;
+  opacity:0; pointer-events:none; transition:all .25s ease; z-index:50; box-shadow:var(--shadow);
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+.note{font-size:12px; color:var(--slate); background:var(--line-soft); border-radius:7px; padding:9px 12px; margin-top:4px;}
+
+/* Charts */
+.chart-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.chart-box{position:relative; height:250px; background:#fff; border:1px solid var(--line-soft); border-radius:8px; padding:8px;}
+@media (max-width:900px){.chart-grid{grid-template-columns:1fr;}}
+.calc-cell{font-family:var(--font-mono); font-weight:600; text-align:right;}
+.savestate{font-family:var(--font-mono); font-size:10px; color:#6B7683; padding:0 20px 10px;}
+
+/* Print styles for the Report */
+@media print{
+  #sidebar, #topbar, .toolbar, .report-controls, .no-print{display:none !important;}
+  #content{padding:0; max-width:none;}
+  body{background:#fff;}
+  .card{box-shadow:none; border:1px solid #ccc; break-inside:avoid;}
+  .panel{display:none !important;}
+  #panel-report{display:block !important;}
+}
+
+@media (max-width:900px){
+  #sidebar{position:fixed; z-index:20; transform:translateX(-100%); transition:transform .2s ease;}
+  #sidebar.open{transform:translateX(0);}
+  #content{padding:20px 16px;}
+  #topbar{padding:14px 16px;}
+  .grid-2, .grid-4{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ============ SIDEBAR ============ -->
+  <nav id="sidebar">
+    <div class="brand">
+      <div class="kicker">ABET · Outcomes Assessment</div>
+      <h1>Instructor Course<br>Assessment</h1>
+      <div class="sub">Interactive replacement for the .xlsm workbook</div>
+    </div>
+    <ul class="steps" id="stepsList"></ul>
+    <div class="sidebar-foot">
+      <button class="ghost-btn" id="btnExport">⬇ Export data (.json)</button>
+      <button class="ghost-btn" id="btnImport">⬆ Import data (.json)</button>
+      <input type="file" id="fileImport" accept="application/json">
+      <button class="ghost-btn" id="btnSample">✦ Load example course</button>
+      <button class="ghost-btn" id="btnReset" style="color:#E39C8A;">↺ Reset everything</button>
+    </div>
+    <div class="savestate" id="saveState">autosave: on</div>
+  </nav>
+
+  <!-- ============ MAIN ============ -->
+  <div id="main">
+    <div id="topbar">
+      <div class="title">
+        <h2 id="topTitle">Course & Outcomes Setup</h2>
+        <div class="meta" id="topMeta">No course configured yet</div>
+      </div>
+    </div>
+
+    <div id="content">
+
+      <!-- STEP 1: SETUP -->
+      <section class="panel" id="panel-setup">
+        <div class="card">
+          <h3>Course information</h3>
+          <div class="hint">Matches the header fields on the original Class List sheet.</div>
+          <div class="grid-4">
+            <div class="field"><label>Course code</label><input id="c-code" placeholder="e.g. POWE 342"></div>
+            <div class="field"><label>Semester</label><input id="c-sem" placeholder="e.g. Spring"></div>
+            <div class="field"><label>Year</label><input id="c-year" placeholder="e.g. 2025/2026"></div>
+            <div class="field"><label>Instructor</label><input id="c-instr" placeholder="e.g. Jane Doe"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Assessment thresholds</h3>
+          <div class="hint">Defaults match the workbook — mastery: a student "passes" an item by scoring ≥ 70% of its max; achievement levels change at 60 / 70 / 85%.</div>
+          <div class="grid-4">
+            <div class="field"><label>Mastery cutoff (% of item max)</label><input id="s-mastery" type="number" min="1" max="100"></div>
+            <div class="field"><label>Level 2 starts at (%)</label><input id="s-b1" type="number" min="0" max="100"></div>
+            <div class="field"><label>Level 3 starts at (%)</label><input id="s-b2" type="number" min="0" max="100"></div>
+            <div class="field"><label>Level 4 starts at (%)</label><input id="s-b3" type="number" min="0" max="100"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Course Learning Outcomes (CLOs)</h3>
+          <div class="hint">One row per CLO — this is the finest-grained outcome, assessed directly by exam/assignment questions.</div>
+          <div class="toolbar"><button class="btn btn-line btn-sm" id="btnAddCLO">+ Add CLO</button></div>
+          <div id="cloList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Student / Program Outcomes (PLOs)</h3>
+          <div class="hint">The 7 broad ABET outcomes (or your program's equivalents). Each CLO below will be mapped to one or more of these.</div>
+          <div class="toolbar"><button class="btn btn-line btn-sm" id="btnAddPLO">+ Add outcome</button></div>
+          <div id="ploList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Outcome Indicators (optional)</h3>
+          <div class="hint">Finer-grained indicators (e.g. "2a", "2b") that, like CLOs, are assessed directly by questions — for programs that track sub-indicators separately (mirrors the workbook's SO_Results sheet).</div>
+          <div class="toolbar"><button class="btn btn-line btn-sm" id="btnAddSO">+ Add indicator</button></div>
+          <div id="soList"></div>
+        </div>
+      </section>
+
+      <!-- STEP 2: ROSTER -->
+      <section class="panel" id="panel-roster">
+        <div class="card">
+          <h3>Class roster</h3>
+          <div class="hint">Click a cell to type, or select the first ID cell and paste a block copied from Excel (Nb / ID / Name columns).</div>
+          <div class="toolbar">
+            <button class="btn btn-line btn-sm" id="btnAddStudent">+ Add student</button>
+            <button class="btn btn-line btn-sm" id="btnAddStudents10">+ Add 10 rows</button>
+            <button class="btn btn-line btn-sm" id="btnImportRoster">⬆ Import from Excel / CSV</button>
+            <input type="file" id="fileRoster" accept=".xlsx,.xls,.xlsm,.csv" style="display:none;">
+            <span class="spacer"></span>
+            <span class="note" id="rosterCount" style="margin:0;"></span>
+          </div>
+          <div class="table-scroll"><table class="datatable" id="rosterTable"></table></div>
+        </div>
+      </section>
+
+      <!-- STEP 3: INSTRUMENTS + GRADES -->
+      <section class="panel" id="panel-grades">
+        <div class="card">
+          <h3>Assessment instruments</h3>
+          <div class="hint">Groups (e.g. "Exam 1", "Assignments") each contain items (e.g. "Pb1") with a maximum score. These items are what CLOs/indicators get mapped to.</div>
+          <div class="toolbar"><button class="btn btn-line btn-sm" id="btnAddGroup">+ Add instrument group</button></div>
+          <div id="groupsEditor"></div>
+        </div>
+
+        <div class="card">
+          <h3>Grade entry</h3>
+          <div class="hint">Row 1 under each item header is the maximum possible score. Paste a block from Excel starting at any score cell to fill quickly.</div>
+          <div class="toolbar">
+            <button class="btn btn-line btn-sm" id="btnRecalc">↻ Recalculate</button>
+            <span class="spacer"></span>
+            <span class="note" id="gradesHint" style="margin:0;"></span>
+          </div>
+          <div class="table-scroll"><table class="datatable" id="gradesTable"></table></div>
+        </div>
+      </section>
+
+      <!-- STEP 4: MAPPING -->
+      <section class="panel" id="panel-mapping">
+        <div class="card">
+          <div class="tier-tabs">
+            <button class="tier-tab active" data-map="clo">CLO → Items</button>
+            <button class="tier-tab" data-map="so">Indicator → Items</button>
+            <button class="tier-tab" data-map="plo">PLO → CLO / Indicators</button>
+          </div>
+          <div class="hint" id="mappingHint">Check every item whose questions assess a given CLO. A CLO is "met" using the average pass rate across all checked items.</div>
+          <div id="mappingArea"></div>
+        </div>
+      </section>
+
+      <!-- STEP 5: DASHBOARD -->
+      <section class="panel" id="panel-dashboard">
+        <div class="stat-row" id="dashStats"></div>
+
+        <div class="card">
+          <h3>Course Learning Outcomes (CLO)</h3>
+          <div class="hint">Achievement level & percentage per CLO, computed from mapped items.</div>
+          <div id="dashCLO"></div>
+        </div>
+
+        <div class="card" id="dashSOCard">
+          <h3>Outcome Indicators</h3>
+          <div class="hint">Achievement level & percentage per indicator, computed from mapped items.</div>
+          <div id="dashSO"></div>
+        </div>
+
+        <div class="card">
+          <h3>Student / Program Outcomes (PLO)</h3>
+          <div class="hint">Averaged from the % achievement of every related CLO / indicator.</div>
+          <div id="dashPLO"></div>
+        </div>
+
+        <div class="card">
+          <h3>Charts</h3>
+          <div class="hint">Bars are colored by achievement level. Grade distribution uses the computed final marks.</div>
+          <div class="chart-grid">
+            <div class="chart-box"><canvas id="chCLO"></canvas></div>
+            <div class="chart-box"><canvas id="chPLO"></canvas></div>
+            <div class="chart-box" id="chSOBox"><canvas id="chSO"></canvas></div>
+            <div class="chart-box"><canvas id="chDist"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 6: REPORT -->
+      <section class="panel" id="panel-report">
+        <div class="card no-print">
+          <h3>Generate report</h3>
+          <div class="hint">Filter by achievement level and/or a minimum % — the sections below update, and the printable report always keeps CLOs, indicators and PLOs together.</div>
+          <div class="report-controls">
+            <div class="field" style="max-width:200px;">
+              <label>Achievement level</label>
+              <select id="rptLevel">
+                <option value="0">Any level</option>
+                <option value="1">Level 1 — below 60%</option>
+                <option value="2">Level 2 — 60–70%</option>
+                <option value="3">Level 3 — 70–85%</option>
+                <option value="4">Level 4 — above 85%</option>
+              </select>
+            </div>
+            <div class="field" style="max-width:200px;">
+              <label>Minimum % achievement</label>
+              <input type="number" id="rptMinPct" value="0" min="0" max="100" step="1">
+            </div>
+            <button class="btn btn-line" id="btnRptReset">Clear filters</button>
+            <span class="spacer"></span>
+            <button class="btn btn-accent" id="btnPrint">🖨 Print / Save PDF</button>
+          </div>
+        </div>
+
+        <div class="card" id="reportSheet">
+          <div style="margin-bottom:6px;">
+            <div class="section-label">Instructor Course Assessment Report</div>
+            <h2 id="rptTitle">—</h2>
+            <div class="mono" id="rptMeta" style="color:var(--slate); font-size:12px; margin-top:4px;"></div>
+          </div>
+          <div class="summary-line" id="rptSummary"></div>
+
+          <div class="chart-grid" style="margin-bottom:6px;">
+            <div class="chart-box"><canvas id="rchCLO"></canvas></div>
+            <div class="chart-box"><canvas id="rchPLO"></canvas></div>
+          </div>
+
+          <div id="rptCLOs"></div>
+          <div id="rptSOs"></div>
+          <div id="rptPLOs"></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let uidCounter = 1;
+function uid(prefix){ return prefix + (uidCounter++); }
+
+function defaultState(){
+  return {
+    course:{code:'', sem:'', year:'', instr:''},
+    settings:{mastery:70, b1:60, b2:70, b3:85},
+    clos:[],
+    plos:[],
+    sos:[],
+    groups:[],
+    students:[],
+    scores:{},     // scores[studentId][itemId] = number|null
+    raises:{},     // raises[studentId] = number  (added to the final mark, like the workbook's Raise column)
+    cloMap:{},     // cloMap[cloId][itemId] = 1/0
+    soMap:{},      // soMap[soId][itemId] = 1/0
+    ploMap:{}      // ploMap[ploId]['clo:'+id or 'so:'+id] = 1/0
+  };
+}
+let S = defaultState();
+
+function SET(){
+  if(!S.settings) S.settings = {mastery:70, b1:60, b2:70, b3:85};
+  return S.settings;
+}
+
+/* ---- Final mark, letter grade, distribution (mirrors the workbook's Grades sheet) ---- */
+function finalMark(st){
+  const sc = S.scores[st.id] || {};
+  let sum = 0, any = false;
+  allItems().forEach(it=>{
+    const v = sc[it.id];
+    if(v!==null && v!==undefined && v!=='' && !isNaN(v)){ sum += Number(v); any = true; }
+  });
+  if(!any) return null;
+  return Math.ceil(sum) + (Number(S.raises && S.raises[st.id]) || 0);
+}
+function letterGrade(m){
+  if(m===null || m===undefined) return '';
+  if(m<=0) return 'UW';
+  if(m<54) return 'F';
+  const bands = [[59,'D-'],[64,'D'],[69,'C-'],[72,'C'],[75,'C+'],[79,'B-'],[82,'B'],[85,'B+'],[89,'A-'],[93,'A']];
+  for(const [top,g] of bands) if(m<=top) return g;
+  return 'A+';
+}
+const GRADE_ORDER = ['A+','A','A-','B+','B','B-','C+','C','C-','D','D-','F','UW'];
+function gradeDistribution(){
+  const d = Object.fromEntries(GRADE_ORDER.map(g=>[g,0]));
+  activeStudents().forEach(s=>{ const g = letterGrade(finalMark(s)); if(g && d[g]!==undefined) d[g]++; });
+  return d;
+}
+/* Students counted in achievement stats: final mark > 0 (matches CLO_Results!AQ4 = COUNTIF(final,">0")) */
+function gradedStudents(){
+  return activeStudents().filter(s=>{ const f = finalMark(s); return f!==null && f>0; });
+}
+
+function allItems(){
+  let items = [];
+  S.groups.forEach(g=>{
+    g.items.forEach(it=> items.push({...it, groupId:g.id, groupName:g.name}));
+  });
+  return items;
+}
+
+function levelOf(pct){
+  if(pct===null || pct===undefined || isNaN(pct)) return null;
+  const t = SET();
+  if(pct < t.b1) return 1;
+  if(pct < t.b2) return 2;
+  if(pct < t.b3) return 3;
+  return 4;
+}
+function levelMeta(lvl){
+  const m = {
+    1:{cls:'l1', label:'Level 1', word:'Below target'},
+    2:{cls:'l2', label:'Level 2', word:'Developing'},
+    3:{cls:'l3', label:'Level 3', word:'Meets target'},
+    4:{cls:'l4', label:'Level 4', word:'Exceeds target'}
+  };
+  return m[lvl] || {cls:'none', label:'—', word:'No data'};
+}
+
+/* ============================================================
+   COMPUTATION ENGINE  (mirrors CLO_Results / SO_Results / PLO_Results)
+   ============================================================ */
+function activeStudents(){
+  return S.students.filter(s => (s.id && String(s.id).trim()!=='') || (s.name && s.name.trim()!==''));
+}
+
+function computeDirect(map, targetId){
+  // Used for both CLOs and Indicators: map[targetId][itemId] = 1/0
+  const items = allItems();
+  // items with max<=0 are excluded entirely so they can't dilute the denominator
+  const marked = items.filter(it => map[targetId] && map[targetId][it.id] && (Number(it.max)||0) > 0);
+  const graded = gradedStudents();
+  const total = graded.length;
+  if(marked.length===0 || total===0) return null;
+
+  const frac = SET().mastery/100;
+  let sumCount = 0;
+  marked.forEach(it=>{
+    const threshold = frac*(Number(it.max)||0);
+    let count = 0;
+    graded.forEach(s=>{
+      const v = (S.scores[s.id] || {})[it.id];
+      if(v!==null && v!==undefined && v!=='' && !isNaN(v) && Number(v) >= threshold) count++;
+    });
+    sumCount += count;
+  });
+  const pct = 100*sumCount/(marked.length*total);
+  return {
+    pct: pct,
+    level: levelOf(pct),
+    studentsAbove: sumCount,
+    numInstruments: marked.length,
+    totalStudents: total
+  };
+}
+
+function computeAggregate(map, targetId, cloResults, soResults){
+  // Used for PLOs: map[targetId]['clo:'+id / 'so:'+id] = 1/0, averaging % of related items that HAVE data
+  const relatedKeys = Object.keys(map[targetId]||{}).filter(k=> map[targetId][k]);
+  let vals = [];
+  relatedKeys.forEach(k=>{
+    const [kind,id] = k.split(':');
+    const res = kind==='clo' ? cloResults[id] : soResults[id];
+    if(res && res.pct!==null && !isNaN(res.pct)) vals.push(res.pct);
+  });
+  if(vals.length===0) return null;
+  const pct = vals.reduce((a,b)=>a+b,0)/vals.length;
+  return { pct: pct, level: levelOf(pct), numRelated: vals.length };
+}
+
+function computeAll(){
+  const cloResults = {};
+  S.clos.forEach(c=> cloResults[c.id] = computeDirect(S.cloMap, c.id));
+  const soResults = {};
+  S.sos.forEach(s=> soResults[s.id] = computeDirect(S.soMap, s.id));
+  const ploResults = {};
+  S.plos.forEach(p=> ploResults[p.id] = computeAggregate(S.ploMap, p.id, cloResults, soResults));
+  return {cloResults, soResults, ploResults};
+}
+
+/* ============================================================
+   PERSISTENCE
+   ============================================================ */
+const LS_KEY = 'abet_tool_state_v1';
+let saveTimer = null;
+function autosave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({S, uidCounter}));
+      const el = document.getElementById('saveState');
+      if(el) el.textContent = 'autosaved ' + new Date().toLocaleTimeString();
+    }catch(e){}
+  }, 300);
+}
+function restoreAutosave(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return false;
+    const o = JSON.parse(raw);
+    if(!o || !o.S || !Array.isArray(o.S.students)) return false;
+    S = Object.assign(defaultState(), o.S);
+    S.settings = Object.assign({mastery:70,b1:60,b2:70,b3:85}, o.S.settings||{});
+    if(!S.raises) S.raises = {};
+    uidCounter = o.uidCounter || guessUidCounter();
+    return true;
+  }catch(e){ return false; }
+}
+function guessUidCounter(){
+  // make sure new uids never collide with ids already in the data
+  let maxN = 0;
+  const scan = x=>{ const m = String(x||'').match(/\d+$/); if(m) maxN = Math.max(maxN, Number(m[0])); };
+  S.clos.forEach(o=>scan(o.id)); S.plos.forEach(o=>scan(o.id)); S.sos.forEach(o=>scan(o.id));
+  S.students.forEach(o=>scan(o.id));
+  S.groups.forEach(g=>{ scan(g.id); g.items.forEach(it=>scan(it.id)); });
+  return maxN + 1;
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const name = (S.course.code || 'course').replace(/[^a-z0-9]+/gi,'_');
+  a.href = url; a.download = `abet_assessment_${name}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('Data exported');
+}
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      S = Object.assign(defaultState(), data);
+      S.settings = Object.assign({mastery:70,b1:60,b2:70,b3:85}, data.settings||{});
+      if(!S.raises) S.raises = {};
+      uidCounter = guessUidCounter();
+      toast('Data imported');
+      renderAll();
+    }catch(err){ toast('Could not read that file'); }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   SAMPLE DATA
+   ============================================================ */
+function loadSample(){
+  S = defaultState();
+  S.course = {code:'ENGR 210', sem:'Fall', year:'2026/2027', instr:'A. Haddad'};
+  const cloTexts = [
+    'Apply fundamental principles to model a linear system.',
+    'Analyze the transient and steady-state response of first/second-order systems.',
+    'Design a basic feedback controller meeting given specifications.'
+  ];
+  S.clos = cloTexts.map(t=>({id:uid('c'), text:t}));
+  S.plos = [1,2,3,4,5,6,7].map(n=>({id:uid('p'), text:`Outcome ${n}`}));
+  S.sos = [
+    {id:uid('s'), text:'2a — Define design specifications and constraints.'},
+    {id:uid('s'), text:'2b — Consider safety, economics, and environment in design decisions.'}
+  ];
+  S.groups = [
+    {id:uid('g'), name:'Exam 1', items:[
+      {id:uid('i'), name:'Pb1', max:5},{id:uid('i'), name:'Pb2', max:5},{id:uid('i'), name:'Pb3', max:5},{id:uid('i'), name:'Pb4', max:5}
+    ]},
+    {id:uid('g'), name:'Final Exam', items:[
+      {id:uid('i'), name:'Pb1', max:8},{id:uid('i'), name:'Pb2', max:8},{id:uid('i'), name:'Pb3', max:8},{id:uid('i'), name:'Pb4', max:8}
+    ]},
+    {id:uid('g'), name:'Assignments', items:[
+      {id:uid('i'), name:'A1', max:6},{id:uid('i'), name:'A2', max:6}
+    ]}
+  ];
+  const names = ['Aoun, Karim','Baz, Lina','Chami, Rami','Diab, Sara','Fares, Tarek','Ghosn, Maya','Haidar, Omar','Issa, Nadine','Jaber, Zeid','Khoury, Rana'];
+  names.forEach((n,idx)=>{
+    const id = uid('st');
+    S.students.push({id: id, sid:String(100000+idx), name:n});
+    S.scores[id] = {};
+  });
+  // random-ish but deterministic scores
+  let seed = 7;
+  function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
+  const items = allItems();
+  S.students.forEach(st=>{
+    items.forEach(it=>{
+      const frac = 0.45 + rnd()*0.55;
+      S.scores[st.id][it.id] = Math.round(frac*it.max*10)/10;
+    });
+  });
+  // CLO mapping
+  S.cloMap[S.clos[0].id] = {}; S.cloMap[S.clos[1].id] = {}; S.cloMap[S.clos[2].id] = {};
+  S.cloMap[S.clos[0].id][items[0].id]=1; S.cloMap[S.clos[0].id][items[4].id]=1;
+  S.cloMap[S.clos[1].id][items[1].id]=1; S.cloMap[S.clos[1].id][items[2].id]=1; S.cloMap[S.clos[1].id][items[5].id]=1;
+  S.cloMap[S.clos[2].id][items[3].id]=1; S.cloMap[S.clos[2].id][items[6].id]=1; S.cloMap[S.clos[2].id][items[8].id]=1;
+  // SO mapping
+  S.soMap[S.sos[0].id] = {}; S.soMap[S.sos[1].id] = {};
+  S.soMap[S.sos[0].id][items[8].id]=1;
+  S.soMap[S.sos[1].id][items[9].id]=1;
+  // PLO mapping
+  S.plos.forEach(p=> S.ploMap[p.id] = {});
+  S.ploMap[S.plos[0].id]['clo:'+S.clos[0].id]=1;
+  S.ploMap[S.plos[1].id]['clo:'+S.clos[1].id]=1;
+  S.ploMap[S.plos[1].id]['clo:'+S.clos[2].id]=1;
+  S.ploMap[S.plos[2].id]['so:'+S.sos[0].id]=1;
+  S.ploMap[S.plos[2].id]['so:'+S.sos[1].id]=1;
+
+  toast('Example course loaded');
+  renderAll();
+}
+
+/* ============================================================
+   ROSTER IMPORT (xlsx / xls / xlsm / csv) — works with the
+   original workbook's "Class List" sheet or any ID/Name sheet
+   ============================================================ */
+function importRosterFile(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const sheet = wb.Sheets['Class List'] || wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
+      let hr=-1, idc=-1, nmc=-1;
+      for(let i=0;i<Math.min(rows.length,15);i++){
+        const cells = (rows[i]||[]).map(x=>String(x??'').toLowerCase().trim());
+        const ic = cells.findIndex(c=> c==='student id' || c==='id' || c.includes('student id'));
+        const nc = cells.findIndex(c=> c==='name' || c.includes('name'));
+        if(ic>-1 && nc>-1){ hr=i; idc=ic; nmc=nc; break; }
+      }
+      if(hr<0){ toast('Could not find ID / Name columns in that file'); return; }
+      const found = [];
+      for(let i=hr+1;i<rows.length;i++){
+        const row = rows[i]||[];
+        const sid = row[idc], name = row[nmc];
+        if((sid===null||sid==='') && (name===null||name==='')) continue;
+        found.push({sid:String(sid??''), name:String(name??'')});
+      }
+      if(!found.length){ toast('No student rows found'); return; }
+      if(S.students.length && !confirm(`Replace the current ${S.students.length} roster row(s) with ${found.length} imported student(s)?`)) return;
+      S.students = []; S.scores = {}; S.raises = {};
+      found.forEach(f=>{
+        const id = uid('st');
+        S.students.push({id, sid:f.sid, name:f.name});
+        S.scores[id] = {};
+      });
+      toast(`Imported ${found.length} students`);
+      renderAll();
+    }catch(err){ toast('Import failed — is that a valid Excel/CSV file?'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ============================================================
+   GENERIC PASTE-FROM-EXCEL HELPER
+   ============================================================ */
+function attachPasteFill(cell, getGrid, onCell){
+  // getGrid() => {rows, cols} counts; onCell(rowIdx, colIdx, value)
+  cell.addEventListener('paste', function(e){
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if(!text || text.indexOf('\t')===-1 && text.indexOf('\n')===-1) return; // let default paste happen for single values
+    e.preventDefault();
+    const rows = text.replace(/\r/g,'').split('\n').filter((r,i,arr)=> !(i===arr.length-1 && r===''));
+    const startRow = Number(cell.dataset.row), startCol = Number(cell.dataset.col);
+    rows.forEach((rowText, ri)=>{
+      const cols = rowText.split('\t');
+      cols.forEach((val, ci)=>{
+        onCell(startRow+ri, startCol+ci, val);
+      });
+    });
+    renderAll();
+  });
+}
+
+/* ============================================================
+   RENDER: SIDEBAR STEPS
+   ============================================================ */
+const STEPS = [
+  {id:'setup', label:'Course & Outcomes', title:'Course & Outcomes Setup'},
+  {id:'roster', label:'Roster', title:'Class Roster'},
+  {id:'grades', label:'Instruments & Grades', title:'Instruments & Grade Entry'},
+  {id:'mapping', label:'Mapping', title:'Outcome Mapping'},
+  {id:'dashboard', label:'Dashboard', title:'Results Dashboard'},
+  {id:'report', label:'Report', title:'Achievement Report'}
+];
+let currentStep = 'setup';
+
+function renderSteps(){
+  const ul = document.getElementById('stepsList');
+  ul.innerHTML = STEPS.map((s,i)=>`
+    <li class="step ${s.id===currentStep?'active':''}" data-step="${s.id}">
+      <span class="num">${i+1}</span>
+      <span class="label">${s.label}</span>
+    </li>`).join('');
+  ul.querySelectorAll('.step').forEach(el=>{
+    el.addEventListener('click', ()=> goToStep(el.dataset.step));
+  });
+}
+function goToStep(id){
+  currentStep = id;
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  const meta = STEPS.find(s=>s.id===id);
+  document.getElementById('topTitle').textContent = meta.title;
+  document.getElementById('topMeta').textContent = courseMetaLine();
+  renderSteps();
+  if(id==='dashboard') renderDashboard();
+  if(id==='report') renderReport();
+  if(id==='mapping') renderMapping();
+  if(id==='grades') renderGrades();
+}
+function courseMetaLine(){
+  const c = S.course;
+  const parts = [c.code, c.sem, c.year, c.instr].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'No course configured yet';
+}
+
+/* ============================================================
+   RENDER: SETUP PANEL
+   ============================================================ */
+function renderSetup(){
+  document.getElementById('c-code').value = S.course.code;
+  document.getElementById('c-sem').value = S.course.sem;
+  document.getElementById('c-year').value = S.course.year;
+  document.getElementById('c-instr').value = S.course.instr;
+
+  const t = SET();
+  document.getElementById('s-mastery').value = t.mastery;
+  document.getElementById('s-b1').value = t.b1;
+  document.getElementById('s-b2').value = t.b2;
+  document.getElementById('s-b3').value = t.b3;
+
+  renderOutcomeList('cloList', S.clos, 'CLO', (id)=>removeEntity('clos', id, ['cloMap'], []));
+  renderOutcomeList('ploList', S.plos, 'PLO', (id)=>removeEntity('plos', id, ['ploMap'], []));
+  renderOutcomeList('soList', S.sos, 'SO', (id)=>removeEntity('sos', id, ['soMap'], []));
+}
+function renderOutcomeList(containerId, arr, prefix, onRemove){
+  const el = document.getElementById(containerId);
+  if(arr.length===0){
+    el.innerHTML = `<div class="empty-state" style="padding:24px;"><p>No ${prefix} entries yet. Add one above.</p></div>`;
+    return;
+  }
+  el.innerHTML = arr.map((o,idx)=>`
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+      <span class="mono" style="color:var(--teal); font-weight:700; font-size:12px; width:34px;">${prefix}${idx+1}</span>
+      <input data-kind="${containerId}" data-id="${o.id}" value="${escapeHtml(o.text)}" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:7px;">
+      <button class="icon-btn" data-remove="${containerId}" data-id="${o.id}" title="Remove">✕</button>
+    </div>`).join('');
+  el.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const arrRef = {cloList:S.clos, ploList:S.plos, soList:S.sos}[containerId];
+      const item = arrRef.find(x=>x.id===e.target.dataset.id);
+      item.text = e.target.value;
+      document.getElementById('topMeta').textContent = courseMetaLine();
+    });
+  });
+  el.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ onRemove(e.target.dataset.id); renderAll(); });
+  });
+}
+function removeEntity(arrKey, id, mapKeysToClean, extra){
+  S[arrKey] = S[arrKey].filter(x=>x.id!==id);
+  mapKeysToClean.forEach(mk=>{ delete S[mk][id]; });
+  if(arrKey==='clos' || arrKey==='sos'){
+    // remove references inside ploMap
+    Object.keys(S.ploMap).forEach(ploId=>{
+      const prefix = arrKey==='clos' ? 'clo:' : 'so:';
+      delete S.ploMap[ploId][prefix+id];
+    });
+  }
+}
+
+/* ============================================================
+   RENDER: ROSTER PANEL
+   ============================================================ */
+function renderRoster(){
+  const table = document.getElementById('rosterTable');
+  let html = `<thead><tr><th style="width:40px;">Nb</th><th>Student ID</th><th>Name</th><th style="width:36px;"></th></tr></thead><tbody>`;
+  S.students.forEach((st, ri)=>{
+    html += `<tr>
+      <td class="mono" style="color:var(--slate-soft);">${ri+1}</td>
+      <td><input data-row="${ri}" data-col="0" data-field="sid" value="${escapeAttr(st.sid||'')}"></td>
+      <td><input data-row="${ri}" data-col="1" data-field="name" value="${escapeAttr(st.name||'')}"></td>
+      <td><button class="icon-btn" data-removestudent="${st.id}">✕</button></td>
+    </tr>`;
+  });
+  html += `</tbody>`;
+  table.innerHTML = html;
+
+  table.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const ri = Number(e.target.dataset.row);
+      S.students[ri][e.target.dataset.field] = e.target.value;
+      document.getElementById('rosterCount').textContent = countLine();
+    });
+    attachPasteFill(inp, null, (r,c,val)=>{
+      while(S.students.length<=r){ const id=uid('st'); S.students.push({id,sid:'',name:''}); S.scores[id]={}; }
+      const field = c===0 ? 'sid' : (c===1 ? 'name' : null);
+      if(field) S.students[r][field] = val;
+    });
+  });
+  table.querySelectorAll('[data-removestudent]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.dataset.removestudent;
+      S.students = S.students.filter(s=>s.id!==id);
+      delete S.scores[id];
+      if(S.raises) delete S.raises[id];
+      renderRoster(); renderGrades();
+    });
+  });
+  document.getElementById('rosterCount').textContent = countLine();
+  function countLine(){
+    const n = activeStudents().length;
+    return `${n} active student${n===1?'':'s'} of ${S.students.length} row${S.students.length===1?'':'s'}`;
+  }
+}
+
+/* ============================================================
+   RENDER: GROUPS + GRADES
+   ============================================================ */
+function renderGroupsEditor(){
+  const el = document.getElementById('groupsEditor');
+  if(S.groups.length===0){
+    el.innerHTML = `<div class="empty-state" style="padding:20px;"><p>No instrument groups yet. Add one, e.g. "Exam 1".</p></div>`;
+    return;
+  }
+  el.innerHTML = S.groups.map(g=>`
+    <div style="border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:12px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <input data-group="${g.id}" value="${escapeAttr(g.name)}" style="font-weight:600; font-size:13.5px; border:1px solid var(--line); border-radius:6px; padding:6px 8px; flex:1; max-width:260px;">
+        <button class="btn btn-line btn-sm" data-additem="${g.id}">+ Item</button>
+        <button class="btn btn-danger-line btn-sm" data-removegroup="${g.id}">Remove group</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        ${g.items.map(it=>`
+          <div style="display:flex; align-items:center; gap:6px; background:var(--line-soft); border-radius:7px; padding:5px 8px;">
+            <input data-itemname="${it.id}" value="${escapeAttr(it.name)}" style="width:66px; border:none; background:transparent; font-size:12.5px; font-family:var(--font-mono);">
+            <span style="color:var(--slate-soft); font-size:11px;">max</span>
+            <input data-itemmax="${it.id}" type="number" step="any" value="${it.max}" style="width:50px; border:none; background:transparent; font-size:12.5px; font-family:var(--font-mono);">
+            <button class="icon-btn" data-removeitem="${it.id}" data-group="${g.id}">✕</button>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+
+  el.querySelectorAll('[data-group]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const g = S.groups.find(x=>x.id===e.target.dataset.group);
+      g.name = e.target.value;
+    });
+  });
+  el.querySelectorAll('[data-itemname]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const it = findItem(e.target.dataset.itemname);
+      if(it) it.name = e.target.value;
+    });
+  });
+  el.querySelectorAll('[data-itemmax]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const it = findItem(e.target.dataset.itemmax);
+      if(it) it.max = Number(e.target.value)||0;
+    });
+  });
+  el.querySelectorAll('[data-additem]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const g = S.groups.find(x=>x.id===e.target.dataset.additem);
+      g.items.push({id:uid('i'), name:'Item'+(g.items.length+1), max:10});
+      renderAll();
+    });
+  });
+  el.querySelectorAll('[data-removeitem]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const g = S.groups.find(x=>x.id===e.target.dataset.group);
+      const itemId = e.target.dataset.removeitem;
+      g.items = g.items.filter(i=>i.id!==itemId);
+      Object.values(S.scores).forEach(sc=> delete sc[itemId]);
+      Object.values(S.cloMap).forEach(m=> delete m[itemId]);
+      Object.values(S.soMap).forEach(m=> delete m[itemId]);
+      renderAll();
+    });
+  });
+  el.querySelectorAll('[data-removegroup]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const gid = e.target.dataset.removegroup;
+      const g = S.groups.find(x=>x.id===gid);
+      g.items.forEach(it=>{
+        Object.values(S.scores).forEach(sc=> delete sc[it.id]);
+        Object.values(S.cloMap).forEach(m=> delete m[it.id]);
+        Object.values(S.soMap).forEach(m=> delete m[it.id]);
+      });
+      S.groups = S.groups.filter(x=>x.id!==gid);
+      renderAll();
+    });
+  });
+}
+function findItem(itemId){
+  for(const g of S.groups){ const it = g.items.find(i=>i.id===itemId); if(it) return it; }
+  return null;
+}
+
+function renderGrades(){
+  const items = allItems();
+  const table = document.getElementById('gradesTable');
+  const hint = document.getElementById('gradesHint');
+  if(items.length===0 || S.students.length===0){
+    table.innerHTML = '';
+    hint.textContent = '';
+    document.getElementById('panel-grades').querySelector('.card:nth-child(2)').style.display = (items.length===0||S.students.length===0) ? 'block' : 'block';
+    if(items.length===0){ table.innerHTML = `<tr><td style="padding:20px; color:var(--slate-soft);">Add instrument items above first.</td></tr>`; }
+    else if(S.students.length===0){ table.innerHTML = `<tr><td style="padding:20px; color:var(--slate-soft);">Add students on the Roster step first.</td></tr>`; }
+    return;
+  }
+  hint.textContent = `${items.length} item${items.length===1?'':'s'} × ${S.students.length} student row${S.students.length===1?'':'s'} — Enter/↑/↓ move between rows`;
+
+  let head1 = `<th class="rowhead-corner" style="min-width:170px;">Student</th>`;
+  S.groups.forEach(g=>{ if(g.items.length) head1 += `<th colspan="${g.items.length}" style="background:var(--ink); color:#fff;">${escapeHtml(g.name)}</th>`; });
+  head1 += `<th rowspan="1" style="background:var(--teal); color:#fff;">Raise</th><th style="background:var(--teal); color:#fff;">Final</th><th style="background:var(--teal); color:#fff;">Grade</th>`;
+  let head2 = `<th class="rowhead-corner" style="top:29px;"></th>`;
+  items.forEach(it=> head2 += `<th style="top:29px;">${escapeHtml(it.name)}<br><span style="color:var(--slate-soft); font-weight:400;">/${it.max}</span></th>`);
+  head2 += `<th style="top:29px;">+</th><th style="top:29px;">/100</th><th style="top:29px;">A–F</th>`;
+
+  let body = '';
+  S.students.forEach((st, ri)=>{
+    body += `<tr><td class="rowhead" style="position:sticky; left:0; background:#fff; font-weight:500;">${escapeHtml(st.name||'(unnamed)')} <span class="mono" style="color:var(--slate-soft); font-size:10.5px;">${escapeHtml(st.sid||'')}</span></td>`;
+    items.forEach((it, ci)=>{
+      const v = (S.scores[st.id]||{})[it.id];
+      body += `<td><input data-row="${ri}" data-col="${ci}" data-student="${st.id}" data-item="${it.id}" type="text" inputmode="decimal" value="${v!==undefined && v!==null ? v : ''}"></td>`;
+    });
+    const f = finalMark(st);
+    body += `<td><input data-row="${ri}" data-raise="${st.id}" type="text" inputmode="decimal" style="width:44px;" value="${(S.raises&&S.raises[st.id])||''}"></td>`;
+    body += `<td class="calc-cell" id="fin-${st.id}">${f===null?'—':f}</td>`;
+    body += `<td class="calc-cell" id="grd-${st.id}">${letterGrade(f)||'—'}</td>`;
+    body += `</tr>`;
+  });
+
+  table.innerHTML = `<thead><tr>${head1}</tr><tr>${head2}</tr></thead><tbody>${body}</tbody>`;
+
+  function refreshComputed(sid){
+    const f = finalMark(S.students.find(s=>s.id===sid));
+    const fe = document.getElementById('fin-'+sid), ge = document.getElementById('grd-'+sid);
+    if(fe) fe.textContent = f===null?'—':f;
+    if(ge) ge.textContent = letterGrade(f)||'—';
+  }
+
+  const cellItems = items;
+  table.querySelectorAll('tbody input[data-item]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const sid = e.target.dataset.student, iid = e.target.dataset.item;
+      const val = e.target.value.trim();
+      if(!S.scores[sid]) S.scores[sid] = {};
+      S.scores[sid][iid] = val==='' ? null : Number(val);
+      refreshComputed(sid);
+    });
+    attachPasteFill(inp, null, (r,c,val)=>{
+      if(r>=S.students.length || c>=cellItems.length) return;
+      const sid = S.students[r].id, iid = cellItems[c].id;
+      if(!S.scores[sid]) S.scores[sid] = {};
+      const t = val.trim();
+      S.scores[sid][iid] = t==='' ? null : Number(t);
+    });
+  });
+  table.querySelectorAll('tbody input[data-raise]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const sid = e.target.dataset.raise;
+      if(!S.raises) S.raises = {};
+      const v = Number(e.target.value);
+      if(e.target.value.trim()==='' || isNaN(v)) delete S.raises[sid]; else S.raises[sid] = v;
+      refreshComputed(sid);
+    });
+  });
+  // keyboard navigation: Enter / ↓ next row, ↑ previous row (same column)
+  table.addEventListener('keydown', e=>{
+    const t = e.target;
+    if(t.tagName!=='INPUT' || t.dataset.col===undefined) return;
+    if(e.key!=='Enter' && e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+    e.preventDefault();
+    const r = Number(t.dataset.row) + (e.key==='ArrowUp' ? -1 : 1);
+    const next = table.querySelector(`input[data-row="${r}"][data-col="${t.dataset.col}"]`);
+    if(next){ next.focus(); next.select && next.select(); }
+  });
+}
+
+/* ============================================================
+   RENDER: MAPPING
+   ============================================================ */
+let mapMode = 'clo';
+function renderMappingTabs(){
+  document.querySelectorAll('.tier-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.map===mapMode);
+  });
+  const hints = {
+    clo:'Check every item whose questions assess a given CLO. A CLO\'s % achievement is the average pass rate across all checked items.',
+    so:'Check every item whose questions assess a given outcome indicator, the same way as CLOs.',
+    plo:'Check every CLO and/or indicator that feeds into a given PLO. The PLO\'s % achievement is the plain average of the related rows\' % achievement.'
+  };
+  document.getElementById('mappingHint').textContent = hints[mapMode];
+}
+function renderMapping(){
+  renderMappingTabs();
+  const area = document.getElementById('mappingArea');
+  if(mapMode==='clo' || mapMode==='so'){
+    const rows = mapMode==='clo' ? S.clos : S.sos;
+    const map = mapMode==='clo' ? S.cloMap : S.soMap;
+    const items = allItems();
+    if(rows.length===0){ area.innerHTML = emptyMap(mapMode==='clo'?'CLOs':'indicators'); return; }
+    if(items.length===0){ area.innerHTML = `<div class="empty-state"><p>Add instrument items on the Grades step first.</p></div>`; return; }
+    let html = `<div class="matrix-wrap"><table class="matrix"><thead><tr><th class="rowhead-corner">Outcome</th>`;
+    S.groups.forEach(g=>{ if(g.items.length) html += `<th colspan="${g.items.length}" class="colhead-group">${escapeHtml(g.name)}</th>`; });
+    html += `</tr><tr><th class="rowhead-corner"></th>`;
+    items.forEach(it=> html += `<th>${escapeHtml(it.name)}</th>`);
+    html += `</tr></thead><tbody>`;
+    rows.forEach(r=>{
+      if(!map[r.id]) map[r.id] = {};
+      html += `<tr><td class="rowhead">${escapeHtml(r.text||'(untitled)')}</td>`;
+      items.forEach(it=>{
+        const checked = map[r.id][it.id] ? 'checked' : '';
+        html += `<td><input type="checkbox" class="chk" data-row="${r.id}" data-col="${it.id}" ${checked}></td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    area.innerHTML = html;
+    area.querySelectorAll('.chk').forEach(cb=>{
+      cb.addEventListener('change', e=>{
+        map[e.target.dataset.row][e.target.dataset.col] = e.target.checked ? 1 : 0;
+      });
+    });
+  } else {
+    if(S.plos.length===0){ area.innerHTML = emptyMap('PLOs'); return; }
+    const cols = [
+      ...S.clos.map(c=>({key:'clo:'+c.id, label:c.text, tag:'CLO'})),
+      ...S.sos.map(s=>({key:'so:'+s.id, label:s.text, tag:'SO'}))
+    ];
+    if(cols.length===0){ area.innerHTML = `<div class="empty-state"><p>Add at least one CLO or indicator first.</p></div>`; return; }
+    let html = `<div class="matrix-wrap"><table class="matrix"><thead><tr><th class="rowhead-corner">PLO</th>`;
+    cols.forEach(c=> html += `<th>${c.tag}<br>${escapeHtml(truncate(c.label,26))}</th>`);
+    html += `</tr></thead><tbody>`;
+    S.plos.forEach(p=>{
+      if(!S.ploMap[p.id]) S.ploMap[p.id] = {};
+      html += `<tr><td class="rowhead">${escapeHtml(p.text||'(untitled)')}</td>`;
+      cols.forEach(c=>{
+        const checked = S.ploMap[p.id][c.key] ? 'checked' : '';
+        html += `<td><input type="checkbox" class="chk" data-row="${p.id}" data-col="${c.key}" ${checked}></td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    area.innerHTML = html;
+    area.querySelectorAll('.chk').forEach(cb=>{
+      cb.addEventListener('change', e=>{
+        S.ploMap[e.target.dataset.row][e.target.dataset.col] = e.target.checked ? 1 : 0;
+      });
+    });
+  }
+}
+function emptyMap(name){
+  return `<div class="empty-state"><div class="glyph">⌗</div><h4>No ${name} defined</h4><p>Add them on the "Course & Outcomes" step first.</p></div>`;
+}
+function truncate(str, n){ return (str||'').length>n ? str.slice(0,n-1)+'…' : (str||''); }
+
+/* ============================================================
+   RENDER: DASHBOARD
+   ============================================================ */
+function meterZones(){
+  const t = SET();
+  const w1 = Math.max(0, Math.min(100, t.b1));
+  const w2 = Math.max(0, Math.min(100, t.b2) - t.b1);
+  const w3 = Math.max(0, Math.min(100, t.b3) - t.b2);
+  const w4 = Math.max(0, 100 - t.b3);
+  return `<i class="z1" style="width:${w1}%"></i><i class="z2" style="width:${w2}%"></i><i class="z3" style="width:${w3}%"></i><i class="z4" style="width:${w4}%"></i>`;
+}
+function meterHTML(res){
+  if(!res) return `<div class="meter-wrap"><div class="meter">${meterZones()}</div><span class="pill pill-none">no data</span></div>`;
+  const lvl = res.level, lm = levelMeta(lvl);
+  const pct = Math.max(0, Math.min(100, res.pct));
+  return `<div class="meter-wrap">
+    <div class="meter">
+      ${meterZones()}
+      <span class="marker" style="left:${pct}%;"></span>
+    </div>
+    <div class="meter-figs">
+      <span class="pct mono">${res.pct.toFixed(1)}%</span>
+      <span class="badge-level" style="background:var(--${lm.cls}-dim); color:var(--${lm.cls});">${lvl}</span>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   CHARTS (Chart.js — bars colored by achievement level)
+   ============================================================ */
+const chartReg = {};
+function lvlColor(l){
+  const cs = getComputedStyle(document.documentElement);
+  const v = cs.getPropertyValue(l===4?'--l4':l===3?'--l3':l===2?'--l2':l===1?'--l1':'--slate-soft');
+  return (v||'#8A939B').trim();
+}
+function barChart(id, title, labels, data, colors, ymax){
+  const el = document.getElementById(id);
+  if(!el || typeof Chart==='undefined') return;
+  if(chartReg[id]) chartReg[id].destroy();
+  chartReg[id] = new Chart(el, {
+    type:'bar',
+    data:{labels, datasets:[{data, backgroundColor:colors, borderRadius:5}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false}, title:{display:true, text:title, color:'#101826', font:{size:13, weight:'600', family:'Inter'}}},
+      scales:{y:{beginAtZero:true, max:ymax, grid:{color:'#EAEFEE'}}, x:{grid:{display:false}}}
+    }
+  });
+}
+function outcomeChartData(defs, results, prefix){
+  const rows = defs.map((o,idx)=>({label:prefix+(idx+1), res:results[o.id]})).filter(r=>r.res);
+  return {
+    labels: rows.map(r=>r.label),
+    data: rows.map(r=>r.res.pct),
+    colors: rows.map(r=>lvlColor(r.res.level))
+  };
+}
+function outcomeCardHTML(label, tagId, text, res, extraMeta){
+  const lm = levelMeta(res ? res.level : null);
+  return `<div class="outcome-card">
+    <div class="top">
+      <div><div class="oc-id">${escapeHtml(label)}</div><div class="oc-text">${escapeHtml(text||'(untitled)')}</div></div>
+      <span class="pill pill-${res?res.level:'none'}">${lm.word}</span>
+    </div>
+    ${meterHTML(res)}
+    <div class="oc-meta">${extraMeta}</div>
+  </div>`;
+}
+function renderDashboard(){
+  const {cloResults, soResults, ploResults} = computeAll();
+  const total = activeStudents().length;
+  const graded = gradedStudents().length;
+
+  const cloLevels = S.clos.map(c=>cloResults[c.id]).filter(Boolean);
+  const avgCloPct = cloLevels.length ? (cloLevels.reduce((a,b)=>a+b.pct,0)/cloLevels.length) : null;
+  const meetingCount = cloLevels.filter(r=>r.level>=3).length;
+
+  document.getElementById('dashStats').innerHTML = `
+    <div class="stat-box"><div class="num mono">${graded}<span style="font-size:14px; color:var(--slate-soft);">/${total}</span></div><div class="lbl">Students counted (final &gt; 0)</div></div>
+    <div class="stat-box"><div class="num mono">${S.clos.length}</div><div class="lbl">CLOs tracked</div></div>
+    <div class="stat-box"><div class="num mono">${avgCloPct!==null ? avgCloPct.toFixed(1)+'%' : '—'}</div><div class="lbl">Avg. CLO achievement</div></div>
+    <div class="stat-box"><div class="num mono">${meetingCount}/${cloLevels.length||0}</div><div class="lbl">CLOs at Level 3+</div></div>
+  `;
+
+  // charts
+  const c = outcomeChartData(S.clos, cloResults, 'CLO');
+  barChart('chCLO', 'CLO — % of Achievement', c.labels, c.data, c.colors, 100);
+  const p = outcomeChartData(S.plos, ploResults, 'PLO');
+  barChart('chPLO', 'PLO — % of Achievement', p.labels, p.data, p.colors, 100);
+  const so = outcomeChartData(S.sos, soResults, 'Ind.');
+  document.getElementById('chSOBox').style.display = so.labels.length ? 'block' : 'none';
+  if(so.labels.length) barChart('chSO', 'Indicators — % of Achievement', so.labels, so.data, so.colors, 100);
+  const dist = gradeDistribution();
+  barChart('chDist', 'Grade Distribution (final marks)', GRADE_ORDER, GRADE_ORDER.map(g=>dist[g]), GRADE_ORDER.map(()=>lvlColor(4)), undefined);
+
+  document.getElementById('dashCLO').innerHTML = S.clos.length ? S.clos.map((c,idx)=>{
+    const r = cloResults[c.id];
+    const meta = r ? `${r.numInstruments} instrument item${r.numInstruments===1?'':'s'} mapped · ${r.studentsAbove} pass-marks of ${r.numInstruments*r.totalStudents} possible` : 'No items mapped yet, or no students in roster.';
+    return outcomeCardHTML('CLO'+(idx+1), c.id, c.text, r, meta);
+  }).join('') : emptyMap('CLOs');
+
+  document.getElementById('dashSOCard').style.display = S.sos.length ? 'block' : 'none';
+  document.getElementById('dashSO').innerHTML = S.sos.map((s,idx)=>{
+    const r = soResults[s.id];
+    const meta = r ? `${r.numInstruments} instrument item${r.numInstruments===1?'':'s'} mapped` : 'No items mapped yet.';
+    return outcomeCardHTML('Ind. '+(idx+1), s.id, s.text, r, meta);
+  }).join('');
+
+  document.getElementById('dashPLO').innerHTML = S.plos.length ? S.plos.map((p,idx)=>{
+    const r = ploResults[p.id];
+    const meta = r ? `Averaged across ${r.numRelated} related CLO/indicator row${r.numRelated===1?'':'s'}` : 'No CLOs or indicators linked yet.';
+    return outcomeCardHTML('PLO'+(idx+1), p.id, p.text, r, meta);
+  }).join('') : emptyMap('PLOs');
+}
+
+/* ============================================================
+   RENDER: REPORT
+   ============================================================ */
+function renderReport(){
+  const {cloResults, soResults, ploResults} = computeAll();
+  document.getElementById('rptTitle').textContent = S.course.code ? `${S.course.code} — Outcomes Achievement Report` : 'Outcomes Achievement Report';
+  document.getElementById('rptMeta').textContent = [S.course.sem, S.course.year, S.course.instr ? 'Instructor: '+S.course.instr : ''].filter(Boolean).join('   ·   ') + `   ·   Generated ${new Date().toLocaleDateString()}`;
+
+  // keep the level-filter labels in sync with the (editable) thresholds
+  const sel = document.getElementById('rptLevel');
+  const t = SET();
+  const keep = sel.value;
+  sel.innerHTML = `<option value="0">Any level</option>
+    <option value="1">Level 1 — below ${t.b1}%</option>
+    <option value="2">Level 2 — ${t.b1}–${t.b2}%</option>
+    <option value="3">Level 3 — ${t.b2}–${t.b3}%</option>
+    <option value="4">Level 4 — ≥ ${t.b3}%</option>`;
+  sel.value = keep;
+
+  const lvlFilter = Number(document.getElementById('rptLevel').value);
+  const minPct = Number(document.getElementById('rptMinPct').value)||0;
+
+  function passesFilter(res){
+    if(!res) return lvlFilter===0 && minPct===0;
+    const okLevel = lvlFilter===0 || res.level===lvlFilter;
+    const okPct = res.pct >= minPct;
+    return okLevel && okPct;
+  }
+
+  const cloRows = S.clos.map((c,idx)=>({label:'CLO'+(idx+1), text:c.text, res:cloResults[c.id]}));
+  const soRows = S.sos.map((s,idx)=>({label:'Ind. '+(idx+1), text:s.text, res:soResults[s.id]}));
+  const ploRows = S.plos.map((p,idx)=>({label:'PLO'+(idx+1), text:p.text, res:ploResults[p.id]}));
+
+  const cloShown = cloRows.filter(r=>passesFilter(r.res));
+  const soShown = soRows.filter(r=>passesFilter(r.res));
+  const ploShown = ploRows.filter(r=>passesFilter(r.res));
+
+  const allRes = [...cloRows, ...soRows, ...ploRows].map(r=>r.res).filter(Boolean);
+  const avgPct = allRes.length ? allRes.reduce((a,b)=>a+b.pct,0)/allRes.length : null;
+  const atRisk = allRes.filter(r=>r.level<=2).length;
+
+  // report charts (printed with the report)
+  const cc = outcomeChartData(S.clos, cloResults, 'CLO');
+  barChart('rchCLO', 'CLO — % of Achievement', cc.labels, cc.data, cc.colors, 100);
+  const pp = outcomeChartData(S.plos, ploResults, 'PLO');
+  barChart('rchPLO', 'PLO — % of Achievement', pp.labels, pp.data, pp.colors, 100);
+
+  document.getElementById('rptSummary').innerHTML = `
+    <div><b class="mono">${gradedStudents().length}</b>Students assessed</div>
+    <div><b class="mono">${cloShown.length}/${cloRows.length}</b>CLOs shown</div>
+    <div><b class="mono">${soShown.length}/${soRows.length}</b>Indicators shown</div>
+    <div><b class="mono">${ploShown.length}/${ploRows.length}</b>PLOs shown</div>
+    <div><b class="mono">${avgPct!==null?avgPct.toFixed(1)+'%':'—'}</b>Overall avg. achievement</div>
+    <div><b class="mono" style="color:${atRisk>0?'var(--rust)':'var(--teal)'};">${atRisk}</b>Outcomes at Level ≤2</div>
+  `;
+
+  document.getElementById('rptCLOs').innerHTML = sectionHTML('Course Learning Outcomes', cloShown, cloRows.length);
+  document.getElementById('rptSOs').innerHTML = S.sos.length ? sectionHTML('Outcome Indicators', soShown, soRows.length) : '';
+  document.getElementById('rptPLOs').innerHTML = sectionHTML('Student / Program Outcomes', ploShown, ploRows.length);
+}
+function sectionHTML(title, rows, totalCount){
+  if(totalCount===0) return '';
+  if(rows.length===0){
+    return `<div style="margin-top:18px;"><h3 style="font-size:14px; margin-bottom:8px;">${title}</h3><div class="note">No rows match the current filter.</div></div>`;
+  }
+  return `<div style="margin-top:18px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">${title} <span style="color:var(--slate-soft); font-weight:400; font-size:12px;">(${rows.length} of ${totalCount})</span></h3>
+    ${rows.map(r=>outcomeCardHTML(r.label, '', r.text, r.res, '')).join('')}
+  </div>`;
+}
+
+/* ============================================================
+   UTIL
+   ============================================================ */
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   GLOBAL RENDER + EVENTS
+   ============================================================ */
+function renderAll(){
+  renderSteps();
+  renderSetup();
+  renderRoster();
+  renderGroupsEditor();
+  renderGrades();
+  renderMapping();
+  renderDashboard();
+  renderReport();
+  document.getElementById('topMeta').textContent = courseMetaLine();
+  autosave();
+}
+
+function initEvents(){
+  ['c-code','c-sem','c-year','c-instr'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', e=>{
+      const map = {'c-code':'code','c-sem':'sem','c-year':'year','c-instr':'instr'};
+      S.course[map[id]] = e.target.value;
+      document.getElementById('topMeta').textContent = courseMetaLine();
+    });
+  });
+
+  [['s-mastery','mastery',70],['s-b1','b1',60],['s-b2','b2',70],['s-b3','b3',85]].forEach(([id,key,dflt])=>{
+    document.getElementById(id).addEventListener('change', e=>{
+      const v = Number(e.target.value);
+      SET()[key] = isNaN(v)||v<=0 ? dflt : v;
+      e.target.value = SET()[key];
+      if(currentStep==='dashboard') renderDashboard();
+      if(currentStep==='report') renderReport();
+      toast('Thresholds updated');
+    });
+  });
+
+  document.getElementById('btnImportRoster').addEventListener('click', ()=> document.getElementById('fileRoster').click());
+  document.getElementById('fileRoster').addEventListener('change', e=>{
+    if(e.target.files[0]) importRosterFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  document.getElementById('btnAddCLO').addEventListener('click', ()=>{ S.clos.push({id:uid('c'), text:''}); renderAll(); });
+  document.getElementById('btnAddPLO').addEventListener('click', ()=>{ S.plos.push({id:uid('p'), text:''}); renderAll(); });
+  document.getElementById('btnAddSO').addEventListener('click', ()=>{ S.sos.push({id:uid('s'), text:''}); renderAll(); });
+
+  document.getElementById('btnAddStudent').addEventListener('click', ()=>{
+    const id = uid('st'); S.students.push({id, sid:'', name:''}); S.scores[id]={}; renderAll();
+  });
+  document.getElementById('btnAddStudents10').addEventListener('click', ()=>{
+    for(let k=0;k<10;k++){ const id=uid('st'); S.students.push({id, sid:'', name:''}); S.scores[id]={}; }
+    renderAll();
+  });
+
+  document.getElementById('btnAddGroup').addEventListener('click', ()=>{
+    S.groups.push({id:uid('g'), name:'New group', items:[{id:uid('i'), name:'Item1', max:10}]});
+    renderAll();
+  });
+  document.getElementById('btnRecalc').addEventListener('click', ()=>{ renderDashboard(); toast('Recalculated'); });
+
+  document.querySelectorAll('.tier-tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ mapMode = btn.dataset.map; renderMapping(); });
+  });
+
+  document.getElementById('rptLevel').addEventListener('change', renderReport);
+  document.getElementById('rptMinPct').addEventListener('input', renderReport);
+  document.getElementById('btnRptReset').addEventListener('click', ()=>{
+    document.getElementById('rptLevel').value = 0;
+    document.getElementById('rptMinPct').value = 0;
+    renderReport();
+  });
+  document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
+
+  document.getElementById('btnExport').addEventListener('click', exportJSON);
+  document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('fileImport').click());
+  document.getElementById('fileImport').addEventListener('change', e=>{
+    if(e.target.files[0]) importJSON(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('btnSample').addEventListener('click', loadSample);
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    if(confirm('This clears all course data (including the browser autosave). Continue?')){
+      S = defaultState();
+      try{ localStorage.removeItem(LS_KEY); }catch(e){}
+      renderAll(); goToStep('setup'); toast('Reset to blank');
+    }
+  });
+
+  // autosave on any edit, anywhere
+  document.addEventListener('input', autosave, true);
+  document.addEventListener('change', autosave, true);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const restored = restoreAutosave();
+  initEvents();
+  renderAll();
+  goToStep('setup');
+  if(restored) toast('Previous session restored');
+});
+
+})();
+</script>
+</body>
+</html>
