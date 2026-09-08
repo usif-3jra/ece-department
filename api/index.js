@@ -259,6 +259,339 @@ async function ensureDelegateTables(sql) {
   )`;
   _delegateTablesReady = true;
 }
+// ── FYP Projects Organizer table setup ────────────────────────────────────
+// Campuses a program can run on. Supervisors carry one; ideas and groups are
+// scoped per (program, campus) because the same program exists on both sites.
+const CAMPUSES = ['Debbieh', 'Tripoli'];
+
+let _campusColumnReady   = false;
+let _organizerTablesReady = false;
+
+// Adds supervisors.campus. Additive and invisible to v3, which reads the table
+// with SELECT * — an extra column changes nothing for it.
+async function ensureCampusColumn(sql) {
+  if (_campusColumnReady) return;
+  await sql`ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS campus TEXT NOT NULL DEFAULT ''`;
+  _campusColumnReady = true;
+}
+
+async function ensureOrganizerTables(sql) {
+  if (_organizerTablesReady) return;
+  await ensureCampusColumn(sql);
+
+  await sql`CREATE TABLE IF NOT EXISTS org_cycles (
+    id                SERIAL PRIMARY KEY,
+    academic_year     VARCHAR(9) NOT NULL,
+    semester          TEXT NOT NULL DEFAULT '',
+    program           TEXT NOT NULL,
+    campus            TEXT NOT NULL,
+    phase             TEXT NOT NULL DEFAULT 'IDEAS_OPEN',
+    ideas_deadline    TIMESTAMPTZ,
+    ranking_deadline  TIMESTAMPTZ,
+    deadline_policy   TEXT NOT NULL DEFAULT 'open',
+    deadline_delegate TEXT NOT NULL DEFAULT '',
+    min_group_size    INT  NOT NULL DEFAULT 2,
+    max_group_size    INT  NOT NULL DEFAULT 5,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_cycles_key_idx
+    ON org_cycles (academic_year, semester, program, campus)`;
+
+  // expected = counted in the "everyone has responded" gate. A coordinator can
+  // clear it for someone on sabbatical so one dormant account cannot block the
+  // whole program.
+  await sql`CREATE TABLE IF NOT EXISTS org_participants (
+    cycle_id      INT  NOT NULL,
+    supervisor_id TEXT NOT NULL,
+    max_groups    INT  NOT NULL DEFAULT 2,
+    status        TEXT NOT NULL DEFAULT 'not_started',
+    expected      BOOLEAN NOT NULL DEFAULT TRUE,
+    submitted_at  TIMESTAMPTZ,
+    PRIMARY KEY (cycle_id, supervisor_id)
+  )`;
+  await sql`ALTER TABLE org_participants ADD COLUMN IF NOT EXISTS expected BOOLEAN NOT NULL DEFAULT TRUE`;
+
+  await sql`CREATE TABLE IF NOT EXISTS org_ideas (
+    id               SERIAL PRIMARY KEY,
+    cycle_id         INT  NOT NULL,
+    supervisor_id    TEXT NOT NULL,
+    title            TEXT NOT NULL,
+    field            TEXT NOT NULL DEFAULT '',
+    description      TEXT NOT NULL DEFAULT '',
+    prerequisites    TEXT NOT NULL DEFAULT '',
+    min_students     INT  NOT NULL DEFAULT 2,
+    max_students     INT  NOT NULL DEFAULT 4,
+    co_supervisor_id TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'draft',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_ideas_title_idx
+    ON org_ideas (cycle_id, lower(title))`;
+
+  await sql`CREATE TABLE IF NOT EXISTS org_groups (
+    id                   SERIAL PRIMARY KEY,
+    cycle_id             INT  NOT NULL,
+    group_code           TEXT NOT NULL UNIQUE,
+    created_by_student_id TEXT NOT NULL DEFAULT '',
+    status               TEXT NOT NULL DEFAULT 'forming',
+    rank_version         INT  NOT NULL DEFAULT 0,
+    ranked_by_student_id TEXT NOT NULL DEFAULT '',
+    ranked_at            TIMESTAMPTZ,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+
+  // The two unique indexes below are the duplicate-prevention mechanism.
+  // App-level checks cannot survive two students submitting overlapping groups
+  // at the same moment — Neon serverless has no transaction spanning requests.
+  await sql`CREATE TABLE IF NOT EXISTS org_group_members (
+    id                 SERIAL PRIMARY KEY,
+    cycle_id           INT  NOT NULL,
+    group_id           INT  NOT NULL,
+    student_id         TEXT NOT NULL,
+    student_name       TEXT NOT NULL,
+    email              TEXT NOT NULL DEFAULT '',
+    added_by_student_id TEXT NOT NULL DEFAULT '',
+    joined_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_id_idx
+    ON org_group_members (cycle_id, student_id)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_name_idx
+    ON org_group_members (cycle_id, lower(student_name))`;
+
+  await sql`CREATE TABLE IF NOT EXISTS org_rankings (
+    id       SERIAL PRIMARY KEY,
+    group_id INT NOT NULL,
+    idea_id  INT NOT NULL,
+    rank     INT NOT NULL
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_rankings_idea_idx ON org_rankings (group_id, idea_id)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_rankings_rank_idx ON org_rankings (group_id, rank)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS org_audit (
+    id         SERIAL PRIMARY KEY,
+    cycle_id   INT  NOT NULL DEFAULT 0,
+    group_id   INT  NOT NULL DEFAULT 0,
+    actor_type TEXT NOT NULL DEFAULT '',
+    actor_id   TEXT NOT NULL DEFAULT '',
+    actor_name TEXT NOT NULL DEFAULT '',
+    action     TEXT NOT NULL,
+    details    JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS org_audit_group_idx ON org_audit (group_id, created_at)`;
+
+  // One idea to one group, one idea per group — enforced at assignment time
+  // only. Students may rank the same idea in any number of groups.
+  await sql`CREATE TABLE IF NOT EXISTS org_allocations (
+    id            SERIAL PRIMARY KEY,
+    cycle_id      INT  NOT NULL,
+    group_id      INT  NOT NULL,
+    idea_id       INT  NOT NULL,
+    assigned_rank INT  NOT NULL DEFAULT 0,
+    assigned_by   TEXT NOT NULL DEFAULT '',
+    status        TEXT NOT NULL DEFAULT 'draft',
+    project_id    TEXT NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_alloc_group_idx ON org_allocations (cycle_id, group_id)`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_alloc_idea_idx  ON org_allocations (cycle_id, idea_id)`;
+
+  _organizerTablesReady = true;
+}
+
+// Derives the academic year and semester from a date. FYP1 runs once per
+// semester, so this plus (program, campus) identifies the current cycle.
+// Sep–Jan is Fall of the year that started in September; Feb–Aug is Spring.
+function academicContext(now) {
+  const d = now || new Date();
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  if (m >= 9)  return { academic_year: `${y}-${y + 1}`, semester: 'Fall'   };
+  if (m === 1) return { academic_year: `${y - 1}-${y}`, semester: 'Fall'   };
+  return { academic_year: `${y - 1}-${y}`, semester: 'Spring' };
+}
+
+// Returns the cycle for this program+campus, creating it on first use so the
+// module works without a separate admin setup step.
+async function getOrCreateCycle(sql, program, campus) {
+  await ensureOrganizerTables(sql);
+  const { academic_year, semester } = academicContext();
+  const found = await sql`SELECT * FROM org_cycles
+    WHERE academic_year = ${academic_year} AND semester = ${semester}
+      AND program = ${program} AND campus = ${campus}`;
+  if (found[0]) return found[0];
+  try {
+    const created = await sql`INSERT INTO org_cycles (academic_year, semester, program, campus)
+      VALUES (${academic_year}, ${semester}, ${program}, ${campus}) RETURNING *`;
+    return created[0];
+  } catch (e) {
+    // Lost the race with a concurrent first request — read back the winner
+    const again = await sql`SELECT * FROM org_cycles
+      WHERE academic_year = ${academic_year} AND semester = ${semester}
+        AND program = ${program} AND campus = ${campus}`;
+    if (again[0]) return again[0];
+    throw e;
+  }
+}
+
+// Everyone in this program+campus is expected to respond. Rows are added as
+// campuses get set, so the board stays accurate without manual maintenance.
+async function syncParticipants(sql, cycle) {
+  const sups = await sql`SELECT supervisor_id FROM supervisors
+    WHERE program = ${cycle.program} AND campus = ${cycle.campus} AND supervisor_id != ${ADMIN_ID}`;
+  for (const s of sups) {
+    await sql`INSERT INTO org_participants (cycle_id, supervisor_id)
+      VALUES (${cycle.id}, ${s.supervisor_id}) ON CONFLICT DO NOTHING`;
+  }
+  return sups.map(s => s.supervisor_id);
+}
+
+// Resolves the logged-in supervisor from the supervisors table rather than the
+// session, so a campus set after login is picked up immediately.
+async function orgContext(sql, session) {
+  await ensureCampusColumn(sql);
+  const rows = await sql`SELECT * FROM supervisors WHERE supervisor_id = ${session.supervisor_id}`;
+  const sup = rows[0];
+  if (!sup) return { error: 'Supervisor record not found.' };
+  if (!sup.campus) return { error: 'Your campus has not been set yet. Ask the admin to set it from Manage Users.' };
+  if (!sup.program) return { error: 'Your program has not been set yet. Ask the admin to set it.' };
+  const cycle = await getOrCreateCycle(sql, sup.program, sup.campus);
+  return { sup, cycle };
+}
+
+// Who may set deadlines, publish the idea list and run the assignment console.
+// Default is open to any supervisor of that program+campus; the admin can lock
+// it to himself or delegate it to one named colleague.
+function canManageCycle(session, sup, cycle) {
+  if (isAdminUser(session)) return true;
+  const policy = cycle.deadline_policy || 'open';
+  if (policy === 'locked')   return false;
+  if (policy === 'delegate') return cycle.deadline_delegate === sup.supervisor_id;
+  return true;
+}
+
+function groupCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
+  let s = '';
+  for (let i = 0; i < 4; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return 'G-' + s;
+}
+
+const STUDENT_ID_RE = /^20\d{7}$/;
+function normName(s) { return String(s || '').trim().replace(/\s+/g, ' '); }
+
+// Student-side cycle resolution. Refuses to create a cycle for a program+campus
+// that has no supervisors at all, so typos cannot litter the table.
+async function studentCycle(sql, program, campus) {
+  await ensureOrganizerTables(sql);
+  if (!CAMPUSES.includes(campus)) return { error: 'Please select a valid campus.' };
+  const sups = await sql`SELECT supervisor_id FROM supervisors
+    WHERE program = ${program} AND campus = ${campus} AND supervisor_id != ${ADMIN_ID} LIMIT 1`;
+  if (!sups.length)
+    return { error: 'No supervisors are registered for that program on that campus yet. Please check your selection.' };
+  const cycle = await getOrCreateCycle(sql, program, campus);
+  return { cycle };
+}
+
+// Resolves a student to their group for the current cycle.
+async function findStudentGroup(sql, cycleId, studentId) {
+  const rows = await sql`SELECT * FROM org_group_members
+    WHERE cycle_id = ${cycleId} AND student_id = ${studentId}`;
+  if (!rows[0]) return null;
+  const g = await sql`SELECT * FROM org_groups WHERE id = ${rows[0].group_id}`;
+  if (!g[0]) return null;
+  const members = await sql`SELECT * FROM org_group_members WHERE group_id = ${g[0].id} ORDER BY id`;
+  return { group: g[0], me: rows[0], members };
+}
+
+async function logAudit(sql, cycleId, groupId, actorType, actorId, actorName, action, details) {
+  try {
+    await sql`INSERT INTO org_audit (cycle_id, group_id, actor_type, actor_id, actor_name, action, details)
+      VALUES (${cycleId}, ${groupId}, ${actorType}, ${actorId}, ${actorName}, ${action},
+              ${JSON.stringify(details || {})})`;
+  } catch { /* the audit trail must never break the operation it records */ }
+}
+
+function deadlinePassed(ts) {
+  return !!ts && new Date(ts).getTime() < Date.now();
+}
+
+// Pre-flight for publishing an allocation into the live FYP tables.
+// registerProject enforces globally unique project titles and globally unique
+// student names, and needs an email unless notifications are disabled — a
+// naive insert loop would fail halfway and leave orphan rows, so every rule is
+// checked before anything is written.
+async function buildPublishReport(sql, cycle) {
+  const allocs = await sql`SELECT * FROM org_allocations WHERE cycle_id = ${cycle.id}`;
+  const groups = await sql`SELECT * FROM org_groups WHERE cycle_id = ${cycle.id}`;
+  const blockers = [], warnings = [], plan = [];
+
+  const unassigned = groups.filter(g => !allocs.some(a => a.group_id === g.id));
+  if (unassigned.length)
+    warnings.push(`${unassigned.length} group(s) have no project assigned and will be skipped: ${unassigned.map(g => g.group_code).join(', ')}.`);
+
+  const pending = allocs.filter(a => a.status !== 'published');
+  const alreadyDone = allocs.length - pending.length;
+  if (alreadyDone) warnings.push(`${alreadyDone} group(s) were already published and will be skipped.`);
+  if (!pending.length) blockers.push('There is nothing new to publish.');
+
+  const [existingProjects, existingStudents] = await Promise.all([
+    sql`SELECT title FROM projects`,
+    sql`SELECT student_id, student_name FROM students`,
+  ]);
+  const titleTaken = new Set(existingProjects.map(p => p.title.trim().toLowerCase()));
+  const idTaken    = new Set(existingStudents.map(s => s.student_id));
+  const nameTaken  = new Set(existingStudents.map(s => s.student_name.trim().toLowerCase()));
+
+  for (const a of pending) {
+    const g = groups.find(x => x.id === a.group_id);
+    const iRows = await sql`SELECT * FROM org_ideas WHERE id = ${a.idea_id}`;
+    const idea = iRows[0];
+    if (!g || !idea) { blockers.push(`Allocation ${a.id} refers to a missing group or project.`); continue; }
+
+    const members = await sql`SELECT * FROM org_group_members WHERE group_id = ${g.id} ORDER BY id`;
+    if (!members.length) { blockers.push(`Group ${g.group_code} has no students.`); continue; }
+
+    if (titleTaken.has(idea.title.trim().toLowerCase()))
+      blockers.push(`A project titled "${idea.title}" already exists in the FYP system — rename the idea before publishing.`);
+
+    for (const m of members) {
+      if (idTaken.has(m.student_id))
+        blockers.push(`Student ID ${m.student_id} (${m.student_name}) is already registered in another FYP project.`);
+      if (nameTaken.has(m.student_name.trim().toLowerCase()))
+        blockers.push(`Student name "${m.student_name}" is already registered in another FYP project — the FYP system requires unique names.`);
+    }
+
+    const size = members.length;
+    if (size < Number(idea.min_students) || size > Number(idea.max_students))
+      warnings.push(`Group ${g.group_code} has ${size} student(s) but "${idea.title}" expects ${idea.min_students}–${idea.max_students}.`);
+
+    const emails = members.map(m => (m.email || '').trim()).filter(Boolean);
+    if (!emails.length)
+      warnings.push(`Group ${g.group_code} gave no email address — its project will be created with notifications disabled.`);
+
+    const supervisorIds = [idea.supervisor_id].concat(idea.co_supervisor_id ? [idea.co_supervisor_id] : []);
+    plan.push({
+      groupId: g.id, code: g.group_code, title: idea.title,
+      supervisorIds, hasEmail: emails.length > 0,
+      students: members.map(m => ({ id: m.student_id, name: m.student_name, email: m.email || '' })),
+    });
+  }
+
+  return { ready: blockers.length === 0 && plan.length > 0, plan, blockers, warnings };
+}
+
+function mapIdea(r) {
+  return {
+    id: r.id, title: r.title, field: r.field || '', description: r.description || '',
+    prerequisites: r.prerequisites || '', minStudents: Number(r.min_students),
+    maxStudents: Number(r.max_students), coSupervisorId: r.co_supervisor_id || '',
+    status: r.status, supervisorId: r.supervisor_id,
+  };
+}
+
 async function isMeetingDelegate(sql, supervisorId) {
   await ensureDelegateTables(sql);
   const rows = await sql`SELECT 1 FROM meeting_delegates WHERE supervisor_id = ${supervisorId}`;
@@ -407,6 +740,7 @@ module.exports = async function handler(req, res) {
         const lockCheck = await checkLockout(supervisorId.trim());
         if (lockCheck.blocked) return ok({ success: false, message: `Account locked. Try again in ${lockCheck.remaining} minute(s).` });
 
+        await ensureCampusColumn(sql);
         const supRows = await sql`SELECT * FROM supervisors WHERE supervisor_id = ${supervisorId.trim()}`;
         const sup = supRows[0] || null;
         if (!sup) {
@@ -428,7 +762,7 @@ module.exports = async function handler(req, res) {
         if (!isHash) await sql`UPDATE supervisors SET password = ${inputHash} WHERE supervisor_id = ${sup.supervisor_id}`;
         await clearLockout(supervisorId.trim());
 
-        const supervisorData = { id: sup.supervisor_id, name: sup.name, program: sup.program, email: sup.email, isAdmin: sup.supervisor_id === ADMIN_ID };
+        const supervisorData = { id: sup.supervisor_id, name: sup.name, program: sup.program, email: sup.email, campus: sup.campus || '', isAdmin: sup.supervisor_id === ADMIN_ID };
         const sessionToken = await createSession(supervisorData);
         return ok({ success: true, supervisor: supervisorData, sessionToken });
       }
@@ -514,29 +848,1022 @@ module.exports = async function handler(req, res) {
       case 'getAllSupervisors': {
         const [sessionToken] = args;
         if (!await verifySession(sessionToken)) return ok([]);
+        await ensureCampusColumn(sql);
         const rows = await sql`SELECT * FROM supervisors WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
-        return ok(rows.map(r => ({ id: r.supervisor_id, name: r.name, program: r.program, email: r.email || '' })));
+        return ok(rows.map(r => ({ id: r.supervisor_id, name: r.name, program: r.program, email: r.email || '', campus: r.campus || '' })));
       }
 
       case 'addSupervisorToSystem': {
-        const [sessionToken, name, program, email, initialPassword] = args;
+        // campus is appended last so existing callers that omit it keep working
+        const [sessionToken, name, program, email, initialPassword, campus] = args;
         const session = await verifySession(sessionToken);
         if (!session) return ok({ success: false, message: 'Session expired.' });
         if (!session.is_admin) return ok({ success: false, message: 'Only the admin can add supervisors.' });
+        await ensureCampusColumn(sql);
+        const campusVal = CAMPUSES.includes(campus) ? campus : '';
         const existing = await sql`SELECT supervisor_id FROM supervisors WHERE name = ${name} AND program = ${program}`;
         if (existing.length) return ok({ success: false, message: 'Supervisor already exists in this program.' });
         const id  = uid('SUP');
         const pwd = (initialPassword && initialPassword.length >= 6) ? initialPassword : DEFAULT_PWD;
-        await sql`INSERT INTO supervisors (supervisor_id, name, program, email, password) VALUES (${id}, ${name}, ${program}, ${email || ''}, ${hashPwd(pwd)})`;
-        return ok({ success: true, id, name, program });
+        await sql`INSERT INTO supervisors (supervisor_id, name, program, email, password, campus) VALUES (${id}, ${name}, ${program}, ${email || ''}, ${hashPwd(pwd)}, ${campusVal})`;
+        return ok({ success: true, id, name, program, campus: campusVal });
       }
 
       case 'getAllSupervisorsForAdmin': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
         if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        await ensureCampusColumn(sql);
         const rows = await sql`SELECT * FROM supervisors WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
-        return ok({ success: true, supervisors: rows.map(r => ({ id: r.supervisor_id, name: r.name, program: r.program, email: r.email || '' })) });
+        return ok({ success: true, campuses: CAMPUSES, supervisors: rows.map(r => ({ id: r.supervisor_id, name: r.name, program: r.program, email: r.email || '', campus: r.campus || '' })) });
+      }
+
+      // ─── Projects Organizer: campus assignment ───────────────────────
+
+      case 'setSupervisorCampuses': {
+        // targets: [{ id, campus }] — campus '' clears the assignment
+        const [sessionToken, targets] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        if (!Array.isArray(targets) || !targets.length) return ok({ success: false, message: 'No changes to save.' });
+        await ensureCampusColumn(sql);
+        for (const t of targets) {
+          if (t.campus && !CAMPUSES.includes(t.campus))
+            return ok({ success: false, message: `Invalid campus "${t.campus}".` });
+        }
+        for (const t of targets) {
+          await sql`UPDATE supervisors SET campus = ${t.campus || ''} WHERE supervisor_id = ${t.id}`;
+        }
+        return ok({ success: true, updated: targets.length });
+      }
+
+      case 'orgInitSchema': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !session.is_admin) return ok({ success: false, message: 'Unauthorized.' });
+        await ensureOrganizerTables(sql);
+        const rows = await sql`SELECT table_name FROM information_schema.tables
+                               WHERE table_schema = 'public' AND table_name LIKE 'org%' ORDER BY table_name`;
+        const colRows = await sql`SELECT column_name FROM information_schema.columns
+                                  WHERE table_name = 'supervisors' AND column_name = 'campus'`;
+        return ok({ success: true, tables: rows.map(r => r.table_name), campusColumn: colRows.length > 0 });
+      }
+
+      // ─── Projects Organizer: supervisor idea submission ──────────────
+
+      case 'orgGetMyIdeas': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+
+        await syncParticipants(sql, cycle);
+        const partRows = await sql`SELECT * FROM org_participants
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        const ideaRows = await sql`SELECT * FROM org_ideas
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id} ORDER BY id`;
+        const colleagues = await sql`SELECT supervisor_id, name FROM supervisors
+          WHERE program = ${cycle.program} AND campus = ${cycle.campus}
+            AND supervisor_id != ${ADMIN_ID} AND supervisor_id != ${sup.supervisor_id} ORDER BY name`;
+
+        const part = partRows[0] || { status: 'not_started', max_groups: 2 };
+        return ok({
+          success: true,
+          cycle: {
+            id: cycle.id, academicYear: cycle.academic_year, semester: cycle.semester,
+            program: cycle.program, campus: cycle.campus, phase: cycle.phase,
+            ideasDeadline: cycle.ideas_deadline, rankingDeadline: cycle.ranking_deadline,
+          },
+          me: { id: sup.supervisor_id, name: sup.name, status: part.status, maxGroups: Number(part.max_groups) },
+          ideas: ideaRows.map(mapIdea),
+          colleagues: colleagues.map(c => ({ id: c.supervisor_id, name: c.name })),
+        });
+      }
+
+      case 'orgSaveIdea': {
+        const [sessionToken, payload] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (cycle.phase !== 'IDEAS_OPEN')
+          return ok({ success: false, message: 'The idea list for your program has already been published — it can no longer be changed.' });
+
+        const p = payload || {};
+        const title = String(p.title || '').trim();
+        const description = String(p.description || '').trim();
+        if (title.length < 5)       return ok({ success: false, message: 'Please give the project a title of at least 5 characters.' });
+        if (description.length < 20) return ok({ success: false, message: 'Please write a short description — at least 20 characters — so students can rank it sensibly.' });
+        const minS = Number(p.minStudents), maxS = Number(p.maxStudents);
+        if (!Number.isInteger(minS) || !Number.isInteger(maxS) || minS < 1 || maxS > 6)
+          return ok({ success: false, message: 'Student numbers must be whole numbers between 1 and 6.' });
+        if (maxS < minS) return ok({ success: false, message: 'The maximum number of students cannot be less than the minimum.' });
+
+        const co = String(p.coSupervisorId || '').trim();
+        if (co) {
+          const coRows = await sql`SELECT supervisor_id FROM supervisors
+            WHERE supervisor_id = ${co} AND program = ${cycle.program} AND campus = ${cycle.campus}`;
+          if (!coRows[0]) return ok({ success: false, message: 'The selected co-supervisor is not in your program and campus.' });
+        }
+
+        try {
+          if (p.id) {
+            const owned = await sql`SELECT id FROM org_ideas
+              WHERE id = ${Number(p.id)} AND supervisor_id = ${sup.supervisor_id} AND cycle_id = ${cycle.id}`;
+            if (!owned[0]) return ok({ success: false, message: 'That idea was not found, or it is not yours.' });
+            await sql`UPDATE org_ideas SET title = ${title}, field = ${String(p.field || '').trim()},
+              description = ${description}, prerequisites = ${String(p.prerequisites || '').trim()},
+              min_students = ${minS}, max_students = ${maxS}, co_supervisor_id = ${co}, updated_at = NOW()
+              WHERE id = ${Number(p.id)}`;
+            return ok({ success: true, id: Number(p.id) });
+          }
+          const ins = await sql`INSERT INTO org_ideas
+            (cycle_id, supervisor_id, title, field, description, prerequisites, min_students, max_students, co_supervisor_id, status)
+            VALUES (${cycle.id}, ${sup.supervisor_id}, ${title}, ${String(p.field || '').trim()}, ${description},
+                    ${String(p.prerequisites || '').trim()}, ${minS}, ${maxS}, ${co}, 'draft') RETURNING id`;
+          return ok({ success: true, id: ins[0].id });
+        } catch (e) {
+          if (e.code === '23505')
+            return ok({ success: false, message: `Another project in your program is already titled "${title}". Please choose a different title.` });
+          return ok({ success: false, message: 'Could not save the idea: ' + (e.message || e) });
+        }
+      }
+
+      case 'orgDeleteIdea': {
+        const [sessionToken, ideaId] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (cycle.phase !== 'IDEAS_OPEN')
+          return ok({ success: false, message: 'The idea list has already been published — it can no longer be changed.' });
+        const res = await sql`DELETE FROM org_ideas
+          WHERE id = ${Number(ideaId)} AND supervisor_id = ${sup.supervisor_id} AND cycle_id = ${cycle.id} RETURNING id`;
+        if (!res[0]) return ok({ success: false, message: 'That idea was not found, or it is not yours.' });
+        // Dropping to zero ideas invalidates a previous submission
+        const left = await sql`SELECT COUNT(*) AS c FROM org_ideas
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        if (Number(left[0].c) === 0) {
+          await sql`UPDATE org_participants SET status = 'not_started', submitted_at = NULL
+            WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id} AND status = 'submitted'`;
+        }
+        return ok({ success: true });
+      }
+
+      case 'orgSubmitIdeas': {
+        const [sessionToken, maxGroups] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (cycle.phase !== 'IDEAS_OPEN')
+          return ok({ success: false, message: 'The idea list has already been published.' });
+
+        const ideaRows = await sql`SELECT id FROM org_ideas
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        if (!ideaRows.length)
+          return ok({ success: false, message: 'You have no ideas to submit. Add at least one, or declare that you have none this semester.' });
+
+        const cap = Number(maxGroups);
+        const capVal = (Number.isInteger(cap) && cap >= 1 && cap <= 10) ? cap : 2;
+        await sql`UPDATE org_ideas SET status = 'submitted', updated_at = NOW()
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        await sql`INSERT INTO org_participants (cycle_id, supervisor_id, max_groups, status, submitted_at)
+          VALUES (${cycle.id}, ${sup.supervisor_id}, ${capVal}, 'submitted', NOW())
+          ON CONFLICT (cycle_id, supervisor_id)
+          DO UPDATE SET status = 'submitted', max_groups = ${capVal}, submitted_at = NOW()`;
+        return ok({ success: true, count: ideaRows.length });
+      }
+
+      case 'orgDeclareNoIdeas': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (cycle.phase !== 'IDEAS_OPEN')
+          return ok({ success: false, message: 'The idea list has already been published.' });
+        const ideaRows = await sql`SELECT id FROM org_ideas
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        if (ideaRows.length)
+          return ok({ success: false, message: 'You still have ideas saved. Delete them first if you do not want to offer any project this semester.' });
+        await sql`INSERT INTO org_participants (cycle_id, supervisor_id, status, submitted_at)
+          VALUES (${cycle.id}, ${sup.supervisor_id}, 'declared_none', NOW())
+          ON CONFLICT (cycle_id, supervisor_id)
+          DO UPDATE SET status = 'declared_none', submitted_at = NOW()`;
+        return ok({ success: true });
+      }
+
+      case 'orgReopenMySubmission': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (cycle.phase !== 'IDEAS_OPEN')
+          return ok({ success: false, message: 'The idea list has already been published.' });
+        await sql`UPDATE org_participants SET status = 'not_started', submitted_at = NULL
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        await sql`UPDATE org_ideas SET status = 'draft'
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
+        return ok({ success: true });
+      }
+
+      case 'orgGetColleagueStatus': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { cycle } = ctx;
+
+        await syncParticipants(sql, cycle);
+        const [sups, parts, ideas] = await Promise.all([
+          sql`SELECT supervisor_id, name FROM supervisors
+              WHERE program = ${cycle.program} AND campus = ${cycle.campus}
+                AND supervisor_id != ${ADMIN_ID} ORDER BY name`,
+          sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id}`,
+          sql`SELECT * FROM org_ideas WHERE cycle_id = ${cycle.id} ORDER BY id`,
+        ]);
+        const partBy = new Map(parts.map(p => [p.supervisor_id, p]));
+        const nameBy = new Map(sups.map(s => [s.supervisor_id, s.name]));
+
+        const board = sups.map(s => {
+          const p = partBy.get(s.supervisor_id) || { status: 'not_started', max_groups: 2, expected: true };
+          const mine = ideas.filter(i => i.supervisor_id === s.supervisor_id);
+          return {
+            id: s.supervisor_id, name: s.name, status: p.status,
+            maxGroups: Number(p.max_groups),
+            expected: p.expected !== false,
+            submittedAt: p.submitted_at || null,
+            ideaCount: mine.length,
+            ideas: mine.map(i => ({
+              id: i.id, title: i.title, field: i.field || '', description: i.description || '',
+              prerequisites: i.prerequisites || '',
+              minStudents: Number(i.min_students), maxStudents: Number(i.max_students),
+              coSupervisor: i.co_supervisor_id ? (nameBy.get(i.co_supervisor_id) || '') : '',
+              status: i.status,
+            })),
+          };
+        });
+        const expected  = board.filter(b => b.expected);
+        const responded = expected.filter(b => b.status === 'submitted' || b.status === 'declared_none').length;
+        return ok({
+          success: true,
+          phase: cycle.phase,
+          program: cycle.program, campus: cycle.campus,
+          academicYear: cycle.academic_year, semester: cycle.semester,
+          totalExpected: expected.length, responded,
+          totalIdeas: ideas.length,
+          canManage: canManageCycle(session, ctx.sup, cycle),
+          deadlinePolicy: cycle.deadline_policy,
+          board,
+        });
+      }
+
+      // ─── Projects Organizer: deadlines, policy and the publish gate ──
+
+      case 'orgGetCycleSettings': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        const delegateRows = cycle.deadline_delegate
+          ? await sql`SELECT name FROM supervisors WHERE supervisor_id = ${cycle.deadline_delegate}` : [];
+        return ok({
+          success: true,
+          cycle: {
+            id: cycle.id, phase: cycle.phase,
+            program: cycle.program, campus: cycle.campus,
+            academicYear: cycle.academic_year, semester: cycle.semester,
+            ideasDeadline: cycle.ideas_deadline, rankingDeadline: cycle.ranking_deadline,
+            deadlinePolicy: cycle.deadline_policy, deadlineDelegate: cycle.deadline_delegate,
+            deadlineDelegateName: delegateRows[0] ? delegateRows[0].name : '',
+            minGroupSize: Number(cycle.min_group_size), maxGroupSize: Number(cycle.max_group_size),
+          },
+          canManage: canManageCycle(session, sup, cycle),
+          isAdmin: isAdminUser(session),
+        });
+      }
+
+      case 'orgSetDeadline': {
+        // which: 'ideas' | 'ranking'; value: ISO string or '' to clear
+        const [sessionToken, which, value] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'The admin has restricted who can change deadlines for your program.' });
+
+        const ts = value ? new Date(value) : null;
+        if (value && isNaN(ts.getTime())) return ok({ success: false, message: 'That date is not valid.' });
+        if (which === 'ideas') {
+          await sql`UPDATE org_cycles SET ideas_deadline = ${ts}, updated_at = NOW() WHERE id = ${cycle.id}`;
+        } else if (which === 'ranking') {
+          await sql`UPDATE org_cycles SET ranking_deadline = ${ts}, updated_at = NOW() WHERE id = ${cycle.id}`;
+        } else {
+          return ok({ success: false, message: 'Unknown deadline type.' });
+        }
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'deadline_set', { which, value: value || null });
+        return ok({ success: true });
+      }
+
+      case 'orgSetGroupSizes': {
+        const [sessionToken, minSize, maxSize] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to change these settings.' });
+        const mn = Number(minSize), mx = Number(maxSize);
+        if (!Number.isInteger(mn) || !Number.isInteger(mx) || mn < 1 || mx > 6 || mx < mn)
+          return ok({ success: false, message: 'Group sizes must be whole numbers between 1 and 6, with the maximum not below the minimum.' });
+        await sql`UPDATE org_cycles SET min_group_size = ${mn}, max_group_size = ${mx}, updated_at = NOW() WHERE id = ${cycle.id}`;
+        return ok({ success: true });
+      }
+
+      case 'orgSetParticipantExpected': {
+        const [sessionToken, supervisorId, expected] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to change the expected list.' });
+        await sql`UPDATE org_participants SET expected = ${!!expected}
+          WHERE cycle_id = ${cycle.id} AND supervisor_id = ${String(supervisorId)}`;
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'participant_expected', { supervisorId, expected: !!expected });
+        return ok({ success: true });
+      }
+
+      case 'orgPublishIdeas': {
+        // Opens the student side. Non-responders are recorded as having no ideas.
+        const [sessionToken, force] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'The admin has restricted who can publish the idea list for your program.' });
+        if (cycle.phase !== 'IDEAS_OPEN')
+          return ok({ success: false, message: 'The idea list has already been published.' });
+
+        await syncParticipants(sql, cycle);
+        const parts = await sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id} AND expected = TRUE`;
+        const pending = parts.filter(p => p.status !== 'submitted' && p.status !== 'declared_none');
+        const deadlineDone = deadlinePassed(cycle.ideas_deadline);
+
+        if (pending.length && !deadlineDone && !force) {
+          const names = await sql`SELECT supervisor_id, name FROM supervisors
+            WHERE supervisor_id = ANY(${pending.map(p => p.supervisor_id)})`;
+          return ok({
+            success: false, needsForce: true,
+            pending: names.map(n => n.name),
+            message: `${pending.length} supervisor(s) have not responded yet and the idea deadline has not passed.`,
+          });
+        }
+
+        const ideaCount = await sql`SELECT COUNT(*) AS c FROM org_ideas WHERE cycle_id = ${cycle.id}`;
+        if (Number(ideaCount[0].c) === 0)
+          return ok({ success: false, message: 'There are no ideas to publish. At least one supervisor must submit a project idea first.' });
+
+        // Everyone still pending is recorded as having no ideas this semester
+        for (const p of pending) {
+          await sql`UPDATE org_participants SET status = 'declared_none', submitted_at = NOW()
+            WHERE cycle_id = ${cycle.id} AND supervisor_id = ${p.supervisor_id}`;
+        }
+        await sql`UPDATE org_ideas SET status = 'submitted' WHERE cycle_id = ${cycle.id} AND status = 'draft'`;
+        await sql`UPDATE org_cycles SET phase = 'RANKING_OPEN', updated_at = NOW() WHERE id = ${cycle.id}`;
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'ideas_published', { forced: !!force, autoDeclared: pending.length });
+        return ok({ success: true, autoDeclared: pending.length, ideas: Number(ideaCount[0].c) });
+      }
+
+      case 'orgSetPhase': {
+        // Manual phase moves: reopen ideas, close ranking, reopen ranking.
+        const [sessionToken, phase] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to change the phase.' });
+        const allowed = { IDEAS_OPEN: 1, RANKING_OPEN: 1, RANKING_CLOSED: 1 };
+        if (!allowed[phase]) return ok({ success: false, message: 'That phase cannot be set manually.' });
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'The allocation has been published — this cycle is closed.' });
+        await sql`UPDATE org_cycles SET phase = ${phase}, updated_at = NOW() WHERE id = ${cycle.id}`;
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'phase_changed', { from: cycle.phase, to: phase });
+        return ok({ success: true });
+      }
+
+      // ─── Projects Organizer: admin policy control ────────────────────
+
+      case 'orgAdminOverview': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !isAdminUser(session)) return ok({ success: false, message: 'Unauthorized.' });
+        await ensureOrganizerTables(sql);
+        const { academic_year, semester } = academicContext();
+        const cycles = await sql`SELECT * FROM org_cycles
+          WHERE academic_year = ${academic_year} AND semester = ${semester} ORDER BY program, campus`;
+        const sups = await sql`SELECT supervisor_id, name, program, campus FROM supervisors
+          WHERE supervisor_id != ${ADMIN_ID} ORDER BY name`;
+        const rows = [];
+        for (const c of cycles) {
+          const counts = await sql`SELECT COUNT(*) AS ideas FROM org_ideas WHERE cycle_id = ${c.id}`;
+          const groups = await sql`SELECT COUNT(*) AS g FROM org_groups WHERE cycle_id = ${c.id}`;
+          rows.push({
+            id: c.id, program: c.program, campus: c.campus, phase: c.phase,
+            deadlinePolicy: c.deadline_policy, deadlineDelegate: c.deadline_delegate,
+            ideasDeadline: c.ideas_deadline, rankingDeadline: c.ranking_deadline,
+            ideaCount: Number(counts[0].ideas), groupCount: Number(groups[0].g),
+          });
+        }
+        return ok({
+          success: true, academicYear: academic_year, semester,
+          cycles: rows,
+          supervisors: sups.map(s => ({ id: s.supervisor_id, name: s.name, program: s.program, campus: s.campus || '' })),
+        });
+      }
+
+      case 'orgSetDeadlinePolicy': {
+        const [sessionToken, cycleId, policy, delegateId] = args;
+        const session = await verifySession(sessionToken);
+        if (!session || !isAdminUser(session)) return ok({ success: false, message: 'Only the admin can change this.' });
+        await ensureOrganizerTables(sql);
+        if (!['open', 'locked', 'delegate'].includes(policy))
+          return ok({ success: false, message: 'Unknown policy.' });
+        const cRows = await sql`SELECT * FROM org_cycles WHERE id = ${Number(cycleId)}`;
+        const cycle = cRows[0];
+        if (!cycle) return ok({ success: false, message: 'Cycle not found.' });
+        let delegate = '';
+        if (policy === 'delegate') {
+          delegate = String(delegateId || '');
+          const d = await sql`SELECT supervisor_id FROM supervisors
+            WHERE supervisor_id = ${delegate} AND program = ${cycle.program} AND campus = ${cycle.campus}`;
+          if (!d[0]) return ok({ success: false, message: 'Choose a supervisor from that program and campus.' });
+        }
+        await sql`UPDATE org_cycles SET deadline_policy = ${policy}, deadline_delegate = ${delegate}, updated_at = NOW()
+          WHERE id = ${Number(cycleId)}`;
+        await logAudit(sql, cycle.id, 0, 'admin', session.supervisor_id, session.name || 'Admin',
+          'policy_changed', { policy, delegate });
+        return ok({ success: true });
+      }
+
+      // ─── Projects Organizer: student groups ──────────────────────────
+
+      case 'orgStudentLookup': {
+        const [program, campus, studentId, studentName] = args;
+        const sid  = String(studentId || '').trim();
+        const name = normName(studentName);
+        if (!STUDENT_ID_RE.test(sid))
+          return ok({ success: false, message: 'Student ID must be exactly 9 digits starting with 20.' });
+        if (name.split(' ').length < 2)
+          return ok({ success: false, message: 'Please enter your full name — at least a first and a family name.' });
+
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        // A known ID must match the name it was registered with
+        if (found && normName(found.me.student_name).toLowerCase() !== name.toLowerCase()) {
+          return ok({ success: false,
+            message: `ID ${sid} is already registered in a group under a different name. If this is an error, ask your coordinator.` });
+        }
+        return ok({
+          success: true,
+          cycle: {
+            id: cycle.id, phase: cycle.phase, program: cycle.program, campus: cycle.campus,
+            academicYear: cycle.academic_year, semester: cycle.semester,
+            minGroupSize: Number(cycle.min_group_size), maxGroupSize: Number(cycle.max_group_size),
+            rankingDeadline: cycle.ranking_deadline,
+            rankingClosed: cycle.phase === 'RANKING_CLOSED' || cycle.phase === 'ALLOCATED'
+                           || deadlinePassed(cycle.ranking_deadline),
+          },
+          hasGroup: !!found,
+        });
+      }
+
+      case 'orgCreateGroup': {
+        const [program, campus, me, others] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'Projects for this semester have already been assigned.' });
+
+        const raw = [{ ...(me || {}), creator: true }].concat(Array.isArray(others) ? others : []);
+        const members = [];
+        for (const m of raw) {
+          const sid  = String((m && m.id) || '').trim();
+          const name = normName(m && m.name);
+          if (!STUDENT_ID_RE.test(sid))
+            return ok({ success: false, message: `"${sid || '(blank)'}" is not a valid student ID — it must be 9 digits starting with 20.` });
+          if (name.split(' ').length < 2)
+            return ok({ success: false, message: `Please give a full name for student ${sid}.` });
+          members.push({ id: sid, name, email: String((m && m.email) || '').trim(), creator: !!m.creator });
+        }
+        if (members.length < Number(cycle.min_group_size))
+          return ok({ success: false, message: `A group needs at least ${cycle.min_group_size} students.` });
+        if (members.length > Number(cycle.max_group_size))
+          return ok({ success: false, message: `A group can have at most ${cycle.max_group_size} students.` });
+
+        // Duplicates inside the submitted list
+        const seenId = new Set(), seenName = new Set();
+        for (const m of members) {
+          if (seenId.has(m.id))   return ok({ success: false, message: `Student ID ${m.id} is listed twice.` });
+          if (seenName.has(m.name.toLowerCase())) return ok({ success: false, message: `"${m.name}" is listed twice.` });
+          seenId.add(m.id); seenName.add(m.name.toLowerCase());
+        }
+
+        // Clashes with groups that already exist — checked up front for a clear
+        // message; the unique indexes below are the real guarantee.
+        const clashes = await sql`SELECT student_id, student_name FROM org_group_members
+          WHERE cycle_id = ${cycle.id}
+            AND (student_id = ANY(${members.map(m => m.id)})
+                 OR lower(student_name) = ANY(${members.map(m => m.name.toLowerCase())}))`;
+        if (clashes.length) {
+          const who = clashes.map(c => `${c.student_name} (${c.student_id})`).join(', ');
+          return ok({ success: false,
+            message: `Already in another group: ${who}. Each student can belong to only one group.` });
+        }
+
+        let code = groupCode();
+        for (let i = 0; i < 5; i++) {
+          const exists = await sql`SELECT 1 FROM org_groups WHERE group_code = ${code}`;
+          if (!exists.length) break;
+          code = groupCode();
+        }
+
+        const creator = members.find(m => m.creator) || members[0];
+        let groupId = null;
+        try {
+          const g = await sql`INSERT INTO org_groups (cycle_id, group_code, created_by_student_id, status)
+            VALUES (${cycle.id}, ${code}, ${creator.id}, 'forming') RETURNING *`;
+          groupId = g[0].id;
+          for (const m of members) {
+            await sql`INSERT INTO org_group_members
+              (cycle_id, group_id, student_id, student_name, email, added_by_student_id)
+              VALUES (${cycle.id}, ${groupId}, ${m.id}, ${m.name}, ${m.email}, ${creator.id})`;
+          }
+        } catch (e) {
+          // Roll back so a half-built group never blocks the students in it
+          if (groupId) {
+            await sql`DELETE FROM org_group_members WHERE group_id = ${groupId}`.catch(() => {});
+            await sql`DELETE FROM org_groups WHERE id = ${groupId}`.catch(() => {});
+          }
+          if (e.code === '23505')
+            return ok({ success: false,
+              message: 'One of these students was added to another group a moment ago. Please reload and check the list.' });
+          return ok({ success: false, message: 'Could not create the group: ' + (e.message || e) });
+        }
+
+        await logAudit(sql, cycle.id, groupId, 'student', creator.id, creator.name,
+          'group_created', { code, members: members.map(m => `${m.name} (${m.id})`) });
+        return ok({ success: true, groupId, groupCode: code });
+      }
+
+      case 'orgGetGroup': {
+        const [program, campus, studentId] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        const sid = String(studentId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({
+          success: true, hasGroup: false,
+          cycle: {
+            id: cycle.id, phase: cycle.phase, program: cycle.program, campus: cycle.campus,
+            minGroupSize: Number(cycle.min_group_size), maxGroupSize: Number(cycle.max_group_size),
+            rankingDeadline: cycle.ranking_deadline,
+          },
+        });
+
+        const ranks = await sql`SELECT r.rank, r.idea_id, i.title, i.field, i.min_students, i.max_students,
+                                       s.name AS supervisor_name
+          FROM org_rankings r
+          JOIN org_ideas i ON i.id = r.idea_id
+          LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
+          WHERE r.group_id = ${found.group.id} ORDER BY r.rank`;
+        const audit = await sql`SELECT * FROM org_audit WHERE group_id = ${found.group.id}
+          ORDER BY created_at DESC LIMIT 40`;
+
+        const rankingClosed = cycle.phase === 'RANKING_CLOSED' || cycle.phase === 'ALLOCATED'
+                              || deadlinePassed(cycle.ranking_deadline);
+        let allocation = null;
+        if (cycle.phase === 'ALLOCATED') {
+          const a = await sql`SELECT a.*, i.title, i.description, s.name AS supervisor_name
+            FROM org_allocations a
+            JOIN org_ideas i ON i.id = a.idea_id
+            LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
+            WHERE a.group_id = ${found.group.id} AND a.status = 'published'`;
+          if (a[0]) allocation = { title: a[0].title, description: a[0].description, supervisor: a[0].supervisor_name || '' };
+        }
+
+        return ok({
+          success: true, hasGroup: true,
+          cycle: {
+            id: cycle.id, phase: cycle.phase, program: cycle.program, campus: cycle.campus,
+            rankingDeadline: cycle.ranking_deadline, rankingClosed,
+            minGroupSize: Number(cycle.min_group_size), maxGroupSize: Number(cycle.max_group_size),
+          },
+          group: {
+            id: found.group.id, code: found.group.group_code, status: found.group.status,
+            rankVersion: Number(found.group.rank_version),
+            rankedBy: found.group.ranked_by_student_id, rankedAt: found.group.ranked_at,
+            createdBy: found.group.created_by_student_id,
+          },
+          members: found.members.map(m => ({ id: m.student_id, name: m.student_name, email: m.email || '' })),
+          ranking: ranks.map(r => ({
+            rank: Number(r.rank), ideaId: r.idea_id, title: r.title, field: r.field || '',
+            minStudents: Number(r.min_students), maxStudents: Number(r.max_students),
+            supervisor: r.supervisor_name || '',
+          })),
+          audit: audit.map(a => ({
+            at: a.created_at, actor: a.actor_name, action: a.action, details: a.details || {},
+          })),
+          allocation,
+        });
+      }
+
+      case 'orgLeaveGroup': {
+        const [program, campus, studentId] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'ALLOCATED' || cycle.phase === 'RANKING_CLOSED')
+          return ok({ success: false, message: 'Groups are frozen — contact your coordinator.' });
+        const sid = String(studentId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({ success: false, message: 'You are not in a group.' });
+
+        const me = found.members.find(m => m.student_id === sid);
+        await sql`DELETE FROM org_group_members WHERE cycle_id = ${cycle.id} AND student_id = ${sid}`;
+        const left = found.members.length - 1;
+        await logAudit(sql, cycle.id, found.group.id, 'student', sid, me ? me.student_name : sid,
+          'member_left', { remaining: left });
+        // An empty group is removed along with its ranking
+        if (left <= 0) {
+          await sql`DELETE FROM org_rankings WHERE group_id = ${found.group.id}`;
+          await sql`DELETE FROM org_groups WHERE id = ${found.group.id}`;
+        }
+        return ok({ success: true, groupDeleted: left <= 0 });
+      }
+
+      case 'orgAddMember': {
+        const [program, campus, studentId, newMember] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'ALLOCATED' || cycle.phase === 'RANKING_CLOSED')
+          return ok({ success: false, message: 'Groups are frozen — contact your coordinator.' });
+        const sid = String(studentId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({ success: false, message: 'You are not in a group.' });
+        if (found.members.length >= Number(cycle.max_group_size))
+          return ok({ success: false, message: `A group can have at most ${cycle.max_group_size} students.` });
+
+        const nid  = String((newMember && newMember.id) || '').trim();
+        const name = normName(newMember && newMember.name);
+        if (!STUDENT_ID_RE.test(nid))
+          return ok({ success: false, message: 'Student ID must be 9 digits starting with 20.' });
+        if (name.split(' ').length < 2)
+          return ok({ success: false, message: 'Please enter their full name.' });
+
+        try {
+          await sql`INSERT INTO org_group_members
+            (cycle_id, group_id, student_id, student_name, email, added_by_student_id)
+            VALUES (${cycle.id}, ${found.group.id}, ${nid}, ${name},
+                    ${String((newMember && newMember.email) || '').trim()}, ${sid})`;
+        } catch (e) {
+          if (e.code === '23505')
+            return ok({ success: false, message: `${name} (${nid}) is already in a group.` });
+          return ok({ success: false, message: 'Could not add that student: ' + (e.message || e) });
+        }
+        const meRow = found.members.find(m => m.student_id === sid);
+        await logAudit(sql, cycle.id, found.group.id, 'student', sid, meRow ? meRow.student_name : sid,
+          'member_added', { added: `${name} (${nid})` });
+        return ok({ success: true });
+      }
+
+      // ─── Projects Organizer: ranking ─────────────────────────────────
+
+      case 'orgGetPublishedIdeas': {
+        const [program, campus] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'IDEAS_OPEN')
+          return ok({ success: true, published: false, ideas: [] });
+        const rows = await sql`SELECT i.*, s.name AS supervisor_name, c.name AS co_name
+          FROM org_ideas i
+          LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
+          LEFT JOIN supervisors c ON c.supervisor_id = i.co_supervisor_id
+          WHERE i.cycle_id = ${cycle.id} ORDER BY s.name, i.id`;
+        return ok({
+          success: true, published: true,
+          ideas: rows.map(r => ({
+            id: r.id, title: r.title, field: r.field || '', description: r.description || '',
+            prerequisites: r.prerequisites || '',
+            minStudents: Number(r.min_students), maxStudents: Number(r.max_students),
+            supervisor: r.supervisor_name || '', coSupervisor: r.co_name || '',
+          })),
+        });
+      }
+
+      case 'orgSaveRanking': {
+        // orderedIdeaIds is the group's full preference list, best first.
+        const [program, campus, studentId, orderedIdeaIds, version] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        const sid = String(studentId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({ success: false, message: 'You are not in a group.' });
+
+        if (cycle.phase !== 'RANKING_OPEN')
+          return ok({ success: false, message: 'Ranking is not open at the moment.' });
+        if (deadlinePassed(cycle.ranking_deadline))
+          return ok({ success: false, message: 'The deadline for changing your project choices has passed.' });
+
+        // Optimistic locking — two teammates editing at once must not overwrite
+        // each other silently.
+        const current = Number(found.group.rank_version);
+        if (version != null && Number(version) !== current) {
+          const whoRows = await sql`SELECT student_name FROM org_group_members
+            WHERE cycle_id = ${cycle.id} AND student_id = ${found.group.ranked_by_student_id}`;
+          const who = whoRows[0] ? whoRows[0].student_name : 'A teammate';
+          return ok({ success: false, stale: true,
+            message: `${who} changed the list while you were editing. Reload to see their version before saving.` });
+        }
+
+        const ids = Array.isArray(orderedIdeaIds) ? orderedIdeaIds.map(Number) : [];
+        if (new Set(ids).size !== ids.length)
+          return ok({ success: false, message: 'The same project appears twice in your list.' });
+        if (ids.length) {
+          const valid = await sql`SELECT id FROM org_ideas WHERE cycle_id = ${cycle.id} AND id = ANY(${ids})`;
+          if (valid.length !== ids.length)
+            return ok({ success: false, message: 'One of the selected projects is no longer available. Please reload.' });
+        }
+
+        const before = await sql`SELECT r.rank, i.title FROM org_rankings r
+          JOIN org_ideas i ON i.id = r.idea_id WHERE r.group_id = ${found.group.id} ORDER BY r.rank`;
+        await sql`DELETE FROM org_rankings WHERE group_id = ${found.group.id}`;
+        for (let i = 0; i < ids.length; i++) {
+          await sql`INSERT INTO org_rankings (group_id, idea_id, rank) VALUES (${found.group.id}, ${ids[i]}, ${i + 1})`;
+        }
+        const after = await sql`SELECT r.rank, i.title FROM org_rankings r
+          JOIN org_ideas i ON i.id = r.idea_id WHERE r.group_id = ${found.group.id} ORDER BY r.rank`;
+
+        await sql`UPDATE org_groups SET rank_version = ${current + 1}, ranked_by_student_id = ${sid},
+          ranked_at = NOW(), status = ${ids.length ? 'ranked' : 'forming'} WHERE id = ${found.group.id}`;
+
+        const meRow = found.members.find(m => m.student_id === sid);
+        await logAudit(sql, cycle.id, found.group.id, 'student', sid, meRow ? meRow.student_name : sid,
+          'ranking_saved', {
+            before: before.map(b => b.title),
+            after: after.map(a => a.title),
+            count: ids.length,
+          });
+        return ok({ success: true, version: current + 1 });
+      }
+
+      // ─── Projects Organizer: assignment console ──────────────────────
+
+      case 'orgGetAssignmentBoard': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+
+        const [groups, ideas, ranks, allocs, parts] = await Promise.all([
+          sql`SELECT * FROM org_groups WHERE cycle_id = ${cycle.id} ORDER BY group_code`,
+          sql`SELECT i.*, s.name AS supervisor_name FROM org_ideas i
+              LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
+              WHERE i.cycle_id = ${cycle.id} ORDER BY s.name, i.id`,
+          sql`SELECT r.* , g.cycle_id FROM org_rankings r
+              JOIN org_groups g ON g.id = r.group_id WHERE g.cycle_id = ${cycle.id} ORDER BY r.rank`,
+          sql`SELECT * FROM org_allocations WHERE cycle_id = ${cycle.id}`,
+          sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id}`,
+        ]);
+        const memberRows = await sql`SELECT group_id, student_id FROM org_group_members WHERE cycle_id = ${cycle.id}`;
+
+        const sizeBy = new Map();
+        memberRows.forEach(m => sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1));
+        const ideaBy  = new Map(ideas.map(i => [i.id, i]));
+        const allocBy = new Map(allocs.map(a => [a.group_id, a]));
+        const capBy   = new Map(parts.map(p => [p.supervisor_id, Number(p.max_groups)]));
+
+        // Groups stay anonymous — code and size only, never student names.
+        const groupRows = groups.map(g => {
+          const prefs = ranks.filter(r => r.group_id === g.id)
+            .map(r => { const i = ideaBy.get(r.idea_id); return i ? { rank: Number(r.rank), ideaId: i.id, title: i.title, supervisor: i.supervisor_name || '' } : null; })
+            .filter(Boolean);
+          const a = allocBy.get(g.id);
+          const assignedIdea = a ? ideaBy.get(a.idea_id) : null;
+          const size = sizeBy.get(g.id) || 0;
+          const warnings = [];
+          if (assignedIdea) {
+            if (size < Number(assignedIdea.min_students) || size > Number(assignedIdea.max_students))
+              warnings.push(`Group of ${size} is outside this project's range of ${assignedIdea.min_students}–${assignedIdea.max_students}.`);
+          }
+          return {
+            id: g.id, code: g.group_code, size, status: g.status,
+            prefs,
+            assignedIdeaId: a ? a.idea_id : null,
+            assignedTitle: assignedIdea ? assignedIdea.title : '',
+            assignedRank: a ? Number(a.assigned_rank) : 0,
+            published: a ? a.status === 'published' : false,
+            warnings,
+          };
+        });
+
+        // Supervisor load against declared capacity
+        const loadBy = new Map();
+        allocs.forEach(a => {
+          const i = ideaBy.get(a.idea_id);
+          if (i) loadBy.set(i.supervisor_id, (loadBy.get(i.supervisor_id) || 0) + 1);
+        });
+        const overloaded = [];
+        loadBy.forEach((n, supId) => {
+          const cap = capBy.has(supId) ? capBy.get(supId) : 2;
+          if (n > cap) {
+            const nm = ideas.find(i => i.supervisor_id === supId);
+            overloaded.push({ supervisor: nm ? nm.supervisor_name : supId, assigned: n, capacity: cap });
+          }
+        });
+
+        return ok({
+          success: true,
+          canManage: canManageCycle(session, sup, cycle),
+          cycle: {
+            id: cycle.id, phase: cycle.phase, program: cycle.program, campus: cycle.campus,
+            academicYear: cycle.academic_year, semester: cycle.semester,
+          },
+          groups: groupRows,
+          ideas: ideas.map(i => ({
+            id: i.id, title: i.title, supervisor: i.supervisor_name || '', supervisorId: i.supervisor_id,
+            minStudents: Number(i.min_students), maxStudents: Number(i.max_students),
+            taken: allocs.some(a => a.idea_id === i.id),
+          })),
+          unassigned: groupRows.filter(g => !g.assignedIdeaId).length,
+          overloaded,
+        });
+      }
+
+      case 'orgSetAssignment': {
+        const [sessionToken, groupId, ideaId] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to assign projects for this program.' });
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'The allocation has already been published.' });
+
+        const g = await sql`SELECT * FROM org_groups WHERE id = ${Number(groupId)} AND cycle_id = ${cycle.id}`;
+        if (!g[0]) return ok({ success: false, message: 'Group not found.' });
+        const i = await sql`SELECT * FROM org_ideas WHERE id = ${Number(ideaId)} AND cycle_id = ${cycle.id}`;
+        if (!i[0]) return ok({ success: false, message: 'Project idea not found.' });
+
+        const taken = await sql`SELECT a.group_id, g.group_code FROM org_allocations a
+          JOIN org_groups g ON g.id = a.group_id
+          WHERE a.cycle_id = ${cycle.id} AND a.idea_id = ${Number(ideaId)} AND a.group_id != ${Number(groupId)}`;
+        if (taken.length)
+          return ok({ success: false, message: `That project is already assigned to group ${taken[0].group_code}.` });
+
+        const rankRow = await sql`SELECT rank FROM org_rankings
+          WHERE group_id = ${Number(groupId)} AND idea_id = ${Number(ideaId)}`;
+        const assignedRank = rankRow[0] ? Number(rankRow[0].rank) : 0;
+
+        try {
+          await sql`INSERT INTO org_allocations (cycle_id, group_id, idea_id, assigned_rank, assigned_by, status)
+            VALUES (${cycle.id}, ${Number(groupId)}, ${Number(ideaId)}, ${assignedRank}, ${sup.supervisor_id}, 'draft')
+            ON CONFLICT (cycle_id, group_id)
+            DO UPDATE SET idea_id = ${Number(ideaId)}, assigned_rank = ${assignedRank},
+                          assigned_by = ${sup.supervisor_id}, created_at = NOW()`;
+        } catch (e) {
+          // The (cycle_id, idea_id) unique index catches a colleague assigning
+          // the same project a moment earlier
+          if (e.code === '23505')
+            return ok({ success: false, message: 'Another supervisor just assigned that project to a different group. Refresh to see the current state.' });
+          throw e;
+        }
+        await logAudit(sql, cycle.id, Number(groupId), 'supervisor', sup.supervisor_id, sup.name,
+          'assignment_set', { group: g[0].group_code, idea: i[0].title, rank: assignedRank });
+        return ok({ success: true, assignedRank });
+      }
+
+      case 'orgClearAssignment': {
+        const [sessionToken, groupId] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to change assignments.' });
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'The allocation has already been published.' });
+        await sql`DELETE FROM org_allocations WHERE cycle_id = ${cycle.id} AND group_id = ${Number(groupId)}`;
+        await logAudit(sql, cycle.id, Number(groupId), 'supervisor', sup.supervisor_id, sup.name,
+          'assignment_cleared', {});
+        return ok({ success: true });
+      }
+
+      // ─── Projects Organizer: publish into the FYP system ─────────────
+
+      case 'orgDryRunPublish': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to publish for this program.' });
+
+        const report = await buildPublishReport(sql, cycle);
+        return ok({ success: true, ...report });
+      }
+
+      case 'orgPublishAllocation': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { sup, cycle } = ctx;
+        if (!canManageCycle(session, sup, cycle))
+          return ok({ success: false, message: 'You are not allowed to publish for this program.' });
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'This allocation has already been published.' });
+
+        const report = await buildPublishReport(sql, cycle);
+        if (!report.ready)
+          return ok({ success: false, message: 'The pre-flight check found problems. Fix them and run the check again.', ...report });
+
+        const created = [];
+        for (const row of report.plan) {
+          const projectId = uid('PRJ');
+          const insertedIds = [];
+          try {
+            for (const s of row.students) {
+              await sql`INSERT INTO students (student_id, student_name, email, project_id)
+                VALUES (${s.id}, ${s.name}, ${s.email || ''}, ${projectId})`;
+              insertedIds.push(s.id);
+            }
+            await sql`INSERT INTO projects
+              (project_id, title, type, semester, year, end_date, program_type, supervisors, students, disable_notifications)
+              VALUES (${projectId}, ${row.title}, 'FYP1', ${cycle.semester}, ${cycle.academic_year}, '',
+                      ${cycle.program}, ${row.supervisorIds.join(',')}, ${insertedIds.join(',')},
+                      ${!row.hasEmail})`;
+            await sql`UPDATE org_allocations SET status = 'published', project_id = ${projectId}
+              WHERE cycle_id = ${cycle.id} AND group_id = ${row.groupId}`;
+            await sql`UPDATE org_groups SET status = 'allocated' WHERE id = ${row.groupId}`;
+            created.push({ group: row.code, title: row.title, projectId });
+          } catch (e) {
+            // Undo this project only; earlier ones already published stay valid
+            for (const sid of insertedIds) await sql`DELETE FROM students WHERE student_id = ${sid}`.catch(() => {});
+            await sql`DELETE FROM projects WHERE project_id = ${projectId}`.catch(() => {});
+            return ok({
+              success: false,
+              message: `Created ${created.length} project(s), then failed on group ${row.code}: ${e.message || e}. `
+                     + 'The failed project was rolled back; the successful ones remain and will be skipped if you publish again.',
+              created,
+            });
+          }
+        }
+
+        await sql`UPDATE org_cycles SET phase = 'ALLOCATED', updated_at = NOW() WHERE id = ${cycle.id}`;
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'allocation_published', { projects: created.length });
+        return ok({ success: true, created });
       }
 
       case 'setAndEmailCredentials': {

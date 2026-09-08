@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FYP Projects Organizer — ECE Department</title>
+  <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── ABET editorial palette — matches the Meeting Organizer ── */
+    :root{
+      --ink:#101826; --ink-soft:#1c2534;
+      --accent:#0F7A73; --accent-dim:#E4F0EE;
+      --amber:#C98A2C; --amber-dim:#FBF1DF;
+      --olive:#4C7A3F; --olive-dim:#E9F1E4;
+      --rust:#B5482F;  --rust-dim:#FBE9E4;
+      --bg:#F4F6F5; --card:#fff;
+      --line:#DBE2E2; --line-soft:#EAEFEE;
+      --slate:#55606B; --slate-soft:#8A939B;
+      --radius:10px;
+      --shadow:0 1px 2px rgba(16,24,38,.04), 0 6px 20px rgba(16,24,38,.05);
+      --font-display:"Fraunces", Georgia, serif;
+      --font-body:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono:"IBM Plex Mono", ui-monospace, monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:var(--font-body);background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;}
+    h1,h2,h3,h4,h5{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;}
+    .mono{font-family:var(--font-mono);}
+    ::selection{background:var(--accent);color:#fff;}
+
+    .screen{display:none;}
+    .screen.active{display:block;}
+
+    /* ── Topbar ── */
+    .topbar{display:flex;align-items:center;gap:14px;padding:14px 26px;background:var(--ink);color:#fff;}
+    .topbar-logo{height:34px;}
+    .topbar-title{font-family:var(--font-display);font-size:19px;font-weight:600;}
+    .topbar-sub{font-size:11px;color:#9fb0ad;font-family:var(--font-mono);}
+    .topbar-name{font-size:13px;color:#cfd8d6;margin-right:4px;}
+    .btn-topbar{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;
+      border-radius:8px;padding:6px 13px;font-size:13px;cursor:pointer;transition:.15s;}
+    .btn-topbar:hover{background:rgba(255,255,255,.2);}
+
+    .page-body{max-width:1080px;margin:0 auto;padding:28px 22px 60px;}
+    .page-heading{font-family:var(--font-display);font-size:22px;font-weight:600;}
+    .page-sub{font-size:13px;color:var(--slate);margin-top:2px;}
+
+    /* ── Gate (choose your door) ── */
+    .gate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;}
+    .gate-logo{height:64px;margin-bottom:20px;}
+    .gate-title{font-family:var(--font-display);font-size:30px;font-weight:700;text-align:center;}
+    .gate-sub{font-size:14px;color:var(--slate);text-align:center;margin:8px 0 32px;max-width:520px;}
+    .gate-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;width:100%;max-width:720px;}
+    .gate-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:30px 26px;text-align:center;cursor:pointer;transition:.16s;}
+    .gate-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 10px 30px rgba(16,24,38,.10);}
+    .gate-icon{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;margin:0 auto 14px;font-size:23px;}
+    .gate-icon.sup{background:var(--accent-dim);color:var(--accent);}
+    .gate-icon.stu{background:var(--amber-dim);color:var(--amber);}
+    .gate-card h3{font-size:17px;margin-bottom:6px;}
+    .gate-card p{font-size:13px;color:var(--slate);line-height:1.5;}
+
+    /* ── Panels & forms ── */
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;}
+    .panel + .panel{margin-top:18px;}
+    .panel-title{font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:4px;}
+    .panel-sub{font-size:12.5px;color:var(--slate);margin-bottom:16px;}
+    .form-wrap{max-width:460px;margin:0 auto;}
+    .field{margin-bottom:15px;}
+    .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+    .field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;
+      font-family:var(--font-body);font-size:14px;color:var(--ink);background:#fff;transition:.15s;}
+    .field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+    .field .hint{font-size:11.5px;color:var(--slate-soft);margin-top:4px;}
+    .btn-primary{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:10px 20px;
+      font-size:14px;font-weight:500;cursor:pointer;transition:.15s;}
+    .btn-primary:hover{background:#0c635d;}
+    .btn-primary:disabled{opacity:.6;cursor:not-allowed;}
+    .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--slate);border-radius:8px;
+      padding:9px 16px;font-size:13.5px;cursor:pointer;transition:.15s;}
+    .btn-ghost:hover{border-color:var(--slate-soft);color:var(--ink);}
+    .alert-box{border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;display:none;}
+    .alert-box.err{background:var(--rust-dim);color:var(--rust);border:1px solid #f0cfc6;display:block;}
+    .alert-box.warn{background:var(--amber-dim);color:#8a5e18;border:1px solid #edd9ad;display:block;}
+    .alert-box.info{background:var(--accent-dim);color:#0b5b56;border:1px solid #bfdedb;display:block;}
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);
+      border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+
+    /* ── Placeholder blocks for modules still to be built ── */
+    .soon{display:flex;align-items:flex-start;gap:13px;padding:16px 18px;border:1px dashed var(--line);
+      border-radius:var(--radius);background:#fbfcfc;margin-bottom:12px;}
+    .soon-icon{width:34px;height:34px;border-radius:9px;background:var(--line-soft);color:var(--slate);
+      display:grid;place-items:center;flex-shrink:0;font-size:14px;}
+    .soon h4{font-family:var(--font-body);font-size:13.5px;font-weight:600;margin-bottom:2px;}
+    .soon p{font-size:12.5px;color:var(--slate);line-height:1.5;}
+    .badge-step{display:inline-block;background:var(--line-soft);color:var(--slate);border-radius:20px;
+      padding:2px 9px;font-size:10.5px;font-weight:600;font-family:var(--font-mono);margin-left:6px;}
+
+    /* ── Cycle bar ── */
+    .cycle-bar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:var(--card);border:1px solid var(--line);
+      border-radius:var(--radius);padding:12px 16px;margin-top:16px;box-shadow:var(--shadow);}
+    .cycle-bit{font-size:12.5px;color:var(--slate);}
+    .cycle-bit strong{color:var(--ink);font-weight:600;}
+    .phase-tag{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;font-weight:600;
+      border-radius:20px;padding:4px 11px;background:var(--accent-dim);color:#0b5b56;}
+
+    /* ── Panel head with an action on the right ── */
+    .panel-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;}
+    .panel-head-row .panel-sub{margin-bottom:0;}
+
+    /* ── Idea cards ── */
+    .idea-card{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;background:#fff;}
+    .idea-card:hover{border-color:var(--slate-soft);}
+    .idea-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+    .idea-title{font-weight:600;font-size:14.5px;line-height:1.35;}
+    .idea-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+    .chip{font-size:11px;border-radius:20px;padding:3px 9px;background:var(--line-soft);color:var(--slate);}
+    .chip.teal{background:var(--accent-dim);color:#0b5b56;}
+    .chip.olive{background:var(--olive-dim);color:#3d6333;}
+    .idea-desc{font-size:12.5px;color:var(--slate);line-height:1.55;margin-top:9px;}
+    .idea-actions{display:flex;gap:6px;flex-shrink:0;}
+    .icon-btn{background:transparent;border:1px solid var(--line);color:var(--slate);border-radius:7px;
+      width:30px;height:30px;display:grid;place-items:center;cursor:pointer;font-size:12px;transition:.15s;}
+    .icon-btn:hover{border-color:var(--slate-soft);color:var(--ink);}
+    .icon-btn.danger:hover{border-color:var(--rust);color:var(--rust);background:var(--rust-dim);}
+    .empty-note{text-align:center;padding:26px 16px;color:var(--slate-soft);font-size:13px;
+      border:1px dashed var(--line);border-radius:var(--radius);}
+
+    /* ── Submit bar ── */
+    .submit-bar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line-soft);}
+    .submit-bar .field{margin-bottom:0;width:210px;}
+    .submit-spacer{flex:1;}
+
+    /* ── Colleague board ── */
+    .progress-track{height:7px;border-radius:20px;background:var(--line-soft);overflow:hidden;margin:10px 0 16px;}
+    .progress-fill{height:100%;background:var(--accent);border-radius:20px;transition:width .4s ease;}
+    .board-row{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
+    .board-head{display:flex;align-items:center;gap:11px;padding:11px 14px;cursor:pointer;background:#fff;transition:.15s;}
+    .board-head:hover{background:#fafbfb;}
+    .board-head.plain{cursor:default;}
+    .board-head.plain:hover{background:#fff;}
+    .status-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;flex-shrink:0;}
+    .status-dot.ok{background:var(--olive-dim);color:var(--olive);}
+    .status-dot.none{background:var(--line-soft);color:var(--slate);}
+    .status-dot.wait{background:var(--amber-dim);color:var(--amber);}
+    .board-name{font-size:13.5px;font-weight:500;flex:1;}
+    .board-name .you{font-size:10.5px;font-family:var(--font-mono);color:var(--accent);margin-left:6px;}
+    .board-note{font-size:12px;color:var(--slate);}
+    .board-body{padding:4px 14px 12px 49px;border-top:1px solid var(--line-soft);background:#fbfcfc;}
+    .board-idea{padding:9px 0;border-bottom:1px dashed var(--line-soft);}
+    .board-idea:last-child{border-bottom:none;}
+    .board-idea .t{font-size:13px;font-weight:500;}
+    .board-idea .d{font-size:12px;color:var(--slate);line-height:1.5;margin-top:3px;}
+
+    /* ── Settings / manage strip ── */
+    .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;}
+    .mini-note{font-size:12px;color:var(--slate);line-height:1.5;}
+    .btn-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--line-soft);}
+    .btn-danger{background:var(--rust);border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;}
+    .btn-danger:hover{background:#9c3d27;}
+    .locked-note{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--slate);
+      background:#fbfcfc;border:1px dashed var(--line);border-radius:8px;padding:11px 13px;}
+
+    /* ── Assignment console ── */
+    .assign-row{display:grid;grid-template-columns:88px 60px 1fr 40px;gap:12px;align-items:center;
+      padding:11px 12px;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;background:#fff;}
+    .assign-code{font-family:var(--font-mono);font-size:13px;font-weight:600;}
+    .assign-size{font-size:12px;color:var(--slate);}
+    .assign-row select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+      font-family:var(--font-body);font-size:13px;background:#fff;}
+    .assign-row.done{border-color:#bfdedb;background:#fbfefe;}
+    .assign-row.pub{border-color:var(--olive);background:var(--olive-dim);}
+    .pref-line{grid-column:1/-1;font-size:11.5px;color:var(--slate-soft);padding-left:2px;}
+    .pref-line b{color:var(--slate);font-weight:600;}
+    .warn-line{grid-column:1/-1;font-size:11.5px;color:var(--rust);}
+    .rank-badge{font-family:var(--font-mono);font-size:10.5px;background:var(--accent-dim);color:#0b5b56;
+      border-radius:20px;padding:2px 8px;}
+
+    /* ── Report block ── */
+    .report{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-top:14px;background:#fbfcfc;}
+    .report h5{font-family:var(--font-body);font-size:13px;font-weight:700;margin-bottom:7px;}
+    .report ul{margin:0 0 12px 18px;}
+    .report li{font-size:12.5px;line-height:1.6;}
+    .report li.block{color:var(--rust);}
+    .report li.warn{color:#8a5e18;}
+    .report li.ok{color:var(--olive);}
+
+    /* ── Student group & ranking ── */
+    .member-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
+      border-radius:8px;margin-bottom:7px;}
+    .member-row .nm{flex:1;font-size:13.5px;}
+    .member-row .sid{font-family:var(--font-mono);font-size:12px;color:var(--slate);}
+    .rank-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    @media (max-width:760px){ .rank-cols{grid-template-columns:1fr;} .assign-row{grid-template-columns:1fr;} }
+    .rank-col h5{font-family:var(--font-body);font-size:12.5px;font-weight:700;color:var(--ink-soft);
+      text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px;}
+    .pick{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:7px;background:#fff;
+      display:flex;align-items:flex-start;gap:10px;}
+    .pick .body{flex:1;}
+    .pick .t{font-size:13.5px;font-weight:600;line-height:1.35;}
+    .pick .s{font-size:11.5px;color:var(--slate);margin-top:2px;}
+    .pick .num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:11.5px;
+      font-weight:700;display:grid;place-items:center;flex-shrink:0;font-family:var(--font-mono);}
+    .pick.avail{cursor:pointer;transition:.14s;}
+    .pick.avail:hover{border-color:var(--accent);background:#fbfefe;}
+    .pick .mv{display:flex;flex-direction:column;gap:2px;}
+    .mv button{background:transparent;border:1px solid var(--line);border-radius:5px;width:22px;height:19px;
+      cursor:pointer;color:var(--slate);font-size:9px;line-height:1;padding:0;}
+    .mv button:hover{border-color:var(--slate-soft);color:var(--ink);}
+    .size-warn{font-size:11px;color:var(--amber);margin-top:3px;}
+    .hist{border-left:2px solid var(--line);padding-left:13px;margin-top:4px;}
+    .hist-item{padding:7px 0;border-bottom:1px dashed var(--line-soft);}
+    .hist-item:last-child{border-bottom:none;}
+    .hist-who{font-size:12.5px;font-weight:600;}
+    .hist-when{font-size:11px;color:var(--slate-soft);}
+    .hist-what{font-size:12px;color:var(--slate);margin-top:2px;line-height:1.5;}
+    .alloc-card{border:1px solid var(--olive);background:var(--olive-dim);border-radius:var(--radius);padding:18px;}
+    .alloc-card .t{font-size:16px;font-weight:700;font-family:var(--font-display);}
+    .alloc-card .s{font-size:12.5px;color:#3d6333;margin-top:4px;}
+
+    /* ── Modal ── */
+    .modal-back{position:fixed;inset:0;background:rgba(16,24,38,.45);display:none;align-items:flex-start;
+      justify-content:center;padding:40px 18px;overflow-y:auto;z-index:50;}
+    .modal-back.open{display:flex;}
+    .modal-card{background:var(--card);border-radius:var(--radius);box-shadow:0 20px 60px rgba(16,24,38,.25);
+      width:100%;max-width:560px;padding:24px;}
+    .modal-card h3{font-size:18px;margin-bottom:16px;}
+    .modal-foot{display:flex;justify-content:flex-end;gap:9px;margin-top:20px;}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-family:var(--font-body);
+      font-size:14px;color:var(--ink);resize:vertical;min-height:78px;}
+    textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+
+    .id-chip{display:inline-flex;align-items:center;gap:7px;background:var(--accent-dim);color:#0b5b56;
+      border-radius:20px;padding:5px 13px;font-size:12.5px;font-weight:500;}
+    .back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--slate);
+      text-decoration:none;margin-top:18px;cursor:pointer;}
+    .back-link:hover{color:var(--ink);}
+  </style>
+</head>
+<body>
+
+<!-- ═══ GATE — choose supervisor or student ═════════════════════════════════ -->
+<div id="scr-gate" class="screen active">
+  <div class="gate">
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="BAU ECE" class="gate-logo"
+         onerror="this.style.display='none'"/>
+    <div class="gate-title">FYP Projects Organizer</div>
+    <div class="gate-sub">
+      Supervisors publish their FYP1 project ideas. Student groups rank the ideas they want.
+      Choose how you are signing in.
+    </div>
+    <div class="gate-cards">
+      <div class="gate-card" onclick="showScreen('suplogin')">
+        <div class="gate-icon sup"><i class="fas fa-chalkboard-user"></i></div>
+        <h3>Supervisor</h3>
+        <p>Sign in with your FYP system ID and password to add your project ideas.</p>
+      </div>
+      <div class="gate-card" onclick="Student.openEntry()">
+        <div class="gate-icon stu"><i class="fas fa-user-graduate"></i></div>
+        <h3>Student</h3>
+        <p>Enter your name and university ID to form your group and rank the project ideas.</p>
+      </div>
+    </div>
+    <a class="back-link" href="/"><i class="fas fa-arrow-left"></i> Back to the ECE portal</a>
+  </div>
+</div>
+
+<!-- ═══ SUPERVISOR LOGIN ════════════════════════════════════════════════════ -->
+<div id="scr-suplogin" class="screen">
+  <div class="gate">
+    <div class="panel" style="width:100%;max-width:420px;">
+      <div class="panel-title">Supervisor Sign In</div>
+      <div class="panel-sub">Use the same ID and password as the FYP Management System.</div>
+      <div id="login-err" class="alert-box"></div>
+      <div class="field">
+        <label for="inp-id">Supervisor ID</label>
+        <input type="text" id="inp-id" placeholder="e.g. F20170170" autocomplete="username"
+               onkeydown="if(event.key==='Enter')Auth.login()"/>
+      </div>
+      <div class="field">
+        <label for="inp-pw">Password</label>
+        <input type="password" id="inp-pw" placeholder="Enter your password" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')Auth.login()"/>
+      </div>
+      <button class="btn-primary w-100" id="btn-login" onclick="Auth.login()">
+        <span id="login-label">Sign In</span>
+      </button>
+    </div>
+    <a class="back-link" onclick="showScreen('gate')"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+</div>
+
+<!-- ═══ SUPERVISOR HOME ═════════════════════════════════════════════════════ -->
+<div id="scr-suphome" class="screen">
+  <div class="topbar">
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo"
+         onerror="this.style.display='none'"/>
+    <div style="flex:1">
+      <div class="topbar-title">FYP Projects Organizer</div>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-08-09-2026 R05</span>
+    </div>
+    <span class="topbar-name" id="sup-name"></span>
+    <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+  <div class="page-body">
+    <div class="page-heading">Welcome, <span id="sup-greet"></span></div>
+    <div class="page-sub" id="sup-context"></div>
+
+    <div id="campus-warn" class="alert-box" style="margin-top:16px;"></div>
+
+    <div id="sup-content" style="display:none;">
+      <div class="cycle-bar">
+        <span class="cycle-bit"><i class="fas fa-calendar-days" style="color:var(--slate-soft)"></i>
+          <strong id="cyc-term"></strong></span>
+        <span class="cycle-bit"><i class="fas fa-graduation-cap" style="color:var(--slate-soft)"></i>
+          <strong id="cyc-prog"></strong></span>
+        <span class="cycle-bit"><i class="fas fa-location-dot" style="color:var(--slate-soft)"></i>
+          <strong id="cyc-campus"></strong></span>
+        <span class="phase-tag" id="cyc-phase"></span>
+      </div>
+
+      <!-- ── My ideas ── -->
+      <div class="panel" style="margin-top:18px;">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Your Project Ideas</div>
+            <div class="panel-sub" id="ideas-sub"></div>
+          </div>
+          <button class="btn-primary" id="btn-add-idea" onclick="Ideas.openForm()">
+            <i class="fas fa-plus me-1"></i> Add Idea
+          </button>
+        </div>
+        <div id="ideas-status" class="alert-box"></div>
+        <div id="ideas-list"></div>
+        <div class="submit-bar" id="submit-bar">
+          <div class="field">
+            <label for="cap-input">Groups you can supervise</label>
+            <input type="number" id="cap-input" min="1" max="10" value="2"/>
+          </div>
+          <div class="submit-spacer"></div>
+          <button class="btn-ghost" id="btn-none" onclick="Ideas.declareNone()">I have no ideas this semester</button>
+          <button class="btn-primary" id="btn-submit" onclick="Ideas.submit()">Submit my ideas</button>
+          <button class="btn-ghost" id="btn-reopen" onclick="Ideas.reopen()" style="display:none;">Reopen for editing</button>
+        </div>
+      </div>
+
+      <!-- ── Colleague board ── -->
+      <div class="panel">
+        <div class="panel-title">Submission Status</div>
+        <div class="panel-sub" id="board-progress">Loading…</div>
+        <div class="progress-track"><div class="progress-fill" id="board-bar" style="width:0%"></div></div>
+        <div id="board-list"></div>
+      </div>
+
+      <!-- ── Deadlines, phase & publishing ── -->
+      <div class="panel" id="panel-manage">
+        <div class="panel-title">Deadlines &amp; Programme Control</div>
+        <div class="panel-sub" id="manage-sub"></div>
+        <div id="manage-msg" class="alert-box"></div>
+        <div id="manage-body">
+          <div class="set-grid">
+            <div class="field">
+              <label for="dl-ideas">Idea submission deadline</label>
+              <input type="datetime-local" id="dl-ideas"/>
+            </div>
+            <div class="field">
+              <label for="dl-rank">Student ranking deadline</label>
+              <input type="datetime-local" id="dl-rank"/>
+            </div>
+            <div class="field">
+              <label for="gs-min">Minimum group size</label>
+              <input type="number" id="gs-min" min="1" max="6"/>
+            </div>
+            <div class="field">
+              <label for="gs-max">Maximum group size</label>
+              <input type="number" id="gs-max" min="1" max="6"/>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-ghost" onclick="Settings.saveDeadlines()">Save deadlines &amp; sizes</button>
+            <div class="submit-spacer"></div>
+            <span class="mini-note" id="phase-note"></span>
+            <button class="btn-primary" id="btn-publish-ideas" onclick="Settings.publishIdeas(false)">
+              Publish idea list &amp; open student ranking
+            </button>
+            <button class="btn-ghost" id="btn-close-ranking" onclick="Settings.setPhase('RANKING_CLOSED')" style="display:none;">Close ranking</button>
+            <button class="btn-ghost" id="btn-reopen-ranking" onclick="Settings.setPhase('RANKING_OPEN')" style="display:none;">Reopen ranking</button>
+          </div>
+        </div>
+        <div id="manage-locked" class="locked-note" style="display:none;">
+          <i class="fas fa-lock" style="margin-top:2px;"></i>
+          <span id="manage-locked-text"></span>
+        </div>
+      </div>
+
+      <!-- ── Assignment console ── -->
+      <div class="panel" id="panel-assign" style="display:none;">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Project Assignment</div>
+            <div class="panel-sub" id="assign-sub"></div>
+          </div>
+          <button class="btn-ghost" onclick="Assign.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+        </div>
+        <div id="assign-msg" class="alert-box"></div>
+        <div id="assign-list"></div>
+        <div id="assign-report"></div>
+        <div class="btn-row" id="assign-actions">
+          <button class="btn-ghost" onclick="Assign.dryRun()"><i class="fas fa-clipboard-check me-1"></i>Run pre-flight check</button>
+          <div class="submit-spacer"></div>
+          <button class="btn-primary" id="btn-publish-alloc" onclick="Assign.publish()" disabled>
+            Publish to FYP System
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Admin: who may set deadlines ── -->
+      <div class="panel" id="panel-admin" style="display:none;">
+        <div class="panel-title">Admin — Deadline Control</div>
+        <div class="panel-sub">Choose who may set deadlines and publish for each programme and campus.</div>
+        <div id="admin-msg" class="alert-box"></div>
+        <div id="admin-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ IDEA FORM MODAL ═════════════════════════════════════════════════════ -->
+<div class="modal-back" id="idea-modal">
+  <div class="modal-card">
+    <h3 id="idea-modal-title">Add Project Idea</h3>
+    <div id="idea-err" class="alert-box"></div>
+    <div class="field">
+      <label for="f-title">Project Title</label>
+      <input type="text" id="f-title" placeholder="e.g. Fault-Tolerant DC-DC Converter for EV Charging"/>
+      <div class="hint">Must be unique across your program this semester.</div>
+    </div>
+    <div class="field">
+      <label for="f-field">Field / Area</label>
+      <input type="text" id="f-field" list="field-list" placeholder="e.g. Power Electronics"/>
+      <datalist id="field-list">
+        <option>Power Electronics</option><option>Renewable Energy</option><option>Power Systems</option>
+        <option>Control Systems</option><option>Embedded Systems</option><option>Communications</option>
+        <option>Signal Processing</option><option>Machine Learning / AI</option><option>Robotics</option>
+        <option>Biomedical Instrumentation</option><option>Networks</option><option>Software / Web</option>
+      </datalist>
+    </div>
+    <div class="field">
+      <label for="f-desc">Description</label>
+      <textarea id="f-desc" placeholder="What the project is about, what the students will build or investigate, and the expected outcome."></textarea>
+      <div class="hint">Students rank projects from this text — give them enough to judge it.</div>
+    </div>
+    <div class="field">
+      <label for="f-prereq">Required Background <span style="font-weight:400;color:var(--slate-soft)">(optional)</span></label>
+      <input type="text" id="f-prereq" placeholder="e.g. Power Electronics course, MATLAB/Simulink"/>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="f-min">Minimum Students</label>
+        <input type="number" id="f-min" min="1" max="6" value="2"/>
+      </div>
+      <div class="field">
+        <label for="f-max">Maximum Students</label>
+        <input type="number" id="f-max" min="1" max="6" value="4"/>
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-co">Co-Supervisor <span style="font-weight:400;color:var(--slate-soft)">(optional)</span></label>
+      <select id="f-co"><option value="">— None —</option></select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="Ideas.closeForm()">Cancel</button>
+      <button class="btn-primary" id="btn-save-idea" onclick="Ideas.save()">Save Idea</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STUDENT ENTRY ═══════════════════════════════════════════════════════ -->
+<div id="scr-stuentry" class="screen">
+  <div class="gate">
+    <div class="panel" style="width:100%;max-width:460px;">
+      <div class="panel-title">Student Access</div>
+      <div class="panel-sub">Enter your details exactly as they appear in your university records.</div>
+      <div id="stu-err" class="alert-box"></div>
+      <div class="field">
+        <label for="stu-program">Program</label>
+        <select id="stu-program"><option value="">Loading…</option></select>
+      </div>
+      <div class="field">
+        <label for="stu-campus">Campus</label>
+        <select id="stu-campus">
+          <option value="">— Select your campus —</option>
+          <option value="Debbieh">Debbieh</option>
+          <option value="Tripoli">Tripoli</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="stu-name">Full Name</label>
+        <input type="text" id="stu-name" placeholder="e.g. Ahmad Khaled Mansour"/>
+        <div class="hint">Your full name as registered — first and family name at minimum.</div>
+      </div>
+      <div class="field">
+        <label for="stu-id">Student ID</label>
+        <input type="text" id="stu-id" class="mono" placeholder="20xxxxxxx" maxlength="9"
+               onkeydown="if(event.key==='Enter')Student.submitEntry()"/>
+        <div class="hint">9 digits starting with 20 — the same ID used across the FYP system.</div>
+      </div>
+      <button class="btn-primary w-100" onclick="Student.submitEntry()">Continue</button>
+    </div>
+    <a class="back-link" onclick="showScreen('gate')"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+</div>
+
+<!-- ═══ STUDENT HOME ════════════════════════════════════════════════════════ -->
+<div id="scr-stuhome" class="screen">
+  <div class="topbar">
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo"
+         onerror="this.style.display='none'"/>
+    <div style="flex:1">
+      <div class="topbar-title">FYP Projects Organizer</div>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-08-09-2026 R05</span>
+    </div>
+    <span class="topbar-name" id="stu-topname"></span>
+    <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
+  </div>
+  <div class="page-body">
+    <div class="page-heading">Hello, <span id="stu-greet"></span></div>
+    <div class="page-sub" id="stu-context"></div>
+    <div style="margin-top:12px;"><span class="id-chip"><i class="fas fa-id-card"></i><span id="stu-idchip"></span></span></div>
+
+    <div id="stu-msg" class="alert-box" style="margin-top:16px;"></div>
+
+    <!-- Create a group (shown when the student has none) -->
+    <div class="panel" id="panel-newgroup" style="margin-top:18px;display:none;">
+      <div class="panel-title">Create Your Group</div>
+      <div class="panel-sub" id="newgroup-sub"></div>
+      <div id="newgroup-err" class="alert-box"></div>
+      <div class="field">
+        <label>You</label>
+        <div class="member-row">
+          <i class="fas fa-user" style="color:var(--slate-soft)"></i>
+          <span class="nm" id="ng-me-name"></span>
+          <span class="sid" id="ng-me-id"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="ng-email">Your email <span style="font-weight:400;color:var(--slate-soft)">(optional)</span></label>
+        <input type="email" id="ng-email" placeholder="you@student.bau.edu.lb"/>
+        <div class="hint">Used only to contact your group about the project assignment.</div>
+      </div>
+      <div class="field">
+        <label>Your teammates</label>
+        <div id="ng-members"></div>
+        <button class="btn-ghost" onclick="Group.addMemberRow()" style="margin-top:6px;">
+          <i class="fas fa-plus me-1"></i>Add a teammate
+        </button>
+      </div>
+      <div class="btn-row">
+        <div class="submit-spacer"></div>
+        <button class="btn-primary" id="btn-create-group" onclick="Group.create()">Create group</button>
+      </div>
+    </div>
+
+    <!-- Existing group -->
+    <div id="group-wrap" style="display:none;">
+      <div class="panel" style="margin-top:18px;">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Your Group <span class="rank-badge" id="grp-code"></span></div>
+            <div class="panel-sub" id="grp-sub"></div>
+          </div>
+          <button class="btn-ghost" onclick="Group.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+        </div>
+        <div id="grp-msg" class="alert-box"></div>
+        <div id="grp-members"></div>
+        <div class="btn-row">
+          <button class="btn-ghost" id="btn-add-member" onclick="Group.promptAdd()">
+            <i class="fas fa-user-plus me-1"></i>Add a teammate
+          </button>
+          <div class="submit-spacer"></div>
+          <button class="btn-ghost" onclick="Group.leave()" style="color:var(--rust);border-color:#f0cfc6;">
+            Leave this group
+          </button>
+        </div>
+      </div>
+
+      <!-- Assigned project (after publication) -->
+      <div class="panel" id="panel-alloc" style="display:none;">
+        <div class="panel-title">Your Assigned Project</div>
+        <div class="panel-sub">The department has finalised the project allocation.</div>
+        <div class="alloc-card">
+          <div class="t" id="alloc-title"></div>
+          <div class="s" id="alloc-sup"></div>
+          <div class="idea-desc" id="alloc-desc" style="color:#3d6333;"></div>
+        </div>
+      </div>
+
+      <!-- Ranking -->
+      <div class="panel" id="panel-rank">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Project Preferences</div>
+            <div class="panel-sub" id="rank-sub"></div>
+          </div>
+          <button class="btn-primary" id="btn-save-rank" onclick="Rank.save()">Save our choices</button>
+        </div>
+        <div id="rank-msg" class="alert-box"></div>
+        <div class="rank-cols">
+          <div class="rank-col">
+            <h5>Your ranked choices</h5>
+            <div id="rank-chosen"></div>
+          </div>
+          <div class="rank-col">
+            <h5>Available projects</h5>
+            <div id="rank-available"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="panel">
+        <div class="panel-title">Change History</div>
+        <div class="panel-sub">Every change your group makes is recorded here.</div>
+        <div class="hist" id="grp-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ API ═══════════════════════════════════════════════════════════════════
+// Same single-dispatcher contract as the rest of the system: POST /api
+async function api(action, ...args) {
+  const r = await fetch('/api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, args }),
+  });
+  if (!r.ok) throw new Error('Server error ' + r.status);
+  return r.json();
+}
+
+function el(id){ return document.getElementById(id); }
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  el('scr-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+function escHtml(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function setAlert(id, msg, kind){
+  const box = el(id);
+  if (!msg) { box.className = 'alert-box'; box.textContent = ''; return; }
+  box.className = 'alert-box ' + (kind || 'err');
+  box.textContent = msg;
+}
+
+// ══ Supervisor session ════════════════════════════════════════════════════
+// Token kept in sessionStorage under an org_ prefix — the same approach the
+// Meeting Organizer uses, so the two pages never share or clobber a session.
+const Auth = {
+  token: sessionStorage.getItem('org_token'),
+  supervisor: JSON.parse(sessionStorage.getItem('org_sup') || 'null'),
+
+  async login() {
+    const id = el('inp-id').value.trim();
+    const pw = el('inp-pw').value;
+    if (!id || !pw) { setAlert('login-err', 'Please enter your Supervisor ID and password.'); return; }
+    el('btn-login').disabled = true;
+    el('login-label').innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await api('loginSupervisor', id, pw);
+      if (!r.success) { setAlert('login-err', r.message || 'Login failed.'); return; }
+      Auth.token = r.sessionToken;
+      Auth.supervisor = r.supervisor;
+      sessionStorage.setItem('org_token', Auth.token);
+      sessionStorage.setItem('org_sup', JSON.stringify(Auth.supervisor));
+      setAlert('login-err', '');
+      el('inp-pw').value = '';
+      Auth.enterHome();
+    } catch (e) {
+      setAlert('login-err', 'Error: ' + (e.message || e));
+    } finally {
+      el('btn-login').disabled = false;
+      el('login-label').textContent = 'Sign In';
+    }
+  },
+
+  enterHome() {
+    const s = Auth.supervisor || {};
+    el('sup-name').textContent  = s.name || '';
+    el('sup-greet').textContent = s.name || 'Supervisor';
+    el('sup-context').textContent =
+      (s.program || 'Program not set') + (s.campus ? ' — ' + s.campus + ' campus' : '');
+    // A supervisor with no campus cannot be placed in a program+campus idea list,
+    // so surface it here rather than letting step 3 fail silently.
+    if (!s.campus) {
+      setAlert('campus-warn',
+        'Your campus (Debbieh or Tripoli) has not been set yet. The admin sets it from '
+        + 'Manage Users in the FYP system. You will not appear in your program’s idea '
+        + 'list until it is set.', 'warn');
+      el('sup-content').style.display = 'none';
+    } else {
+      setAlert('campus-warn', '');
+      Ideas.load().then(() => Board.load()).then(() => Settings.load());
+    }
+    showScreen('suphome');
+  },
+
+  async logout() {
+    if (Auth.token) api('logoutSession', Auth.token).catch(() => {});
+    sessionStorage.removeItem('org_token');
+    sessionStorage.removeItem('org_sup');
+    Auth.token = null;
+    Auth.supervisor = null;
+    showScreen('gate');
+  },
+
+  // Restores a session left over from a page refresh, but only if the server
+  // still recognises the token.
+  async restore() {
+    if (!Auth.token || !Auth.supervisor) return false;
+    try {
+      const r = await api('heartbeat', Auth.token);
+      if (r && r.success) { Auth.enterHome(); return true; }
+    } catch { /* fall through to the gate */ }
+    sessionStorage.removeItem('org_token');
+    sessionStorage.removeItem('org_sup');
+    Auth.token = null;
+    Auth.supervisor = null;
+    return false;
+  },
+};
+
+// ══ Student identity ══════════════════════════════════════════════════════
+// Identical to the rule registerProject enforces in api/index.js. Keeping the
+// two in sync matters: a student accepted here must also be acceptable when
+// the allocation is published into the FYP system.
+const STUDENT_ID_RE = /^20\d{7}$/;
+
+const Student = {
+  me: JSON.parse(sessionStorage.getItem('org_student') || 'null'),
+  _programsLoaded: false,
+
+  async openEntry() {
+    showScreen('stuentry');
+    if (this._programsLoaded) return;
+    try {
+      const programs = await api('getPrograms');
+      const sel = el('stu-program');
+      sel.innerHTML = '<option value="">— Select your program —</option>'
+        + (programs || []).map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+      this._programsLoaded = true;
+    } catch {
+      el('stu-program').innerHTML = '<option value="">Could not load programs — refresh the page</option>';
+    }
+  },
+
+  async submitEntry() {
+    const program = el('stu-program').value;
+    const campus  = el('stu-campus').value;
+    const name    = el('stu-name').value.trim().replace(/\s+/g, ' ');
+    const id      = el('stu-id').value.trim();
+
+    if (!program) { setAlert('stu-err', 'Please select your program.'); return; }
+    if (!campus)  { setAlert('stu-err', 'Please select your campus.'); return; }
+    if (name.split(' ').length < 2) {
+      setAlert('stu-err', 'Please enter your full name — at least a first and a family name.');
+      return;
+    }
+    if (!STUDENT_ID_RE.test(id)) {
+      setAlert('stu-err', 'Student ID must be exactly 9 digits starting with 20 — for example 201700170.');
+      return;
+    }
+    setAlert('stu-err', '');
+
+    // The server confirms the programme+campus exists and that this ID is not
+    // already registered under a different name.
+    try {
+      const r = await api('orgStudentLookup', program, campus, id, name);
+      if (!r.success) { setAlert('stu-err', r.message); return; }
+    } catch (e) {
+      setAlert('stu-err', 'Could not reach the server: ' + (e.message || e));
+      return;
+    }
+
+    Student.me = { program, campus, name, id };
+    sessionStorage.setItem('org_student', JSON.stringify(Student.me));
+    Student.enterHome();
+  },
+
+  enterHome() {
+    const m = Student.me || {};
+    el('stu-topname').textContent = m.name || '';
+    el('stu-greet').textContent   = m.name || 'Student';
+    el('stu-context').textContent = (m.program || '') + (m.campus ? ' — ' + m.campus + ' campus' : '');
+    el('stu-idchip').textContent  = m.id || '';
+    // The 5th digit is 0 in the usual BAU pattern, but it is not enforced —
+    // the grading system accepts any 9-digit ID starting with 20.
+    showScreen('stuhome');
+    Group.load();
+  },
+
+  exit() {
+    sessionStorage.removeItem('org_student');
+    Student.me = null;
+    el('stu-name').value = '';
+    el('stu-id').value = '';
+    showScreen('gate');
+  },
+};
+
+// ══ Supervisor: project ideas ═════════════════════════════════════════════
+const STATUS_LABEL = {
+  not_started:   'Not started',
+  draft:         'Draft saved',
+  submitted:     'Submitted',
+  declared_none: 'No ideas this semester',
+};
+
+const Ideas = {
+  data: null,
+
+  async load() {
+    try {
+      const r = await api('orgGetMyIdeas', Auth.token);
+      if (!r.success) { setAlert('ideas-status', r.message, 'warn'); return; }
+      this.data = r;
+      el('sup-content').style.display = 'block';
+      // Cycle bar
+      el('cyc-term').textContent   = r.cycle.semester + ' ' + r.cycle.academicYear;
+      el('cyc-prog').textContent   = r.cycle.program;
+      el('cyc-campus').textContent = r.cycle.campus + ' campus';
+      el('cyc-phase').textContent  = r.cycle.phase.replace(/_/g, ' ');
+      // Co-supervisor options
+      el('f-co').innerHTML = '<option value="">— None —</option>'
+        + r.colleagues.map(c => `<option value="${escHtml(c.id)}">${escHtml(c.name)}</option>`).join('');
+      el('cap-input').value = r.me.maxGroups || 2;
+      this.render();
+    } catch (e) {
+      setAlert('ideas-status', 'Could not load your ideas: ' + (e.message || e), 'err');
+    }
+  },
+
+  render() {
+    const d = this.data;
+    const ideas = d.ideas || [];
+    const locked = d.cycle.phase !== 'IDEAS_OPEN';
+    const status = d.me.status;
+
+    el('ideas-sub').textContent = ideas.length
+      ? `${ideas.length} idea${ideas.length === 1 ? '' : 's'} — ${STATUS_LABEL[status] || status}`
+      : (status === 'declared_none' ? STATUS_LABEL.declared_none : 'No ideas added yet.');
+
+    el('ideas-list').innerHTML = ideas.length ? ideas.map(i => `
+      <div class="idea-card">
+        <div class="idea-top">
+          <div style="flex:1">
+            <div class="idea-title">${escHtml(i.title)}</div>
+            <div class="idea-meta">
+              ${i.field ? `<span class="chip teal">${escHtml(i.field)}</span>` : ''}
+              <span class="chip">${i.minStudents}–${i.maxStudents} students</span>
+              ${i.prerequisites ? `<span class="chip">${escHtml(i.prerequisites)}</span>` : ''}
+              ${i.status === 'submitted' ? '<span class="chip olive">Submitted</span>' : '<span class="chip">Draft</span>'}
+            </div>
+          </div>
+          ${locked ? '' : `<div class="idea-actions">
+            <button class="icon-btn" title="Edit" onclick="Ideas.openForm(${i.id})"><i class="fas fa-pen"></i></button>
+            <button class="icon-btn danger" title="Delete" onclick="Ideas.remove(${i.id})"><i class="fas fa-trash"></i></button>
+          </div>`}
+        </div>
+        <div class="idea-desc">${escHtml(i.description)}</div>
+      </div>`).join('')
+      : `<div class="empty-note">
+           ${status === 'declared_none'
+             ? 'You declared that you have no project ideas this semester.'
+             : 'No ideas yet. Click <strong>Add Idea</strong> to enter your first project.'}
+         </div>`;
+
+    // Buttons reflect where this supervisor is in the flow
+    el('btn-add-idea').style.display = locked ? 'none' : '';
+    el('btn-none').style.display     = (locked || ideas.length || status === 'declared_none') ? 'none' : '';
+    el('btn-submit').style.display   = (locked || !ideas.length || status === 'submitted') ? 'none' : '';
+    el('btn-reopen').style.display   = (!locked && (status === 'submitted' || status === 'declared_none')) ? '' : 'none';
+    el('cap-input').parentElement.style.display = (locked || !ideas.length) ? 'none' : '';
+
+    if (locked) {
+      setAlert('ideas-status', 'The idea list for your program has been published — ideas can no longer be changed.', 'info');
+    } else if (status === 'submitted') {
+      setAlert('ideas-status', 'Your ideas are submitted. You can still edit them until the list is published.', 'info');
+    } else if (status === 'declared_none') {
+      setAlert('ideas-status', 'You are recorded as having no ideas this semester. Reopen if that changes.', 'info');
+    } else {
+      setAlert('ideas-status', '');
+    }
+  },
+
+  openForm(id) {
+    const i = id ? (this.data.ideas || []).find(x => x.id === id) : null;
+    el('idea-modal-title').textContent = i ? 'Edit Project Idea' : 'Add Project Idea';
+    el('f-title').value  = i ? i.title : '';
+    el('f-field').value  = i ? i.field : '';
+    el('f-desc').value   = i ? i.description : '';
+    el('f-prereq').value = i ? i.prerequisites : '';
+    el('f-min').value    = i ? i.minStudents : 2;
+    el('f-max').value    = i ? i.maxStudents : 4;
+    el('f-co').value     = i ? i.coSupervisorId : '';
+    this._editingId = i ? i.id : null;
+    setAlert('idea-err', '');
+    el('idea-modal').classList.add('open');
+    el('f-title').focus();
+  },
+
+  closeForm() { el('idea-modal').classList.remove('open'); },
+
+  async save() {
+    const payload = {
+      id: this._editingId || undefined,
+      title:         el('f-title').value,
+      field:         el('f-field').value,
+      description:   el('f-desc').value,
+      prerequisites: el('f-prereq').value,
+      minStudents:   parseInt(el('f-min').value, 10),
+      maxStudents:   parseInt(el('f-max').value, 10),
+      coSupervisorId: el('f-co').value,
+    };
+    const btn = el('btn-save-idea');
+    btn.disabled = true;
+    try {
+      const r = await api('orgSaveIdea', Auth.token, payload);
+      if (!r.success) { setAlert('idea-err', r.message); return; }
+      this.closeForm();
+      await this.load();
+      await Board.load();
+    } catch (e) {
+      setAlert('idea-err', 'Error: ' + (e.message || e));
+    } finally { btn.disabled = false; }
+  },
+
+  async remove(id) {
+    const i = (this.data.ideas || []).find(x => x.id === id);
+    if (!confirm(`Delete "${i ? i.title : 'this idea'}"?\n\nThis cannot be undone.`)) return;
+    const r = await api('orgDeleteIdea', Auth.token, id);
+    if (!r.success) { setAlert('ideas-status', r.message, 'err'); return; }
+    await this.load();
+    await Board.load();
+  },
+
+  async submit() {
+    const cap = parseInt(el('cap-input').value, 10);
+    const n = (this.data.ideas || []).length;
+    if (!confirm(`Submit ${n} idea${n === 1 ? '' : 's'} to your program?\n\nYou can still edit them until the list is published.`)) return;
+    const r = await api('orgSubmitIdeas', Auth.token, cap);
+    if (!r.success) { setAlert('ideas-status', r.message, 'err'); return; }
+    await this.load();
+    await Board.load();
+  },
+
+  async declareNone() {
+    if (!confirm('Record that you have no project ideas this semester?\n\nYou can reopen this later if that changes.')) return;
+    const r = await api('orgDeclareNoIdeas', Auth.token);
+    if (!r.success) { setAlert('ideas-status', r.message, 'err'); return; }
+    await this.load();
+    await Board.load();
+  },
+
+  async reopen() {
+    const r = await api('orgReopenMySubmission', Auth.token);
+    if (!r.success) { setAlert('ideas-status', r.message, 'err'); return; }
+    await this.load();
+    await Board.load();
+  },
+};
+
+// ══ Supervisor: colleague submission board ════════════════════════════════
+const Board = {
+  _open: {},
+
+  async load() {
+    try {
+      const r = await api('orgGetColleagueStatus', Auth.token);
+      if (!r.success) { el('board-progress').textContent = r.message; return; }
+      this.data = r;
+      this.render();
+    } catch (e) {
+      el('board-progress').textContent = 'Could not load the board: ' + (e.message || e);
+    }
+  },
+
+  render() {
+    const r = this.data;
+    const pct = r.totalExpected ? Math.round((r.responded / r.totalExpected) * 100) : 0;
+    el('board-progress').innerHTML =
+      `<strong>${r.responded} of ${r.totalExpected}</strong> supervisors in ${escHtml(r.program)} — `
+      + `${escHtml(r.campus)} have responded &middot; <strong>${r.totalIdeas}</strong> idea(s) so far`
+      + (r.responded === r.totalExpected && r.totalExpected > 0
+          ? ' &middot; <span style="color:var(--olive)">everyone has responded</span>' : '');
+    el('board-bar').style.width = pct + '%';
+
+    const meId = (Ideas.data && Ideas.data.me) ? Ideas.data.me.id : '';
+    el('board-list').innerHTML = (r.board || []).map(b => {
+      const done = b.status === 'submitted';
+      const none = b.status === 'declared_none';
+      const dot  = done ? 'ok' : (none ? 'none' : 'wait');
+      const icon = done ? 'fa-check' : (none ? 'fa-minus' : 'fa-hourglass-half');
+      const note = done ? `${b.ideaCount} idea${b.ideaCount === 1 ? '' : 's'}`
+                        : (none ? 'No ideas this semester' : 'Not submitted yet');
+      const expandable = done && b.ideaCount > 0;
+      const isOpen = !!this._open[b.id];
+      return `
+        <div class="board-row">
+          <div class="board-head ${expandable ? '' : 'plain'}"
+               ${expandable ? `onclick="Board.toggle('${escHtml(b.id)}')"` : ''}>
+            <span class="status-dot ${dot}"><i class="fas ${icon}"></i></span>
+            <span class="board-name">${escHtml(b.name)}${b.id === meId ? '<span class="you">YOU</span>' : ''}</span>
+            <span class="board-note">${note}</span>
+            ${expandable ? `<i class="fas fa-chevron-${isOpen ? 'up' : 'down'}" style="color:var(--slate-soft);font-size:11px;"></i>` : ''}
+          </div>
+          ${expandable && isOpen ? `<div class="board-body">${b.ideas.map(i => `
+            <div class="board-idea">
+              <div class="t">${escHtml(i.title)}</div>
+              <div class="idea-meta">
+                ${i.field ? `<span class="chip teal">${escHtml(i.field)}</span>` : ''}
+                <span class="chip">${i.minStudents}–${i.maxStudents} students</span>
+                ${i.coSupervisor ? `<span class="chip">with ${escHtml(i.coSupervisor)}</span>` : ''}
+              </div>
+              <div class="d">${escHtml(i.description)}</div>
+            </div>`).join('')}</div>` : ''}
+        </div>`;
+    }).join('') || '<div class="empty-note">No supervisors are registered for this program and campus yet.</div>';
+  },
+
+  toggle(id) { this._open[id] = !this._open[id]; this.render(); },
+};
+
+// ══ Boot ══════════════════════════════════════════════════════════════════
+// ══ Supervisor: deadlines, phase and publishing ═══════════════════════════
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmtDate(iso) {
+  if (!iso) return 'not set';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? 'not set'
+    : d.toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+const Settings = {
+  data: null,
+
+  async load() {
+    const r = await api('orgGetCycleSettings', Auth.token);
+    if (!r.success) { setAlert('manage-msg', r.message, 'warn'); return; }
+    this.data = r;
+    const c = r.cycle;
+
+    el('dl-ideas').value = toLocalInput(c.ideasDeadline);
+    el('dl-rank').value  = toLocalInput(c.rankingDeadline);
+    el('gs-min').value   = c.minGroupSize;
+    el('gs-max').value   = c.maxGroupSize;
+
+    el('manage-sub').innerHTML =
+      `Ideas close <strong>${fmtDate(c.ideasDeadline)}</strong> &middot; `
+      + `ranking closes <strong>${fmtDate(c.rankingDeadline)}</strong>`;
+
+    // Visibility follows the policy the admin set
+    el('manage-body').style.display   = r.canManage ? 'block' : 'none';
+    el('manage-locked').style.display = r.canManage ? 'none' : 'flex';
+    if (!r.canManage) {
+      el('manage-locked-text').textContent = c.deadlinePolicy === 'delegate'
+        ? `Deadlines and publishing for this programme are handled by ${c.deadlineDelegateName || 'a designated supervisor'}.`
+        : 'The admin has locked deadlines and publishing for this programme.';
+    }
+
+    const phase = c.phase;
+    el('phase-note').textContent = 'Current phase: ' + phase.replace(/_/g, ' ').toLowerCase();
+    el('btn-publish-ideas').style.display  = phase === 'IDEAS_OPEN' ? '' : 'none';
+    el('btn-close-ranking').style.display  = phase === 'RANKING_OPEN' ? '' : 'none';
+    el('btn-reopen-ranking').style.display = phase === 'RANKING_CLOSED' ? '' : 'none';
+
+    // The assignment console only matters once students have started ranking
+    const showAssign = (phase === 'RANKING_OPEN' || phase === 'RANKING_CLOSED' || phase === 'ALLOCATED');
+    el('panel-assign').style.display = showAssign ? 'block' : 'none';
+    if (showAssign) Assign.load();
+
+    if (r.isAdmin) { el('panel-admin').style.display = 'block'; AdminPanel.load(); }
+  },
+
+  async saveDeadlines() {
+    setAlert('manage-msg', '');
+    const a = await api('orgSetDeadline', Auth.token, 'ideas',   el('dl-ideas').value || '');
+    if (!a.success) { setAlert('manage-msg', a.message, 'err'); return; }
+    const b = await api('orgSetDeadline', Auth.token, 'ranking', el('dl-rank').value || '');
+    if (!b.success) { setAlert('manage-msg', b.message, 'err'); return; }
+    const c = await api('orgSetGroupSizes', Auth.token,
+      parseInt(el('gs-min').value, 10), parseInt(el('gs-max').value, 10));
+    if (!c.success) { setAlert('manage-msg', c.message, 'err'); return; }
+    setAlert('manage-msg', 'Saved.', 'info');
+    this.load();
+  },
+
+  async publishIdeas(force) {
+    if (!force && !confirm('Publish the idea list and open ranking for students?\n\nSupervisors will no longer be able to change their ideas.')) return;
+    const r = await api('orgPublishIdeas', Auth.token, !!force);
+    if (!r.success) {
+      if (r.needsForce) {
+        const names = (r.pending || []).join(', ');
+        if (confirm(`${r.message}\n\nNot yet submitted: ${names}\n\nPublish anyway? They will be recorded as having no ideas this semester.`)) {
+          return this.publishIdeas(true);
+        }
+        return;
+      }
+      setAlert('manage-msg', r.message, 'err');
+      return;
+    }
+    setAlert('manage-msg',
+      `Published ${r.ideas} idea(s). Students can now form groups and rank projects.`
+      + (r.autoDeclared ? ` ${r.autoDeclared} supervisor(s) were recorded as having no ideas.` : ''), 'info');
+    await Ideas.load(); await Board.load(); await this.load();
+  },
+
+  async setPhase(phase) {
+    const r = await api('orgSetPhase', Auth.token, phase);
+    if (!r.success) { setAlert('manage-msg', r.message, 'err'); return; }
+    await this.load();
+  },
+};
+
+// ══ Supervisor: assignment console ════════════════════════════════════════
+const Assign = {
+  data: null,
+
+  async load() {
+    const r = await api('orgGetAssignmentBoard', Auth.token);
+    if (!r.success) { setAlert('assign-msg', r.message, 'warn'); return; }
+    this.data = r;
+    this.render();
+  },
+
+  render() {
+    const r = this.data;
+    const groups = r.groups || [];
+    el('assign-sub').innerHTML =
+      `${groups.length} group(s) &middot; <strong>${r.unassigned}</strong> still unassigned`
+      + (r.cycle.phase === 'ALLOCATED' ? ' &middot; <span style="color:var(--olive)">published</span>' : '');
+
+    if (!groups.length) {
+      el('assign-list').innerHTML = '<div class="empty-note">No student groups have been created yet.</div>';
+      el('assign-actions').style.display = 'none';
+      return;
+    }
+    el('assign-actions').style.display = r.canManage && r.cycle.phase !== 'ALLOCATED' ? 'flex' : 'none';
+
+    const locked = !r.canManage || r.cycle.phase === 'ALLOCATED';
+    el('assign-list').innerHTML = groups.map(g => {
+      const opts = ['<option value="">— Not assigned —</option>'].concat(
+        (r.ideas || []).map(i => {
+          const disabled = i.taken && i.id !== g.assignedIdeaId;
+          return `<option value="${i.id}"${i.id === g.assignedIdeaId ? ' selected' : ''}${disabled ? ' disabled' : ''}>`
+            + `${escHtml(i.title)} — ${escHtml(i.supervisor)} (${i.minStudents}–${i.maxStudents})`
+            + `${disabled ? ' · already assigned' : ''}</option>`;
+        })
+      ).join('');
+      const prefs = g.prefs.length
+        ? g.prefs.slice(0, 5).map(p => `<b>${p.rank}.</b> ${escHtml(p.title)}`).join(' &nbsp; ')
+        : '<em>this group has not ranked any project</em>';
+      return `
+        <div class="assign-row ${g.published ? 'pub' : (g.assignedIdeaId ? 'done' : '')}">
+          <span class="assign-code">${escHtml(g.code)}</span>
+          <span class="assign-size">${g.size} student${g.size === 1 ? '' : 's'}</span>
+          <select ${locked ? 'disabled' : ''} onchange="Assign.set(${g.id}, this.value)">${opts}</select>
+          <span>${g.assignedRank ? `<span class="rank-badge">#${g.assignedRank}</span>` : ''}</span>
+          <div class="pref-line">${prefs}</div>
+          ${g.warnings.map(w => `<div class="warn-line"><i class="fas fa-triangle-exclamation"></i> ${escHtml(w)}</div>`).join('')}
+        </div>`;
+    }).join('');
+
+    if ((r.overloaded || []).length) {
+      setAlert('assign-msg',
+        r.overloaded.map(o => `${o.supervisor} has ${o.assigned} groups but declared capacity for ${o.capacity}.`).join(' '),
+        'warn');
+    } else {
+      setAlert('assign-msg', '');
+    }
+  },
+
+  async set(groupId, ideaId) {
+    const r = ideaId
+      ? await api('orgSetAssignment', Auth.token, groupId, parseInt(ideaId, 10))
+      : await api('orgClearAssignment', Auth.token, groupId);
+    if (!r.success) { setAlert('assign-msg', r.message, 'err'); }
+    el('btn-publish-alloc').disabled = true;
+    el('assign-report').innerHTML = '';
+    await this.load();
+  },
+
+  async dryRun() {
+    const r = await api('orgDryRunPublish', Auth.token);
+    if (!r.success) { setAlert('assign-msg', r.message, 'err'); return; }
+    this.renderReport(r);
+    el('btn-publish-alloc').disabled = !r.ready;
+    return r;
+  },
+
+  renderReport(r) {
+    const items = []
+      .concat((r.blockers || []).map(b => `<li class="block"><i class="fas fa-circle-xmark"></i> ${escHtml(b)}</li>`))
+      .concat((r.warnings || []).map(w => `<li class="warn"><i class="fas fa-triangle-exclamation"></i> ${escHtml(w)}</li>`));
+    el('assign-report').innerHTML = `
+      <div class="report">
+        <h5>Pre-flight check</h5>
+        ${items.length ? `<ul>${items.join('')}</ul>` : ''}
+        <ul><li class="${r.ready ? 'ok' : 'block'}">
+          ${r.ready
+            ? `<i class="fas fa-circle-check"></i> Ready — ${r.plan.length} project(s) will be created in the FYP system.`
+            : '<i class="fas fa-ban"></i> Not ready to publish. Fix the items above and run the check again.'}
+        </li></ul>
+        ${r.ready ? `<div class="mini-note">Will create: ${r.plan.map(p =>
+            `<strong>${escHtml(p.title)}</strong> (${p.students.length} students)`).join(', ')}</div>` : ''}
+      </div>`;
+  },
+
+  async publish() {
+    const check = await this.dryRun();
+    if (!check || !check.ready) return;
+    if (!confirm(
+      `Create ${check.plan.length} FYP1 project(s) in the FYP Management System?\n\n`
+      + 'This writes real projects and students into the live system and closes this cycle.')) return;
+    const r = await api('orgPublishAllocation', Auth.token);
+    if (!r.success) { setAlert('assign-msg', r.message, 'err'); await this.load(); return; }
+    setAlert('assign-msg', `Published — ${r.created.length} project(s) created in the FYP system.`, 'info');
+    await this.load(); await Settings.load();
+  },
+};
+
+// ══ Admin: deadline policy per programme ══════════════════════════════════
+const AdminPanel = {
+  async load() {
+    const r = await api('orgAdminOverview', Auth.token);
+    if (!r.success) { setAlert('admin-msg', r.message, 'warn'); return; }
+    this.data = r;
+    el('admin-list').innerHTML = (r.cycles || []).length ? r.cycles.map(c => {
+      const peers = r.supervisors.filter(s => s.program === c.program && s.campus === c.campus);
+      const opts = peers.map(s =>
+        `<option value="${escHtml(s.id)}"${c.deadlineDelegate === s.id ? ' selected' : ''}>${escHtml(s.name)}</option>`).join('');
+      return `
+        <div class="board-row"><div class="board-head plain" style="flex-wrap:wrap;gap:10px;">
+          <span class="board-name">${escHtml(c.program)} — ${escHtml(c.campus)}
+            <span class="chip">${c.ideaCount} ideas</span>
+            <span class="chip">${c.groupCount} groups</span>
+            <span class="chip teal">${escHtml(c.phase.replace(/_/g, ' '))}</span>
+          </span>
+          <select id="pol-${c.id}" onchange="AdminPanel.change(${c.id})"
+                  style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+            <option value="open"${c.deadlinePolicy === 'open' ? ' selected' : ''}>Anyone in the programme</option>
+            <option value="locked"${c.deadlinePolicy === 'locked' ? ' selected' : ''}>Admin only</option>
+            <option value="delegate"${c.deadlinePolicy === 'delegate' ? ' selected' : ''}>One supervisor…</option>
+          </select>
+          <select id="del-${c.id}" onchange="AdminPanel.change(${c.id})"
+                  style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;
+                         ${c.deadlinePolicy === 'delegate' ? '' : 'display:none;'}">${opts}</select>
+        </div></div>`;
+    }).join('') : '<div class="empty-note">No programme cycles exist yet. They are created when a supervisor first opens this page.</div>';
+  },
+
+  async change(cycleId) {
+    const policy = el('pol-' + cycleId).value;
+    const delSel = el('del-' + cycleId);
+    delSel.style.display = policy === 'delegate' ? '' : 'none';
+    if (policy === 'delegate' && !delSel.value) {
+      setAlert('admin-msg', 'That programme and campus has no supervisors to delegate to.', 'warn');
+      return;
+    }
+    const r = await api('orgSetDeadlinePolicy', Auth.token, cycleId, policy, delSel.value);
+    if (!r.success) { setAlert('admin-msg', r.message, 'err'); return; }
+    setAlert('admin-msg', 'Deadline control updated.', 'info');
+  },
+};
+
+// ══ Student: group formation ══════════════════════════════════════════════
+const Group = {
+  data: null,
+  _rows: 0,
+
+  async load() {
+    const m = Student.me;
+    const r = await api('orgGetGroup', m.program, m.campus, m.id);
+    if (!r.success) { setAlert('stu-msg', r.message, 'err'); return; }
+    if (!r.hasGroup) {
+      el('panel-newgroup').style.display = 'block';
+      el('group-wrap').style.display = 'none';
+      el('ng-me-name').textContent = m.name;
+      el('ng-me-id').textContent   = m.id;
+      if (!this._rows) { this.addMemberRow(); this.addMemberRow(); }
+      el('newgroup-sub').textContent =
+        `A group needs between ${r.cycle && r.cycle.minGroupSize || 2} and ${r.cycle && r.cycle.maxGroupSize || 5} students, including you.`;
+      return;
+    }
+    this.data = r;
+    el('panel-newgroup').style.display = 'none';
+    el('group-wrap').style.display = 'block';
+    el('grp-code').textContent = r.group.code;
+    el('grp-sub').textContent =
+      `${r.members.length} member(s)`
+      + (r.group.rankedAt ? ` · last change by ${(r.members.find(x => x.id === r.group.rankedBy) || {}).name || 'a teammate'} on ${fmtDate(r.group.rankedAt)}` : ' · no choices saved yet');
+
+    el('grp-members').innerHTML = r.members.map(x => `
+      <div class="member-row">
+        <i class="fas fa-user" style="color:var(--slate-soft)"></i>
+        <span class="nm">${escHtml(x.name)}${x.id === Student.me.id ? ' <span class="you" style="color:var(--accent);font-size:10.5px;font-family:var(--font-mono)">YOU</span>' : ''}</span>
+        <span class="sid">${escHtml(x.id)}</span>
+      </div>`).join('');
+
+    const frozen = r.cycle.rankingClosed;
+    el('btn-add-member').style.display = frozen ? 'none' : '';
+
+    // Allocation result, once the department has published
+    if (r.allocation) {
+      el('panel-alloc').style.display = 'block';
+      el('alloc-title').textContent = r.allocation.title;
+      el('alloc-sup').textContent   = 'Supervisor: ' + (r.allocation.supervisor || '—');
+      el('alloc-desc').textContent  = r.allocation.description || '';
+      el('panel-rank').style.display = 'none';
+    } else {
+      el('panel-alloc').style.display = 'none';
+      el('panel-rank').style.display = 'block';
+      await Rank.load(r);
+    }
+
+    el('grp-history').innerHTML = (r.audit || []).length ? r.audit.map(a => `
+      <div class="hist-item">
+        <div class="hist-who">${escHtml(a.actor)} <span class="hist-when">· ${fmtDate(a.at)}</span></div>
+        <div class="hist-what">${escHtml(describeAudit(a))}</div>
+      </div>`).join('') : '<div class="mini-note">No changes recorded yet.</div>';
+  },
+
+  addMemberRow() {
+    this._rows++;
+    const i = this._rows;
+    const div = document.createElement('div');
+    div.className = 'member-row';
+    div.id = 'ngrow-' + i;
+    div.innerHTML = `
+      <input type="text" id="ngn-${i}" placeholder="Full name" style="flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;"/>
+      <input type="text" id="ngi-${i}" placeholder="20xxxxxxx" maxlength="9" class="mono" style="width:110px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;"/>
+      <button class="icon-btn danger" onclick="Group.removeRow(${i})"><i class="fas fa-xmark"></i></button>`;
+    el('ng-members').appendChild(div);
+  },
+
+  removeRow(i) {
+    const row = el('ngrow-' + i);
+    if (row) row.remove();
+  },
+
+  async create() {
+    setAlert('newgroup-err', '');
+    const others = [];
+    document.querySelectorAll('#ng-members .member-row').forEach(row => {
+      const n = row.querySelector('input[id^="ngn-"]');
+      const d = row.querySelector('input[id^="ngi-"]');
+      if (!n || !d) return;
+      if (!n.value.trim() && !d.value.trim()) return; // blank row, ignore
+      others.push({ name: n.value, id: d.value });
+    });
+    const btn = el('btn-create-group');
+    btn.disabled = true;
+    try {
+      const m = Student.me;
+      const r = await api('orgCreateGroup', m.program, m.campus,
+        { id: m.id, name: m.name, email: el('ng-email').value.trim() }, others);
+      if (!r.success) { setAlert('newgroup-err', r.message); return; }
+      await this.load();
+    } finally { btn.disabled = false; }
+  },
+
+  async promptAdd() {
+    const name = prompt('Full name of the student to add:');
+    if (!name) return;
+    const id = prompt('Their student ID (9 digits starting with 20):');
+    if (!id) return;
+    const m = Student.me;
+    const r = await api('orgAddMember', m.program, m.campus, m.id, { name, id });
+    if (!r.success) { setAlert('grp-msg', r.message, 'err'); return; }
+    setAlert('grp-msg', '');
+    await this.load();
+  },
+
+  async leave() {
+    if (!confirm('Leave this group?\n\nIf you are the last member the group and its choices will be deleted.')) return;
+    const m = Student.me;
+    const r = await api('orgLeaveGroup', m.program, m.campus, m.id);
+    if (!r.success) { setAlert('grp-msg', r.message, 'err'); return; }
+    this._rows = 0;
+    el('ng-members').innerHTML = '';
+    await this.load();
+  },
+};
+
+function describeAudit(a) {
+  const d = a.details || {};
+  switch (a.action) {
+    case 'group_created':  return `Created the group with ${(d.members || []).join(', ')}.`;
+    case 'member_added':   return `Added ${d.added}.`;
+    case 'member_left':    return `Left the group (${d.remaining} member(s) remaining).`;
+    case 'ranking_saved': {
+      const before = d.before || [], after = d.after || [];
+      if (!before.length) return `Saved the first list of ${after.length} choice(s): ${after.slice(0, 3).join(', ')}${after.length > 3 ? '…' : ''}.`;
+      const moves = [];
+      after.forEach((t, i) => {
+        const was = before.indexOf(t);
+        if (was === -1) moves.push(`added "${t}" at #${i + 1}`);
+        else if (was !== i) moves.push(`moved "${t}" from #${was + 1} to #${i + 1}`);
+      });
+      before.forEach(t => { if (!after.includes(t)) moves.push(`removed "${t}"`); });
+      return moves.length ? moves.join('; ') + '.' : 'Saved the list with no changes.';
+    }
+    default: return a.action.replace(/_/g, ' ');
+  }
+}
+
+// ══ Student: ranking ══════════════════════════════════════════════════════
+const Rank = {
+  all: [],       // every published idea
+  chosen: [],    // ordered idea ids
+  version: 0,
+  frozen: false,
+
+  async load(groupData) {
+    const m = Student.me;
+    const r = await api('orgGetPublishedIdeas', m.program, m.campus);
+    if (!r.success) { setAlert('rank-msg', r.message, 'err'); return; }
+
+    this.version = groupData.group.rankVersion;
+    this.frozen  = groupData.cycle.rankingClosed;
+
+    if (!r.published) {
+      el('rank-sub').textContent = 'Waiting for the supervisors to publish their project ideas.';
+      el('rank-chosen').innerHTML = '';
+      el('rank-available').innerHTML =
+        '<div class="empty-note">The project list is not open yet. Come back once your supervisors have submitted their ideas.</div>';
+      el('btn-save-rank').style.display = 'none';
+      return;
+    }
+
+    this.all    = r.ideas || [];
+    this.chosen = (groupData.ranking || []).map(x => x.ideaId);
+    this.size   = (groupData.members || []).length;
+
+    el('rank-sub').innerHTML = this.frozen
+      ? 'Ranking is closed — your choices are final.'
+      : `Put the projects you want in order, best first. Any number of choices. `
+        + `Deadline: <strong>${fmtDate(groupData.cycle.rankingDeadline)}</strong>`;
+    el('btn-save-rank').style.display = this.frozen ? 'none' : '';
+    this.render();
+  },
+
+  render() {
+    const byId = new Map(this.all.map(i => [i.id, i]));
+
+    el('rank-chosen').innerHTML = this.chosen.length ? this.chosen.map((id, idx) => {
+      const i = byId.get(id);
+      if (!i) return '';
+      const bad = this.size < i.minStudents || this.size > i.maxStudents;
+      return `
+        <div class="pick">
+          <span class="num">${idx + 1}</span>
+          <div class="body">
+            <div class="t">${escHtml(i.title)}</div>
+            <div class="s">${escHtml(i.supervisor)}${i.field ? ' · ' + escHtml(i.field) : ''} · ${i.minStudents}–${i.maxStudents} students</div>
+            ${bad ? `<div class="size-warn"><i class="fas fa-triangle-exclamation"></i> Your group has ${this.size} student(s); this project expects ${i.minStudents}–${i.maxStudents}.</div>` : ''}
+          </div>
+          ${this.frozen ? '' : `<div class="mv">
+            <button onclick="Rank.move(${idx},-1)" title="Move up"><i class="fas fa-chevron-up"></i></button>
+            <button onclick="Rank.move(${idx},1)" title="Move down"><i class="fas fa-chevron-down"></i></button>
+          </div>
+          <button class="icon-btn danger" onclick="Rank.remove(${idx})" title="Remove"><i class="fas fa-xmark"></i></button>`}
+        </div>`;
+    }).join('') : '<div class="empty-note">No choices yet — pick projects from the right.</div>';
+
+    const avail = this.all.filter(i => !this.chosen.includes(i.id));
+    el('rank-available').innerHTML = avail.length ? avail.map(i => `
+      <div class="pick ${this.frozen ? '' : 'avail'}" ${this.frozen ? '' : `onclick="Rank.add(${i.id})"`}>
+        <div class="body">
+          <div class="t">${escHtml(i.title)}</div>
+          <div class="s">${escHtml(i.supervisor)}${i.field ? ' · ' + escHtml(i.field) : ''} · ${i.minStudents}–${i.maxStudents} students</div>
+          <div class="idea-desc" style="margin-top:6px;">${escHtml(i.description)}</div>
+          ${i.prerequisites ? `<div class="s" style="margin-top:5px;"><strong>Needs:</strong> ${escHtml(i.prerequisites)}</div>` : ''}
+        </div>
+        ${this.frozen ? '' : '<i class="fas fa-plus" style="color:var(--accent);"></i>'}
+      </div>`).join('')
+      : '<div class="empty-note">You have ranked every available project.</div>';
+  },
+
+  add(id)      { this.chosen.push(id); this.render(); },
+  remove(idx)  { this.chosen.splice(idx, 1); this.render(); },
+  move(idx, d) {
+    const j = idx + d;
+    if (j < 0 || j >= this.chosen.length) return;
+    const t = this.chosen[idx];
+    this.chosen[idx] = this.chosen[j];
+    this.chosen[j] = t;
+    this.render();
+  },
+
+  async save() {
+    const m = Student.me;
+    const btn = el('btn-save-rank');
+    btn.disabled = true;
+    try {
+      const r = await api('orgSaveRanking', m.program, m.campus, m.id, this.chosen, this.version);
+      if (!r.success) {
+        setAlert('rank-msg', r.message, r.stale ? 'warn' : 'err');
+        if (r.stale) await Group.load();
+        return;
+      }
+      setAlert('rank-msg', 'Your group’s choices have been saved.', 'info');
+      await Group.load();
+    } finally { btn.disabled = false; }
+  },
+};
+
+// Close the idea form on backdrop click or Escape
+el('idea-modal').addEventListener('click', e => {
+  if (e.target === el('idea-modal')) Ideas.closeForm();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && el('idea-modal').classList.contains('open')) Ideas.closeForm();
+});
+
+(async function boot(){
+  if (await Auth.restore()) return;
+  if (Student.me) { Student.enterHome(); return; }
+  showScreen('gate');
+})();
+</script>
+</body>
+</html>

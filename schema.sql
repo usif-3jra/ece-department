@@ -27,13 +27,21 @@ CREATE TABLE IF NOT EXISTS programs (
 );
 
 -- ── Supervisors ──────────────────────────────────────────────────────────
+-- campus: 'Debbieh' | 'Tripoli' | '' (unset). Programs run on both campuses, so
+-- the Projects Organizer scopes ideas and groups per (program, campus).
 CREATE TABLE IF NOT EXISTS supervisors (
   supervisor_id TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
   program       TEXT NOT NULL DEFAULT '',
   email         TEXT NOT NULL DEFAULT '',
-  password      TEXT NOT NULL DEFAULT ''
+  password      TEXT NOT NULL DEFAULT '',
+  campus        TEXT NOT NULL DEFAULT ''
 );
+-- For databases created before v4 (the API also applies this automatically):
+ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS campus TEXT NOT NULL DEFAULT '';
+
+-- NOTE: the org_* tables for the FYP Projects Organizer are created at runtime by
+-- ensureOrganizerTables() in api/index.js, the same convention the meeting_* tables use.
 
 -- ── Projects ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS projects (

@@ -33,6 +33,9 @@ app.get('/fyp', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index
 // ── Meeting Organizer ────────────────────────────────────────────────────
 app.get('/meetings', (req, res) => res.sendFile(path.join(__dirname, 'public', 'meetings', 'index.html')));
 
+// ── FYP Projects Organizer ───────────────────────────────────────────────
+app.get('/organizer', (req, res) => res.sendFile(path.join(__dirname, 'public', 'organizer', 'index.html')));
+
 // ── Static files (js, css, images, html pages) ───────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
 

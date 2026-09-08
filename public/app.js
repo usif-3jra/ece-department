@@ -732,14 +732,17 @@ const Reg = {
     const program  = document.getElementById('ms-program').value;
     const email    = document.getElementById('ms-email').value.trim();
     const password = document.getElementById('ms-password').value.trim();
+    const campusEl = document.getElementById('ms-campus');
+    const campus   = campusEl ? campusEl.value : '';
     if (!name || !program) { Toast.show('Name and program are required.', 'warning'); return; }
     Spinner.show();
     try {
-      const res = await gsrAuth('addSupervisorToSystem', name, program, email, password || 'fyp2025');
+      const res = await gsrAuth('addSupervisorToSystem', name, program, email, password || 'fyp2025', campus);
       if (!res.success) throw new Error(res.message);
       Toast.show(`Supervisor added. Password: ${password || 'fyp2025'}`);
       await this._loadMasterData();
       document.getElementById('ms-password').value = '';
+      if (campusEl) campusEl.value = '';
       bootstrap.Modal.getInstance(document.getElementById('modalAddSupervisor')).hide();
     } catch (e) { Toast.show(e.message, 'error'); }
     finally { Spinner.hide(); }
@@ -3436,7 +3439,7 @@ const Admin = {
     if (!Auth.supervisor || !Auth.supervisor.isAdmin) return;
     const tbody = document.getElementById('manageUsersTbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
     this.loadDistributionAccess();
     this.loadExNamesAccess();
     this.loadBoostConfig();
@@ -3445,11 +3448,20 @@ const Admin = {
       const res = await gsrAuth('getAllSupervisorsForAdmin');
       if (!res.success) throw new Error(res.message);
       this._supervisors = res.supervisors;
-      tbody.innerHTML = res.supervisors.map(s => `
+      const campuses = res.campuses || ['Debbieh', 'Tripoli'];
+      tbody.innerHTML = res.supervisors.map(s => {
+        const opts = ['<option value="">— Not set —</option>'].concat(
+          campuses.map(c => `<option value="${escHtml(c)}"${s.campus === c ? ' selected' : ''}>${escHtml(c)}</option>`)
+        ).join('');
+        return `
         <tr>
           <td><code>${s.id}</code></td>
           <td>${s.name}</td>
           <td class="small text-muted">${s.program}</td>
+          <td>
+            <select class="form-select form-select-sm cred-campus" onchange="Admin._renderCampusWarning()"
+                    data-id="${s.id}" data-original="${escHtml(s.campus || '')}">${opts}</select>
+          </td>
           <td>
             <input type="text" class="form-control form-control-sm cred-pwd"
                    data-id="${s.id}" data-name="${s.name}" data-email="${s.email}"
@@ -3459,8 +3471,42 @@ const Admin = {
             <input type="checkbox" class="form-check-input cred-email" data-id="${s.id}"
                    title="Send credentials email to ${s.email || 'no email'}"/>
           </td>
-        </tr>`).join('');
-    } catch(e) { tbody.innerHTML = `<tr><td colspan="5" class="text-danger small py-2">${e.message}</td></tr>`; }
+        </tr>`;
+      }).join('');
+      this._renderCampusWarning();
+    } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="text-danger small py-2">${e.message}</td></tr>`; }
+  },
+
+  // Warns while any supervisor still has no campus — the Projects Organizer
+  // cannot build its per-(program, campus) supervisor list until all are set.
+  _renderCampusWarning() {
+    const warn = document.getElementById('campusUnsetWarn');
+    if (!warn) return;
+    const unset = Array.from(document.querySelectorAll('.cred-campus')).filter(el => !el.value).length;
+    if (unset === 0) { warn.classList.add('d-none'); warn.textContent = ''; return; }
+    warn.textContent = `${unset} supervisor(s) still have no campus set.`;
+    warn.classList.remove('d-none');
+  },
+
+  async saveCampuses() {
+    const targets = [];
+    document.querySelectorAll('.cred-campus').forEach(el => {
+      if (el.value !== el.dataset.original) targets.push({ id: el.dataset.id, campus: el.value });
+    });
+    if (!targets.length) { Toast.show('No campus changes to save.', 'warning'); return; }
+    Spinner.show();
+    try {
+      const res = await gsrAuth('setSupervisorCampuses', targets);
+      if (!res.success) throw new Error(res.message);
+      document.querySelectorAll('.cred-campus').forEach(el => { el.dataset.original = el.value; });
+      this._supervisors.forEach(s => {
+        const t = targets.find(x => x.id === s.id);
+        if (t) s.campus = t.campus;
+      });
+      Toast.show(`Campus updated for ${res.updated} supervisor(s).`);
+      this._renderCampusWarning();
+    } catch(e) { Toast.show(e.message || e, 'error'); }
+    finally { Spinner.hide(); }
   },
 
   async saveCredentials() {
