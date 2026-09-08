@@ -182,6 +182,25 @@
     .rank-badge{font-family:var(--font-mono);font-size:10.5px;background:var(--accent-dim);color:#0b5b56;
       border-radius:20px;padding:2px 8px;}
 
+    /* ── Ranking statistics table ── */
+    .stat-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px;}
+    .stat-table th{text-align:left;font-weight:600;color:var(--slate);border-bottom:1px solid var(--line);
+      padding:7px 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+    .stat-table td{padding:7px 8px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+    .stat-table th.n,.stat-table td.n{text-align:center;width:44px;}
+    .stat-table tr:hover td{background:#fbfcfc;}
+    .stat-title{font-weight:600;}
+    .stat-sup{font-size:11.5px;color:var(--slate);}
+    .cnt{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:6px;
+      font-family:var(--font-mono);font-size:11.5px;font-weight:600;}
+    .cnt.zero{color:var(--slate-soft);background:transparent;}
+    .cnt.first{background:var(--accent);color:#fff;}
+    .cnt.some{background:var(--accent-dim);color:#0b5b56;}
+    .stat-none{color:var(--slate-soft);}
+    .demand{font-size:11px;border-radius:20px;padding:2px 8px;}
+    .demand.hot{background:var(--rust-dim);color:var(--rust);}
+    .demand.cold{background:var(--line-soft);color:var(--slate);}
+
     /* ── Report block ── */
     .report{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-top:14px;background:#fbfcfc;}
     .report h5{font-family:var(--font-body);font-size:13px;font-weight:700;margin-bottom:7px;}
@@ -304,7 +323,7 @@
          onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-08-09-2026 R05</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-08-09-2026 R06</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -387,9 +406,6 @@
             <button class="btn-ghost" onclick="Settings.saveDeadlines()">Save deadlines &amp; sizes</button>
             <div class="submit-spacer"></div>
             <span class="mini-note" id="phase-note"></span>
-            <button class="btn-primary" id="btn-publish-ideas" onclick="Settings.publishIdeas(false)">
-              Publish idea list &amp; open student ranking
-            </button>
             <button class="btn-ghost" id="btn-close-ranking" onclick="Settings.setPhase('RANKING_CLOSED')" style="display:none;">Close ranking</button>
             <button class="btn-ghost" id="btn-reopen-ranking" onclick="Settings.setPhase('RANKING_OPEN')" style="display:none;">Reopen ranking</button>
           </div>
@@ -410,6 +426,16 @@
           <button class="btn-ghost" onclick="Assign.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
         </div>
         <div id="assign-msg" class="alert-box"></div>
+
+        <!-- How the groups ranked each project, before any assignment is made -->
+        <div id="stats-wrap">
+          <div class="panel-title" style="font-size:14px;margin-top:4px;">How the groups ranked each project</div>
+          <div class="panel-sub" id="stats-sub"></div>
+          <div style="overflow-x:auto;"><table class="stat-table" id="stats-table"></table></div>
+        </div>
+
+        <div class="panel-title" style="font-size:14px;margin-top:22px;">Assign a project to each group</div>
+        <div class="panel-sub">Groups are shown by code only — student names stay hidden until the allocation is published.</div>
         <div id="assign-list"></div>
         <div id="assign-report"></div>
         <div class="btn-row" id="assign-actions">
@@ -525,7 +551,7 @@
          onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-08-09-2026 R05</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-08-09-2026 R06</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -664,6 +690,17 @@ function setAlert(id, msg, kind){
   box.textContent = msg;
 }
 
+// Any org call that comes back with sessionInvalid means the token is gone or
+// expired. Returning the user to the sign-in screen is more useful than leaving
+// a broken panel with an error inside it.
+function sessionCheck(r) {
+  if (r && r.sessionInvalid) {
+    Auth.forceSignOut(r.message);
+    return true;
+  }
+  return false;
+}
+
 // ══ Supervisor session ════════════════════════════════════════════════════
 // Token kept in sessionStorage under an org_ prefix — the same approach the
 // Meeting Organizer uses, so the two pages never share or clobber a session.
@@ -711,18 +748,34 @@ const Auth = {
       el('sup-content').style.display = 'none';
     } else {
       setAlert('campus-warn', '');
-      Ideas.load().then(() => Board.load()).then(() => Settings.load());
+      Ideas.load()
+        .then(() => Board.load())
+        .then(() => Settings.load())
+        .then(() => Live.start());
     }
     showScreen('suphome');
   },
 
   async logout() {
+    Live.stop();
     if (Auth.token) api('logoutSession', Auth.token).catch(() => {});
     sessionStorage.removeItem('org_token');
     sessionStorage.removeItem('org_sup');
     Auth.token = null;
     Auth.supervisor = null;
     showScreen('gate');
+  },
+
+  // Session lost mid-use: clear it and send the user back to sign in with the
+  // reason, instead of leaving an error buried in a panel.
+  forceSignOut(reason) {
+    Live.stop();
+    sessionStorage.removeItem('org_token');
+    sessionStorage.removeItem('org_sup');
+    Auth.token = null;
+    Auth.supervisor = null;
+    showScreen('suplogin');
+    setAlert('login-err', reason || 'Please sign in again.', 'warn');
   },
 
   // Restores a session left over from a page refresh, but only if the server
@@ -833,6 +886,7 @@ const Ideas = {
   async load() {
     try {
       const r = await api('orgGetMyIdeas', Auth.token);
+      if (sessionCheck(r)) return;
       if (!r.success) { setAlert('ideas-status', r.message, 'warn'); return; }
       this.data = r;
       el('sup-content').style.display = 'block';
@@ -958,19 +1012,58 @@ const Ideas = {
   async submit() {
     const cap = parseInt(el('cap-input').value, 10);
     const n = (this.data.ideas || []).length;
-    if (!confirm(`Submit ${n} idea${n === 1 ? '' : 's'} to your program?\n\nYou can still edit them until the list is published.`)) return;
+    if (!confirm(`Submit ${n} idea${n === 1 ? '' : 's'} to your program?\n\nYou can still edit them until the list opens to students.`)) return;
     const r = await api('orgSubmitIdeas', Auth.token, cap);
+    if (sessionCheck(r)) return;
     if (!r.success) { setAlert('ideas-status', r.message, 'err'); return; }
-    await this.load();
-    await Board.load();
+    await this.afterResponse(r, `Your ${n} idea${n === 1 ? '' : 's'} were submitted.`);
   },
 
   async declareNone() {
     if (!confirm('Record that you have no project ideas this semester?\n\nYou can reopen this later if that changes.')) return;
     const r = await api('orgDeclareNoIdeas', Auth.token);
+    if (sessionCheck(r)) return;
     if (!r.success) { setAlert('ideas-status', r.message, 'err'); return; }
+    await this.afterResponse(r, 'Recorded: no ideas from you this semester.');
+  },
+
+  // Submitting is individual. The list publishes itself when the last
+  // supervisor responds; before that, the submitter is told who is still
+  // outstanding and may publish anyway.
+  async afterResponse(r, doneMsg) {
     await this.load();
     await Board.load();
+    await Settings.load();
+
+    if (r.autoPublished) {
+      alert(`${doneMsg}\n\nEvery supervisor in your programme and campus has now responded, `
+          + `so the list of ${r.totalIdeas} project(s) has been opened to students automatically.`);
+      setAlert('ideas-status', 'All supervisors have responded — students can now rank the projects.', 'info');
+      return;
+    }
+
+    const pending = r.pending || [];
+    if (!pending.length) return;
+
+    const list = pending.map(n => '  •  ' + n).join('\n');
+    if (!r.canPublishNow) {
+      alert(`${doneMsg}\n\nStill waiting on:\n${list}\n\n`
+          + 'The project list opens to students automatically once everyone has responded.');
+      return;
+    }
+    const publishNow = confirm(
+      `${doneMsg}\n\nThese supervisors have not submitted yet:\n${list}\n\n`
+      + 'Publish the list to students now anyway?\n\n'
+      + 'They will be recorded as having no ideas this semester and will not be able to add any.\n\n'
+      + 'Choose Cancel to keep waiting — the list opens by itself once everyone has responded.');
+    if (!publishNow) return;
+
+    const p = await api('orgPublishIdeas', Auth.token, true);
+    if (sessionCheck(p)) return;
+    if (!p.success) { setAlert('ideas-status', p.message, 'err'); return; }
+    setAlert('ideas-status',
+      `Published ${p.ideas} idea(s) to students. ${p.autoDeclared} supervisor(s) were recorded as having no ideas.`, 'info');
+    await this.load(); await Board.load(); await Settings.load();
   },
 
   async reopen() {
@@ -988,6 +1081,7 @@ const Board = {
   async load() {
     try {
       const r = await api('orgGetColleagueStatus', Auth.token);
+      if (sessionCheck(r)) return;
       if (!r.success) { el('board-progress').textContent = r.message; return; }
       this.data = r;
       this.render();
@@ -1062,7 +1156,15 @@ const Settings = {
   data: null,
 
   async load() {
-    const r = await api('orgGetCycleSettings', Auth.token);
+    if (!Auth.token) { Auth.forceSignOut('Please sign in again.'); return; }
+    let r;
+    try {
+      r = await api('orgGetCycleSettings', Auth.token);
+    } catch (e) {
+      setAlert('manage-msg', 'Could not reach the server: ' + (e.message || e), 'err');
+      return;
+    }
+    if (sessionCheck(r)) return;
     if (!r.success) { setAlert('manage-msg', r.message, 'warn'); return; }
     this.data = r;
     const c = r.cycle;
@@ -1086,8 +1188,9 @@ const Settings = {
     }
 
     const phase = c.phase;
-    el('phase-note').textContent = 'Current phase: ' + phase.replace(/_/g, ' ').toLowerCase();
-    el('btn-publish-ideas').style.display  = phase === 'IDEAS_OPEN' ? '' : 'none';
+    el('phase-note').textContent = phase === 'IDEAS_OPEN'
+      ? 'The project list opens to students automatically once every supervisor has submitted.'
+      : 'Current phase: ' + phase.replace(/_/g, ' ').toLowerCase();
     el('btn-close-ranking').style.display  = phase === 'RANKING_OPEN' ? '' : 'none';
     el('btn-reopen-ranking').style.display = phase === 'RANKING_CLOSED' ? '' : 'none';
 
@@ -1144,10 +1247,66 @@ const Assign = {
   data: null,
 
   async load() {
-    const r = await api('orgGetAssignmentBoard', Auth.token);
+    if (!Auth.token) return;
+    let r;
+    try { r = await api('orgGetAssignmentBoard', Auth.token); }
+    catch (e) { setAlert('assign-msg', 'Could not reach the server: ' + (e.message || e), 'err'); return; }
+    if (sessionCheck(r)) return;
     if (!r.success) { setAlert('assign-msg', r.message, 'warn'); return; }
     this.data = r;
     this.render();
+  },
+
+  // Counts, for every project, how many groups placed it at each position.
+  // Supervisors cannot see who chose what, so this distribution is the only
+  // basis they have for assigning sensibly.
+  renderStats() {
+    const r = this.data;
+    const groups = r.groups || [];
+    const ranked = groups.filter(g => g.prefs && g.prefs.length);
+
+    el('stats-sub').innerHTML = ranked.length
+      ? `${ranked.length} of ${groups.length} group(s) have submitted their preferences. `
+        + 'Each number is how many groups put that project at that position.'
+      : 'No group has submitted preferences yet.';
+
+    if (!ranked.length) { el('stats-table').innerHTML = ''; return; }
+
+    const maxCol = Math.min(5, Math.max(...ranked.map(g => g.prefs.length)));
+    const stats = new Map();
+    (r.ideas || []).forEach(i => stats.set(i.id, { idea: i, counts: {}, total: 0, best: Infinity }));
+    ranked.forEach(g => g.prefs.forEach(p => {
+      const s = stats.get(p.ideaId);
+      if (!s) return;
+      s.counts[p.rank] = (s.counts[p.rank] || 0) + 1;
+      s.total++;
+      if (p.rank < s.best) s.best = p.rank;
+    }));
+
+    const rows = [...stats.values()].sort((a, b) =>
+      (b.counts[1] || 0) - (a.counts[1] || 0) || b.total - a.total || a.idea.title.localeCompare(b.idea.title));
+
+    const head = '<tr><th>Project</th>'
+      + Array.from({ length: maxCol }, (_, i) => `<th class="n">#${i + 1}</th>`).join('')
+      + '<th class="n">Total</th><th>Demand</th></tr>';
+
+    el('stats-table').innerHTML = head + rows.map(s => {
+      const firsts = s.counts[1] || 0;
+      const cells = Array.from({ length: maxCol }, (_, i) => {
+        const n = s.counts[i + 1] || 0;
+        const cls = n === 0 ? 'zero' : (i === 0 ? 'first' : 'some');
+        return `<td class="n"><span class="cnt ${cls}">${n || '·'}</span></td>`;
+      }).join('');
+      const demand = firsts > 1 ? `<span class="demand hot">${firsts} groups want it first</span>`
+        : (s.total === 0 ? '<span class="demand cold">not chosen</span>' : '');
+      return `<tr>
+        <td><div class="stat-title">${escHtml(s.idea.title)}</div>
+            <div class="stat-sup">${escHtml(s.idea.supervisor)} · ${s.idea.minStudents}–${s.idea.maxStudents} students</div></td>
+        ${cells}
+        <td class="n"><span class="cnt ${s.total ? 'some' : 'zero'}">${s.total || '·'}</span></td>
+        <td>${demand}</td>
+      </tr>`;
+    }).join('');
   },
 
   render() {
@@ -1156,6 +1315,7 @@ const Assign = {
     el('assign-sub').innerHTML =
       `${groups.length} group(s) &middot; <strong>${r.unassigned}</strong> still unassigned`
       + (r.cycle.phase === 'ALLOCATED' ? ' &middot; <span style="color:var(--olive)">published</span>' : '');
+    this.renderStats();
 
     if (!groups.length) {
       el('assign-list').innerHTML = '<div class="empty-note">No student groups have been created yet.</div>';
@@ -1243,6 +1403,36 @@ const Assign = {
     if (!r.success) { setAlert('assign-msg', r.message, 'err'); await this.load(); return; }
     setAlert('assign-msg', `Published — ${r.created.length} project(s) created in the FYP system.`, 'info');
     await this.load(); await Settings.load();
+  },
+};
+
+// ══ Live refresh ══════════════════════════════════════════════════════════
+// The supervisor page keeps itself current after sign-in — colleague
+// submissions and student rankings appear without pressing anything.
+const Live = {
+  timer: null,
+  EVERY: 30000,
+
+  start() {
+    this.stop();
+    this.timer = setInterval(() => this.tick(), this.EVERY);
+    document.addEventListener('visibilitychange', this._vis = () => {
+      if (!document.hidden && Auth.token) this.tick();
+    });
+  },
+
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this._vis) { document.removeEventListener('visibilitychange', this._vis); this._vis = null; }
+  },
+
+  async tick() {
+    if (!Auth.token || document.hidden) return;
+    if (el('idea-modal').classList.contains('open')) return; // don't disturb an open form
+    try {
+      await Board.load();
+      await Settings.load();
+    } catch { /* a failed refresh must not break the page */ }
   },
 };
 
@@ -1461,7 +1651,7 @@ const Rank = {
 
     el('rank-sub').innerHTML = this.frozen
       ? 'Ranking is closed — your choices are final.'
-      : `Put the projects you want in order, best first. Any number of choices. `
+      : `Rank <strong>every</strong> project, best first. You can only save once no project is left on the right. `
         + `Deadline: <strong>${fmtDate(groupData.cycle.rankingDeadline)}</strong>`;
     el('btn-save-rank').style.display = this.frozen ? 'none' : '';
     this.render();
@@ -1502,6 +1692,24 @@ const Rank = {
         ${this.frozen ? '' : '<i class="fas fa-plus" style="color:var(--accent);"></i>'}
       </div>`).join('')
       : '<div class="empty-note">You have ranked every available project.</div>';
+
+    // A ranking must cover every project, so saving stays blocked until the
+    // available column is empty.
+    const btn = el('btn-save-rank');
+    if (!this.frozen) {
+      const left = avail.length;
+      btn.disabled = left > 0;
+      btn.textContent = left > 0
+        ? `Rank ${left} more project${left === 1 ? '' : 's'} to save`
+        : 'Save our choices';
+      if (left > 0 && this.chosen.length) {
+        setAlert('rank-msg',
+          `Add the remaining ${left} project${left === 1 ? '' : 's'} to your list — every project must be ranked before you can save.`,
+          'warn');
+      } else if (!left) {
+        setAlert('rank-msg', '');
+      }
+    }
   },
 
   add(id)      { this.chosen.push(id); this.render(); },
@@ -1528,7 +1736,10 @@ const Rank = {
       }
       setAlert('rank-msg', 'Your group’s choices have been saved.', 'info');
       await Group.load();
-    } finally { btn.disabled = false; }
+    } finally {
+      // Only re-enable if the list is still complete — render() owns this state
+      btn.disabled = !(this.all.length && this.chosen.length === this.all.length);
+    }
   },
 };
 

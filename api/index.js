@@ -472,6 +472,19 @@ function canManageCycle(session, sup, cycle) {
   return true;
 }
 
+// Distinguishes "no token was sent" from "the token is unknown or expired", so
+// a session complaint identifies its own cause instead of being ambiguous.
+// sessionInvalid tells the page to return to the sign-in screen.
+function sessionGone(token) {
+  return {
+    success: false,
+    sessionInvalid: true,
+    message: token
+      ? 'Your session has expired or is no longer valid — please sign in again.'
+      : 'No sign-in was sent with this request — please sign in again.',
+  };
+}
+
 function groupCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
   let s = '';
@@ -914,7 +927,7 @@ module.exports = async function handler(req, res) {
       case 'orgGetMyIdeas': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -945,7 +958,7 @@ module.exports = async function handler(req, res) {
       case 'orgSaveIdea': {
         const [sessionToken, payload] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -995,7 +1008,7 @@ module.exports = async function handler(req, res) {
       case 'orgDeleteIdea': {
         const [sessionToken, ideaId] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1017,7 +1030,7 @@ module.exports = async function handler(req, res) {
       case 'orgSubmitIdeas': {
         const [sessionToken, maxGroups] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1037,13 +1050,37 @@ module.exports = async function handler(req, res) {
           VALUES (${cycle.id}, ${sup.supervisor_id}, ${capVal}, 'submitted', NOW())
           ON CONFLICT (cycle_id, supervisor_id)
           DO UPDATE SET status = 'submitted', max_groups = ${capVal}, submitted_at = NOW()`;
-        return ok({ success: true, count: ideaRows.length });
+
+        // Each supervisor submits independently. When the last one in this
+        // program+campus submits, the list publishes itself — no separate
+        // publish step. Until then the submitter is told who is outstanding
+        // and may choose to publish anyway.
+        await syncParticipants(sql, cycle);
+        const parts = await sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id} AND expected = TRUE`;
+        const pending = parts.filter(p => p.status !== 'submitted' && p.status !== 'declared_none');
+
+        if (!pending.length) {
+          await sql`UPDATE org_ideas SET status = 'submitted' WHERE cycle_id = ${cycle.id} AND status = 'draft'`;
+          await sql`UPDATE org_cycles SET phase = 'RANKING_OPEN', updated_at = NOW() WHERE id = ${cycle.id}`;
+          await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+            'ideas_published', { trigger: 'last_submission' });
+          const total = await sql`SELECT COUNT(*) AS c FROM org_ideas WHERE cycle_id = ${cycle.id}`;
+          return ok({ success: true, count: ideaRows.length, autoPublished: true, totalIdeas: Number(total[0].c) });
+        }
+
+        const names = await sql`SELECT name FROM supervisors
+          WHERE supervisor_id = ANY(${pending.map(p => p.supervisor_id)}) ORDER BY name`;
+        return ok({
+          success: true, count: ideaRows.length, autoPublished: false,
+          pending: names.map(n => n.name),
+          canPublishNow: canManageCycle(session, sup, cycle),
+        });
       }
 
       case 'orgDeclareNoIdeas': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1057,13 +1094,27 @@ module.exports = async function handler(req, res) {
           VALUES (${cycle.id}, ${sup.supervisor_id}, 'declared_none', NOW())
           ON CONFLICT (cycle_id, supervisor_id)
           DO UPDATE SET status = 'declared_none', submitted_at = NOW()`;
-        return ok({ success: true });
+
+        // Declaring "no ideas" is a response too, so it can be the one that
+        // completes the programme and publishes the list.
+        await syncParticipants(sql, cycle);
+        const parts = await sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id} AND expected = TRUE`;
+        const pending = parts.filter(p => p.status !== 'submitted' && p.status !== 'declared_none');
+        const total = await sql`SELECT COUNT(*) AS c FROM org_ideas WHERE cycle_id = ${cycle.id}`;
+        if (!pending.length && Number(total[0].c) > 0) {
+          await sql`UPDATE org_ideas SET status = 'submitted' WHERE cycle_id = ${cycle.id} AND status = 'draft'`;
+          await sql`UPDATE org_cycles SET phase = 'RANKING_OPEN', updated_at = NOW() WHERE id = ${cycle.id}`;
+          await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+            'ideas_published', { trigger: 'last_response' });
+          return ok({ success: true, autoPublished: true, totalIdeas: Number(total[0].c) });
+        }
+        return ok({ success: true, autoPublished: false });
       }
 
       case 'orgReopenMySubmission': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1079,7 +1130,7 @@ module.exports = async function handler(req, res) {
       case 'orgGetColleagueStatus': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { cycle } = ctx;
@@ -1133,7 +1184,7 @@ module.exports = async function handler(req, res) {
       case 'orgGetCycleSettings': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1159,7 +1210,7 @@ module.exports = async function handler(req, res) {
         // which: 'ideas' | 'ranking'; value: ISO string or '' to clear
         const [sessionToken, which, value] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1183,7 +1234,7 @@ module.exports = async function handler(req, res) {
       case 'orgSetGroupSizes': {
         const [sessionToken, minSize, maxSize] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1199,7 +1250,7 @@ module.exports = async function handler(req, res) {
       case 'orgSetParticipantExpected': {
         const [sessionToken, supervisorId, expected] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1216,7 +1267,7 @@ module.exports = async function handler(req, res) {
         // Opens the student side. Non-responders are recorded as having no ideas.
         const [sessionToken, force] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1260,7 +1311,7 @@ module.exports = async function handler(req, res) {
         // Manual phase moves: reopen ideas, close ranking, reopen ranking.
         const [sessionToken, phase] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1281,7 +1332,8 @@ module.exports = async function handler(req, res) {
       case 'orgAdminOverview': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session || !isAdminUser(session)) return ok({ success: false, message: 'Unauthorized.' });
+        if (!session) return ok(sessionGone(sessionToken));
+        if (!isAdminUser(session)) return ok({ success: false, message: 'Only the admin can do this.' });
         await ensureOrganizerTables(sql);
         const { academic_year, semester } = academicContext();
         const cycles = await sql`SELECT * FROM org_cycles
@@ -1309,7 +1361,8 @@ module.exports = async function handler(req, res) {
       case 'orgSetDeadlinePolicy': {
         const [sessionToken, cycleId, policy, delegateId] = args;
         const session = await verifySession(sessionToken);
-        if (!session || !isAdminUser(session)) return ok({ success: false, message: 'Only the admin can change this.' });
+        if (!session) return ok(sessionGone(sessionToken));
+        if (!isAdminUser(session)) return ok({ success: false, message: 'Only the admin can change this.' });
         await ensureOrganizerTables(sql);
         if (!['open', 'locked', 'delegate'].includes(policy))
           return ok({ success: false, message: 'Unknown policy.' });
@@ -1621,10 +1674,19 @@ module.exports = async function handler(req, res) {
         const ids = Array.isArray(orderedIdeaIds) ? orderedIdeaIds.map(Number) : [];
         if (new Set(ids).size !== ids.length)
           return ok({ success: false, message: 'The same project appears twice in your list.' });
-        if (ids.length) {
-          const valid = await sql`SELECT id FROM org_ideas WHERE cycle_id = ${cycle.id} AND id = ANY(${ids})`;
-          if (valid.length !== ids.length)
+
+        // Every group must rank every project, so the assignment console always
+        // has a complete preference order to work from.
+        const allIdeas = await sql`SELECT id FROM org_ideas WHERE cycle_id = ${cycle.id}`;
+        const allIds = new Set(allIdeas.map(i => i.id));
+        for (const id of ids) {
+          if (!allIds.has(id))
             return ok({ success: false, message: 'One of the selected projects is no longer available. Please reload.' });
+        }
+        if (ids.length !== allIds.size) {
+          const missing = allIds.size - ids.length;
+          return ok({ success: false,
+            message: `Please rank every project before saving — ${missing} project(s) are still unranked.` });
         }
 
         const before = await sql`SELECT r.rank, i.title FROM org_rankings r
@@ -1654,7 +1716,7 @@ module.exports = async function handler(req, res) {
       case 'orgGetAssignmentBoard': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1737,7 +1799,7 @@ module.exports = async function handler(req, res) {
       case 'orgSetAssignment': {
         const [sessionToken, groupId, ideaId] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1782,7 +1844,7 @@ module.exports = async function handler(req, res) {
       case 'orgClearAssignment': {
         const [sessionToken, groupId] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1801,7 +1863,7 @@ module.exports = async function handler(req, res) {
       case 'orgDryRunPublish': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;
@@ -1815,7 +1877,7 @@ module.exports = async function handler(req, res) {
       case 'orgPublishAllocation': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
-        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
         if (ctx.error) return ok({ success: false, message: ctx.error });
         const { sup, cycle } = ctx;

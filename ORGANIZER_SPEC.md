@@ -1,6 +1,6 @@
 # FYP Projects Organizer — v4 Design Specification
 
-**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-08-09-2026 R05
+**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-08-09-2026 R06
 
 ## Scope decisions (confirmed)
 
@@ -24,7 +24,7 @@ IDEAS_OPEN -> RANKING_OPEN -> RANKING_CLOSED -> ALLOCATED
 ```
 
 - **IDEAS_OPEN** — supervisors draft/submit ideas. Students see "not yet open".
-- **RANKING_OPEN** — set by publishing the idea list, which requires all expected supervisors to have responded, or the ideas deadline to have passed, or a forced publish. Non-responders are recorded as having no ideas. Groups rank; editable until the ranking deadline. (Groups may be formed during IDEAS_OPEN too, so students can organise early.)
+- **RANKING_OPEN** — reached automatically the moment the **last** expected supervisor submits or declares no ideas. There is no manual publish button. A supervisor who submits while others are outstanding is shown their names and may choose to publish early, which records the non-responders as having no ideas. Groups rank; editable until the ranking deadline. (Groups may be formed during IDEAS_OPEN too, so students can organise early.)
 - **RANKING_CLOSED** — ranking frozen; matching can run.
 - **ALLOCATED** — allocation published; projects + students rows created in the live FYP tables.
 
@@ -72,12 +72,13 @@ The allocation decision stays with the doctors. There is **no automatic matching
 **During ranking there are no restrictions at all:**
 
 - Several groups may rank the same idea — including all of them at #1. Exclusivity is *not* enforced while students choose.
-- A group may rank as many or as few ideas as it likes; no minimum, no maximum.
+- A group must rank **every** project before it can save; partial lists are refused, so the assignment console always has a complete preference order. (Consequence: there are no partial saves — a group finishes the ordering in one sitting.)
 - If a group's size falls outside an idea's min/max student range, the idea is shown with a warning badge but is **not** blocked from being ranked.
 
 **Assignment console** (coordinator / any supervisor of that program+campus, per the deadline policy):
 
-- Lists every group — anonymous code + size + its ranked preferences in order.
+- Opens with a **distribution table** — for every project, how many groups placed it #1, #2, #3 … and its total. Since supervisors never see which group chose what, this is their only basis for assigning sensibly.
+- Then lists every group — anonymous code + size + its ranked preferences in order.
 - Each row has an idea dropdown. Assignment is entirely by hand.
 - Live conflict flags:
   - the same idea assigned to two groups — **blocked**, since each project goes to exactly one group
@@ -129,6 +130,9 @@ Record `project_id` back into `org_allocations` so the link is traceable and rev
 9. Optional: email notifications via the existing mail plumbing
 
 ## 9. Operational notes
+
+- The supervisor page refreshes itself every 30 seconds after sign-in (paused while a form is open or the tab is hidden), so colleague submissions and student rankings appear without pressing anything.
+- Session failures return `sessionInvalid`, and the page sends the user back to sign-in rather than showing an error inside a panel. The message distinguishes "no token sent" from "token expired or unknown".
 
 - `/api` is rate limited to 300 requests / 15 min **per IP** (`server.js`). A lab of students behind one campus NAT will trip it during ranking week — raise it or exempt organizer reads before go-live.
 - The version stamp lives in 3 files (`index.html`, `landing.html`, `meetings/index.html`) and will be 4 once `organizer/index.html` exists. Bump on every change.
