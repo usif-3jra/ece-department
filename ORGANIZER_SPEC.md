@@ -1,6 +1,6 @@
 # FYP Projects Organizer — v4 Design Specification
 
-**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-08-09-2026 R06
+**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-09-09-2026 R01
 
 ## Scope decisions (confirmed)
 
