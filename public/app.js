@@ -378,15 +378,28 @@ const Reg = {
     if (el) el.value = this._currentSemester();
   },
 
+  // The academic year runs September to August, matching _currentSemester():
+  // from September the year rolls over, so Sept 2026 is 2026-2027.
+  _currentAcademicYear() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const start = (d.getMonth() + 1) >= 9 ? y : y - 1;
+    return `${start}-${start + 1}`;
+  },
+
   _buildYears() {
     const sel = document.getElementById('f-year');
     sel.innerHTML = '';
+    const current = this._currentAcademicYear();
     const START = 2025;
-    for (let i = 0; i < 10; i++) {
-      const y1 = START + i, y2 = y1 + 1;
-      const val = `${y1}-${y2}`;
-      sel.innerHTML += `<option value="${val}">${val}</option>`;
+    const currentStart = parseInt(current.split('-')[0], 10);
+    // Always include the current year even if the window has moved past START+9
+    const last = Math.max(START + 9, currentStart + 4);
+    for (let y1 = START; y1 <= last; y1++) {
+      const val = `${y1}-${y1 + 1}`;
+      sel.innerHTML += `<option value="${val}"${val === current ? ' selected' : ''}>${val}</option>`;
     }
+    sel.value = current;
   },
 
   async _loadMasterData() {

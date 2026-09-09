@@ -1,6 +1,6 @@
 # FYP Projects Organizer — v4 Design Specification
 
-**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-09-09-2026 R02
+**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-09-09-2026 R03
 
 ## Scope decisions (confirmed)
 
@@ -49,7 +49,9 @@ ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS campus TEXT NOT NULL DEFAULT ''
 
 Group codes read `PROGRAM-CAMPUS-Gnn`, e.g. **EPME-D-G01** (Electric Power and Machines Engineering, Debbieh, group 1) or **CE-T-G03**. The campus letter comes from the cycle, and `nn` is the next unused number in that cycle — taken from the highest existing code rather than a row count, so deleting a group never reissues its code. Abbreviations: EPME, CEE, CE, BME; any programme added later falls back to its initials.
 
-**org_group_members** — id, cycle_id, group_id, student_id, student_name, email (optional), added_by_student_id, joined_at.
+**org_group_members** — id, cycle_id, group_id, student_id, student_name, email (**required for the group creator** — used for the assignment notification and the FYP grading portal's week-14 reminder), added_by_student_id, joined_at.
+
+Only the student who created a group may add or remove members, or delete the group; teammates see the membership read-only and take part only in the ranking. The creator is marked GROUP CREATOR in the member list.
 `UNIQUE (cycle_id, student_id)` and `UNIQUE INDEX (cycle_id, lower(student_name))`
 
 > These two indexes **are** the duplicate-prevention mechanism. Application-level checks alone cannot survive two students submitting overlapping groups at the same moment, because Neon serverless gives no transaction spanning requests.
@@ -75,7 +77,7 @@ The allocation decision stays with the doctors. There is **no automatic matching
 **During ranking there are no restrictions at all:**
 
 - Several groups may rank the same idea — including all of them at #1. Exclusivity is *not* enforced while students choose.
-- A group must rank **every** project before it can save; partial lists are refused, so the assignment console always has a complete preference order. (Consequence: there are no partial saves — a group finishes the ordering in one sitting.)
+- A group must fill its **quota** before it can save: `quota = Σ over supervisors of min(their project count, their group capacity)`. A supervisor offering 3 projects but able to take only 2 groups may be chosen at most twice, and their remaining projects are shown locked. Partial lists are refused, so the assignment console always has a complete preference order. (Consequence: there are no partial saves — a group finishes the ordering in one sitting.)
 - If a group's size falls outside an idea's min/max student range, the idea is shown with a warning badge but is **not** blocked from being ranked.
 
 **Assignment console** (coordinator / any supervisor of that program+campus, per the deadline policy):

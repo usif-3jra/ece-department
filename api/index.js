@@ -561,6 +561,7 @@ function formatGroupCode(cycle, n) {
 }
 
 const STUDENT_ID_RE = /^20\d{7}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function normName(s) { return String(s || '').trim().replace(/\s+/g, ' '); }
 
 // Student-side cycle resolution. Refuses to create a cycle for a program+campus
@@ -662,6 +663,32 @@ async function buildPublishReport(sql, cycle) {
   }
 
   return { ready: blockers.length === 0 && plan.length > 0, plan, blockers, warnings };
+}
+
+// supervisor_id -> how many groups that supervisor is willing to take.
+async function supervisorCaps(sql, cycle) {
+  const rows = await sql`SELECT supervisor_id, max_groups FROM org_participants WHERE cycle_id = ${cycle.id}`;
+  const m = new Map();
+  rows.forEach(r => m.set(r.supervisor_id, Number(r.max_groups)));
+  return m;
+}
+
+// A group may rank at most `capacity` projects from any one supervisor, since
+// that supervisor cannot take more groups than that. The complete-ranking rule
+// therefore targets the sum of those per-supervisor limits rather than the raw
+// number of projects.
+function rankingQuota(ideas, caps) {
+  const bySup = new Map();
+  ideas.forEach(i => bySup.set(i.supervisor_id, (bySup.get(i.supervisor_id) || 0) + 1));
+  let quota = 0;
+  const limits = new Map();
+  bySup.forEach((count, supId) => {
+    const cap = caps.get(supId) != null ? caps.get(supId) : 2;
+    const allowed = Math.min(count, cap);
+    limits.set(supId, allowed);
+    quota += allowed;
+  });
+  return { quota, limits };
 }
 
 function mapIdea(r) {
@@ -1465,7 +1492,14 @@ module.exports = async function handler(req, res) {
         if (cycle.phase === 'ALLOCATED')
           return ok({ success: false, message: 'Projects for this semester have already been assigned.' });
 
-        const raw = [{ ...(me || {}), creator: true }].concat(Array.isArray(others) ? others : []);
+        // The creator's email is required: it is how the department notifies the
+        // group of its assigned project, and it carries into the FYP grading
+        // system for the week-14 report reminder.
+        const creatorEmail = String((me && me.email) || '').trim();
+        if (!EMAIL_RE.test(creatorEmail))
+          return ok({ success: false, message: 'Please enter a valid email address — your group will be notified there about the project assignment and report deadlines.' });
+
+        const raw = [{ ...(me || {}), email: creatorEmail, creator: true }].concat(Array.isArray(others) ? others : []);
         const members = [];
         for (const m of raw) {
           const sid  = String((m && m.id) || '').trim();
@@ -1619,18 +1653,46 @@ module.exports = async function handler(req, res) {
         const sid = String(studentId || '').trim();
         const found = await findStudentGroup(sql, cycle.id, sid);
         if (!found) return ok({ success: false, message: 'You are not in a group.' });
+        // Only the student who created the group may change its membership
+        if (found.group.created_by_student_id !== sid)
+          return ok({ success: false,
+            message: 'Only the student who created this group can change its members. Ask them if you need to be removed.' });
 
         const me = found.members.find(m => m.student_id === sid);
-        await sql`DELETE FROM org_group_members WHERE cycle_id = ${cycle.id} AND student_id = ${sid}`;
-        const left = found.members.length - 1;
+        await sql`DELETE FROM org_rankings WHERE group_id = ${found.group.id}`;
+        await sql`DELETE FROM org_group_members WHERE group_id = ${found.group.id}`;
+        await sql`DELETE FROM org_groups WHERE id = ${found.group.id}`;
         await logAudit(sql, cycle.id, found.group.id, 'student', sid, me ? me.student_name : sid,
-          'member_left', { remaining: left });
-        // An empty group is removed along with its ranking
-        if (left <= 0) {
-          await sql`DELETE FROM org_rankings WHERE group_id = ${found.group.id}`;
-          await sql`DELETE FROM org_groups WHERE id = ${found.group.id}`;
-        }
-        return ok({ success: true, groupDeleted: left <= 0 });
+          'group_deleted', { members: found.members.length });
+        return ok({ success: true, groupDeleted: true });
+      }
+
+      case 'orgRemoveMember': {
+        const [program, campus, studentId, targetId] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'ALLOCATED' || cycle.phase === 'RANKING_CLOSED')
+          return ok({ success: false, message: 'Groups are frozen — contact your coordinator.' });
+        const sid = String(studentId || '').trim();
+        const tid = String(targetId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({ success: false, message: 'You are not in a group.' });
+        if (found.group.created_by_student_id !== sid)
+          return ok({ success: false, message: 'Only the student who created this group can remove members.' });
+        if (tid === sid)
+          return ok({ success: false, message: 'You created this group — use "Delete this group" instead of removing yourself.' });
+
+        const target = found.members.find(m => m.student_id === tid);
+        if (!target) return ok({ success: false, message: 'That student is not in your group.' });
+        if (found.members.length - 1 < Number(cycle.min_group_size))
+          return ok({ success: false, message: `A group needs at least ${cycle.min_group_size} students.` });
+
+        await sql`DELETE FROM org_group_members WHERE cycle_id = ${cycle.id} AND student_id = ${tid}`;
+        const me = found.members.find(m => m.student_id === sid);
+        await logAudit(sql, cycle.id, found.group.id, 'student', sid, me ? me.student_name : sid,
+          'member_removed', { removed: `${target.student_name} (${tid})` });
+        return ok({ success: true });
       }
 
       case 'orgAddMember': {
@@ -1643,6 +1705,8 @@ module.exports = async function handler(req, res) {
         const sid = String(studentId || '').trim();
         const found = await findStudentGroup(sql, cycle.id, sid);
         if (!found) return ok({ success: false, message: 'You are not in a group.' });
+        if (found.group.created_by_student_id !== sid)
+          return ok({ success: false, message: 'Only the student who created this group can add members.' });
         if (found.members.length >= Number(cycle.max_group_size))
           return ok({ success: false, message: `A group can have at most ${cycle.max_group_size} students.` });
 
@@ -1683,13 +1747,20 @@ module.exports = async function handler(req, res) {
           LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
           LEFT JOIN supervisors c ON c.supervisor_id = i.co_supervisor_id
           WHERE i.cycle_id = ${cycle.id} ORDER BY s.name, i.id`;
+        const caps = await supervisorCaps(sql, cycle);
         return ok({
           success: true, published: true,
+          program: cycle.program, campus: cycle.campus,
+          academicYear: cycle.academic_year, semester: cycle.semester,
           ideas: rows.map(r => ({
             id: r.id, title: r.title, field: r.field || '', description: r.description || '',
             prerequisites: r.prerequisites || '',
             minStudents: Number(r.min_students), maxStudents: Number(r.max_students),
-            supervisor: r.supervisor_name || '', coSupervisor: r.co_name || '',
+            supervisor: r.supervisor_name || '', supervisorId: r.supervisor_id,
+            coSupervisor: r.co_name || '',
+            // How many groups this supervisor can take in total — a group may
+            // not rank more of their projects than this.
+            supervisorCapacity: caps.get(r.supervisor_id) != null ? caps.get(r.supervisor_id) : 2,
           })),
         });
       }
@@ -1724,18 +1795,35 @@ module.exports = async function handler(req, res) {
         if (new Set(ids).size !== ids.length)
           return ok({ success: false, message: 'The same project appears twice in your list.' });
 
-        // Every group must rank every project, so the assignment console always
-        // has a complete preference order to work from.
-        const allIdeas = await sql`SELECT id FROM org_ideas WHERE cycle_id = ${cycle.id}`;
-        const allIds = new Set(allIdeas.map(i => i.id));
+        const allIdeas = await sql`SELECT id, supervisor_id FROM org_ideas WHERE cycle_id = ${cycle.id}`;
+        const ideaById = new Map(allIdeas.map(i => [i.id, i]));
         for (const id of ids) {
-          if (!allIds.has(id))
+          if (!ideaById.has(id))
             return ok({ success: false, message: 'One of the selected projects is no longer available. Please reload.' });
         }
-        if (ids.length !== allIds.size) {
-          const missing = allIds.size - ids.length;
+
+        // No supervisor may be chosen more times than the number of groups they
+        // can supervise, and the list must be complete up to that limit.
+        const caps = await supervisorCaps(sql, cycle);
+        const { quota, limits } = rankingQuota(allIdeas, caps);
+        const perSup = new Map();
+        for (const id of ids) {
+          const supId = ideaById.get(id).supervisor_id;
+          perSup.set(supId, (perSup.get(supId) || 0) + 1);
+        }
+        for (const [supId, used] of perSup) {
+          const allowed = limits.get(supId);
+          if (used > allowed) {
+            const nameRows = await sql`SELECT name FROM supervisors WHERE supervisor_id = ${supId}`;
+            const who = nameRows[0] ? nameRows[0].name : 'That supervisor';
+            return ok({ success: false,
+              message: `${who} can supervise only ${allowed} project(s), but you selected ${used}.` });
+          }
+        }
+        if (ids.length !== quota) {
+          const missing = quota - ids.length;
           return ok({ success: false,
-            message: `Please rank every project before saving — ${missing} project(s) are still unranked.` });
+            message: `Please rank ${quota} project(s) before saving — ${missing} still to add.` });
         }
 
         const before = await sql`SELECT r.rank, i.title FROM org_rankings r

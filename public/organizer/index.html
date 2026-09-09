@@ -5,85 +5,120 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>FYP Projects Organizer — ECE Department</title>
   <link rel="icon" type="image/png" href="https://usif-3jra.github.io/epme-study-plan/assets/Webpage%20logo.png"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <!-- The FYP Management System stylesheet, so both systems look identical -->
+  <link rel="stylesheet" href="/style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
   <style>
-    /* ── ABET editorial palette — matches the Meeting Organizer ── */
+    /* Organizer components are written against these names; they now point at
+       the FYP Management System's own tokens from style.css. */
     :root{
-      --ink:#101826; --ink-soft:#1c2534;
-      --accent:#0F7A73; --accent-dim:#E4F0EE;
-      --amber:#C98A2C; --amber-dim:#FBF1DF;
-      --olive:#4C7A3F; --olive-dim:#E9F1E4;
-      --rust:#B5482F;  --rust-dim:#FBE9E4;
-      --bg:#F4F6F5; --card:#fff;
-      --line:#DBE2E2; --line-soft:#EAEFEE;
-      --slate:#55606B; --slate-soft:#8A939B;
-      --radius:10px;
-      --shadow:0 1px 2px rgba(16,24,38,.04), 0 6px 20px rgba(16,24,38,.05);
-      --font-display:"Fraunces", Georgia, serif;
-      --font-body:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --font-mono:"IBM Plex Mono", ui-monospace, monospace;
+      --ink:var(--navy); --ink-soft:#1e293b;
+      --accent:var(--blue); --accent-dim:var(--blue-lt);
+      --amber-dim:#fef3c7;
+      --olive:var(--green); --olive-dim:#d1fae5;
+      --rust:var(--red);  --rust-dim:#fee2e2;
+      --card:rgba(255,255,255,.85);
+      --line:var(--border); --line-soft:#eef2f7;
+      --slate:var(--gray); --slate-soft:#94a3b8;
+      --font-body:'Inter',sans-serif;
+      --font-display:'Inter',sans-serif;
+      --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
     }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:var(--font-body);background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;}
-    h1,h2,h3,h4,h5{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;}
+    *,*::before,*::after{box-sizing:border-box;}
+    h1,h2,h3,h4,h5{font-weight:700;letter-spacing:-.02em;color:var(--navy);}
     .mono{font-family:var(--font-mono);}
-    ::selection{background:var(--accent);color:#fff;}
+    ::selection{background:var(--blue);color:#fff;}
 
     .screen{display:none;}
     .screen.active{display:block;}
 
-    /* ── Topbar ── */
-    .topbar{display:flex;align-items:center;gap:14px;padding:14px 26px;background:var(--ink);color:#fff;}
-    .topbar-logo{height:34px;}
-    .topbar-title{font-family:var(--font-display);font-size:19px;font-weight:600;}
-    .topbar-sub{font-size:11px;color:#9fb0ad;font-family:var(--font-mono);}
-    .topbar-name{font-size:13px;color:#cfd8d6;margin-right:4px;}
-    .btn-topbar{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;
-      border-radius:8px;padding:6px 13px;font-size:13px;cursor:pointer;transition:.15s;}
-    .btn-topbar:hover{background:rgba(255,255,255,.2);}
+    /* ── Header — mirrors .app-header from the FYP dashboard ── */
+    .topbar{
+      background:linear-gradient(135deg,var(--navy) 0%,#162d56 60%,var(--navy2) 100%);
+      color:#fff;position:sticky;top:0;z-index:1000;
+      box-shadow:0 2px 24px rgba(0,0,0,.3),0 1px 0 rgba(255,255,255,.06) inset;
+      border-bottom:1px solid rgba(255,255,255,.07);
+      display:flex;align-items:center;gap:14px;padding:13px 32px;
+    }
+    .topbar-logo{height:46px;width:auto;object-fit:contain;filter:drop-shadow(0 0 8px rgba(37,99,235,.3));}
+    .topbar-sep{width:1px;height:34px;flex-shrink:0;background:rgba(255,255,255,.28);border-radius:1px;}
+    .topbar-univ{font-size:10px;opacity:.6;letter-spacing:.1em;text-transform:uppercase;}
+    .topbar-title{font-size:15px;font-weight:700;letter-spacing:-.02em;
+      background:linear-gradient(90deg,#fff 0%,#93c5fd 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .topbar-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:var(--font-mono);}
+    .topbar-name{font-size:13px;color:rgba(255,255,255,.8);margin-right:4px;}
+    .btn-topbar{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;
+      border-radius:8px;padding:6px 13px;font-size:13px;cursor:pointer;transition:all .2s;backdrop-filter:blur(6px);}
+    .btn-topbar:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.35);}
 
-    .page-body{max-width:1080px;margin:0 auto;padding:28px 22px 60px;}
-    .page-heading{font-family:var(--font-display);font-size:22px;font-weight:600;}
-    .page-sub{font-size:13px;color:var(--slate);margin-top:2px;}
+    .page-body{max-width:1400px;margin:0 auto;padding:24px 32px 60px;}
+    .page-heading{font-size:20px;font-weight:700;color:var(--navy);letter-spacing:-.02em;}
+    .page-sub{font-size:13px;color:var(--gray);margin-top:2px;}
 
-    /* ── Gate (choose your door) ── */
-    .gate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;}
-    .gate-logo{height:64px;margin-bottom:20px;}
-    .gate-title{font-family:var(--font-display);font-size:30px;font-weight:700;text-align:center;}
-    .gate-sub{font-size:14px;color:var(--slate);text-align:center;margin:8px 0 32px;max-width:520px;}
-    .gate-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;width:100%;max-width:720px;}
-    .gate-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
-      padding:30px 26px;text-align:center;cursor:pointer;transition:.16s;}
-    .gate-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 10px 30px rgba(16,24,38,.10);}
-    .gate-icon{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;margin:0 auto 14px;font-size:23px;}
-    .gate-icon.sup{background:var(--accent-dim);color:var(--accent);}
-    .gate-icon.stu{background:var(--amber-dim);color:var(--amber);}
-    .gate-card h3{font-size:17px;margin-bottom:6px;}
-    .gate-card p{font-size:13px;color:var(--slate);line-height:1.5;}
+    /* ── Entry screens — the FYP login look ── */
+    .gate{
+      position:relative;min-height:100vh;
+      background:linear-gradient(135deg,#c7d9f5 0%,#d6e4ff 45%,#e2d8f5 100%);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;
+    }
+    .gate::before{
+      content:'';position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 20%, rgba(37,99,235,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 85% 80%, rgba(124,58,237,.12) 0%, transparent 55%),
+        radial-gradient(ellipse 30% 25% at 50% 50%, rgba(6,182,212,.10) 0%, transparent 50%);
+    }
+    .gate-card-wrap{
+      position:relative;background:rgba(255,255,255,.88);
+      backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+      border:1px solid rgba(255,255,255,.9);border-radius:24px;padding:40px;
+      width:100%;max-width:540px;
+      box-shadow:0 20px 60px rgba(37,99,235,.15),0 4px 16px rgba(0,0,0,.08),inset 0 1px 0 #fff;
+    }
+    .gate-card-wrap.narrow{max-width:440px;}
+    .gate-logo-wrap{text-align:center;margin-bottom:22px;}
+    /* Same 86px logo as the FYP Management System login */
+    .gate-logo{height:86px;width:auto;object-fit:contain;filter:drop-shadow(0 2px 10px rgba(37,99,235,.3));}
+    .gate-title{font-size:21px;font-weight:700;color:var(--navy);text-align:center;margin-bottom:4px;letter-spacing:-.02em;}
+    .gate-sub{font-size:12px;color:var(--gray);text-align:center;margin-bottom:26px;}
+    .gate-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;}
+    .gate-card{background:rgba(255,255,255,.9);border:1px solid var(--border);border-radius:14px;
+      padding:24px 18px;text-align:center;cursor:pointer;transition:all .2s;}
+    .gate-card:hover{transform:translateY(-2px);border-color:rgba(37,99,235,.4);
+      box-shadow:0 8px 24px rgba(37,99,235,.18);}
+    .gate-icon{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;margin:0 auto 12px;font-size:21px;}
+    .gate-icon.sup{background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1d4ed8;}
+    .gate-icon.stu{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#b45309;}
+    .gate-card h3{font-size:15px;margin-bottom:5px;font-weight:700;}
+    .gate-card p{font-size:12px;color:var(--gray);line-height:1.5;margin:0;}
 
-    /* ── Panels & forms ── */
-    .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;}
-    .panel + .panel{margin-top:18px;}
-    .panel-title{font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:4px;}
-    .panel-sub{font-size:12.5px;color:var(--slate);margin-bottom:16px;}
-    .form-wrap{max-width:460px;margin:0 auto;}
-    .field{margin-bottom:15px;}
-    .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
-    .field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;
-      font-family:var(--font-body);font-size:14px;color:var(--ink);background:#fff;transition:.15s;}
-    .field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+    /* ── Panels & forms — the dashboard's .card-section look ── */
+    .panel{border:1px solid rgba(226,232,240,.8);border-radius:var(--radius-lg);
+      box-shadow:var(--shadow-sm);background:rgba(255,255,255,.85);
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:20px;transition:box-shadow .2s;}
+    .panel:hover{box-shadow:var(--shadow);}
+    .panel + .panel{margin-top:16px;}
+    .panel-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:3px;}
+    .panel-sub{font-size:12.5px;color:var(--gray);margin-bottom:14px;}
+    .field{margin-bottom:13px;}
+    .field label{display:block;font-size:12.5px;font-weight:500;color:#374151;margin-bottom:5px;}
+    .field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:9px;
+      font-family:var(--font-body);font-size:14px;color:#1e293b;background:rgba(255,255,255,.9);transition:.15s;}
+    .field input:focus,.field select:focus{outline:none;border-color:var(--blue);
+      box-shadow:0 0 0 3px var(--blue-glow);background:#fff;}
     .field .hint{font-size:11.5px;color:var(--slate-soft);margin-top:4px;}
-    .btn-primary{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:10px 20px;
-      font-size:14px;font-weight:500;cursor:pointer;transition:.15s;}
-    .btn-primary:hover{background:#0c635d;}
-    .btn-primary:disabled{opacity:.6;cursor:not-allowed;}
-    .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--slate);border-radius:8px;
-      padding:9px 16px;font-size:13.5px;cursor:pointer;transition:.15s;}
-    .btn-ghost:hover{border-color:var(--slate-soft);color:var(--ink);}
+    .btn-primary{background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);border:none;color:#fff;
+      border-radius:10px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;
+      box-shadow:0 4px 16px rgba(37,99,235,.35);transition:all .2s;}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(37,99,235,.5);color:#fff;}
+    .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none;}
+    .btn-ghost{background:rgba(255,255,255,.8);border:1px solid var(--border);color:var(--gray);
+      border-radius:9px;padding:8px 15px;font-size:13.5px;cursor:pointer;transition:all .2s;}
+    .btn-ghost:hover{border-color:rgba(37,99,235,.35);color:var(--navy);background:#fff;}
     .alert-box{border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;display:none;}
     .alert-box.err{background:var(--rust-dim);color:var(--rust);border:1px solid #f0cfc6;display:block;}
     .alert-box.warn{background:var(--amber-dim);color:#8a5e18;border:1px solid #edd9ad;display:block;}
@@ -91,16 +126,6 @@
     .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);
       border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;}
     @keyframes spin{to{transform:rotate(360deg);}}
-
-    /* ── Placeholder blocks for modules still to be built ── */
-    .soon{display:flex;align-items:flex-start;gap:13px;padding:16px 18px;border:1px dashed var(--line);
-      border-radius:var(--radius);background:#fbfcfc;margin-bottom:12px;}
-    .soon-icon{width:34px;height:34px;border-radius:9px;background:var(--line-soft);color:var(--slate);
-      display:grid;place-items:center;flex-shrink:0;font-size:14px;}
-    .soon h4{font-family:var(--font-body);font-size:13.5px;font-weight:600;margin-bottom:2px;}
-    .soon p{font-size:12.5px;color:var(--slate);line-height:1.5;}
-    .badge-step{display:inline-block;background:var(--line-soft);color:var(--slate);border-radius:20px;
-      padding:2px 9px;font-size:10.5px;font-weight:600;font-family:var(--font-mono);margin-left:6px;}
 
     /* ── Cycle bar ── */
     .cycle-bar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:var(--card);border:1px solid var(--line);
@@ -115,15 +140,21 @@
     .panel-head-row .panel-sub{margin-bottom:0;}
 
     /* ── Idea cards ── */
-    .idea-card{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;background:#fff;}
-    .idea-card:hover{border-color:var(--slate-soft);}
+    .idea-card{border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;
+      background:rgba(255,255,255,.9);transition:border-color .15s;}
+    .idea-card:hover{border-color:rgba(37,99,235,.35);}
     .idea-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
-    .idea-title{font-weight:600;font-size:14.5px;line-height:1.35;}
-    .idea-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
-    .chip{font-size:11px;border-radius:20px;padding:3px 9px;background:var(--line-soft);color:var(--slate);}
+    .idea-title{font-weight:600;font-size:13.5px;line-height:1.35;color:var(--navy);}
+    .idea-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+    .chip{font-size:10.5px;border-radius:20px;padding:2px 8px;background:var(--gray-lt);
+      color:var(--gray);border:1px solid var(--border);}
     .chip.teal{background:var(--accent-dim);color:#0b5b56;}
     .chip.olive{background:var(--olive-dim);color:#3d6333;}
-    .idea-desc{font-size:12.5px;color:var(--slate);line-height:1.55;margin-top:9px;}
+    .idea-desc{font-size:12.5px;color:var(--slate);line-height:1.5;margin-top:7px;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .idea-card.open .idea-desc,.pick.open .idea-desc{-webkit-line-clamp:unset;}
+    .more-link{font-size:11.5px;color:var(--blue);cursor:pointer;margin-top:4px;display:inline-block;}
+    .more-link:hover{text-decoration:underline;}
     .idea-actions{display:flex;gap:6px;flex-shrink:0;}
     .icon-btn{background:transparent;border:1px solid var(--line);color:var(--slate);border-radius:7px;
       width:30px;height:30px;display:grid;place-items:center;cursor:pointer;font-size:12px;transition:.15s;}
@@ -200,10 +231,6 @@
     .cnt.zero{color:var(--slate-soft);background:transparent;}
     .cnt.first{background:var(--accent);color:#fff;}
     .cnt.some{background:var(--accent-dim);color:#0b5b56;}
-    .stat-none{color:var(--slate-soft);}
-    .demand{font-size:11px;border-radius:20px;padding:2px 8px;}
-    .demand.hot{background:var(--rust-dim);color:var(--rust);}
-    .demand.cold{background:var(--line-soft);color:var(--slate);}
 
     /* ── Report block ── */
     .report{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-top:14px;background:#fbfcfc;}
@@ -223,8 +250,8 @@
     @media (max-width:760px){ .rank-cols{grid-template-columns:1fr;} .assign-row{grid-template-columns:1fr;} }
     .rank-col h5{font-family:var(--font-body);font-size:12.5px;font-weight:700;color:var(--ink-soft);
       text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px;}
-    .pick{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:7px;background:#fff;
-      display:flex;align-items:flex-start;gap:10px;}
+    .pick{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:6px;
+      background:rgba(255,255,255,.9);display:flex;align-items:flex-start;gap:9px;}
     .pick .body{flex:1;}
     .pick .t{font-size:13.5px;font-weight:600;line-height:1.35;}
     .pick .s{font-size:11.5px;color:var(--slate);margin-top:2px;}
@@ -246,6 +273,28 @@
     .alloc-card{border:1px solid var(--olive);background:var(--olive-dim);border-radius:var(--radius);padding:18px;}
     .alloc-card .t{font-size:16px;font-weight:700;font-family:var(--font-display);}
     .alloc-card .s{font-size:12.5px;color:#3d6333;margin-top:4px;}
+
+    /* ── Share / QR ── */
+    .share-row{display:flex;justify-content:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft);}
+    #qrcode{display:flex;justify-content:center;padding:16px;background:#fff;border:1px solid var(--border);
+      border-radius:14px;margin-bottom:14px;}
+    #qrcode canvas,#qrcode img{display:block;}
+    .link-box{display:flex;gap:8px;}
+    .link-box input{flex:1;padding:9px 12px;border:1px solid #d1d5db;border-radius:9px;
+      font-family:var(--font-mono);font-size:12px;color:#1e293b;background:var(--gray-lt);}
+
+    /* ── Creator badge ── */
+    .owner-tag{font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;
+      background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1d4ed8;border-radius:20px;padding:2px 8px;margin-left:6px;}
+    .readonly-note{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--gray);
+      background:var(--gray-lt);border:1px dashed var(--border);border-radius:10px;padding:11px 13px;margin-top:12px;}
+
+    /* ── Capacity-blocked project ── */
+    .pick.blocked{opacity:.55;cursor:not-allowed;background:var(--gray-lt);}
+    .pick.blocked:hover{border-color:var(--border);background:var(--gray-lt);}
+    .cap-note{font-size:11px;color:#b45309;margin-top:3px;}
+    .cap-chip{font-size:10.5px;font-family:var(--font-mono);background:#fef3c7;color:#92400e;
+      border-radius:20px;padding:2px 8px;margin-left:6px;}
 
     /* ── Modal ── */
     .modal-back{position:fixed;inset:0;background:rgba(16,24,38,.45);display:none;align-items:flex-start;
@@ -272,35 +321,61 @@
 <!-- ═══ GATE — choose supervisor or student ═════════════════════════════════ -->
 <div id="scr-gate" class="screen active">
   <div class="gate">
-    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="BAU ECE" class="gate-logo"
-         onerror="this.style.display='none'"/>
-    <div class="gate-title">FYP Projects Organizer</div>
-    <div class="gate-sub">
-      Supervisors publish their FYP1 project ideas. Student groups rank the ideas they want.
-      Choose how you are signing in.
-    </div>
-    <div class="gate-cards">
-      <div class="gate-card" onclick="showScreen('suplogin')">
-        <div class="gate-icon sup"><i class="fas fa-chalkboard-user"></i></div>
-        <h3>Supervisor</h3>
-        <p>Sign in with your FYP system ID and password to add your project ideas.</p>
+    <div class="gate-card-wrap">
+      <div class="gate-logo-wrap">
+        <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png"
+             alt="University Logo" class="gate-logo" onerror="this.style.display='none'"/>
       </div>
-      <div class="gate-card" onclick="Student.openEntry()">
-        <div class="gate-icon stu"><i class="fas fa-user-graduate"></i></div>
-        <h3>Student</h3>
-        <p>Enter your name and university ID to form your group and rank the project ideas.</p>
+      <div class="gate-title">FYP Projects Organizer</div>
+      <div class="gate-sub">Please choose how you are signing in</div>
+      <div class="gate-cards">
+        <div class="gate-card" onclick="showScreen('suplogin')">
+          <div class="gate-icon sup"><i class="fas fa-chalkboard-user"></i></div>
+          <h3>Supervisor</h3>
+          <p>Sign in with your FYP system ID to add your project ideas.</p>
+        </div>
+        <div class="gate-card" onclick="Student.openEntry()">
+          <div class="gate-icon stu"><i class="fas fa-user-graduate"></i></div>
+          <h3>Student</h3>
+          <p>Enter your name and ID to form your group and rank the projects.</p>
+        </div>
+      </div>
+      <div class="share-row">
+        <button class="btn-ghost" onclick="Share.open()">
+          <i class="fas fa-qrcode me-1"></i>Share this page
+        </button>
       </div>
     </div>
-    <a class="back-link" href="/"><i class="fas fa-arrow-left"></i> Back to the ECE portal</a>
+  </div>
+</div>
+
+<!-- ═══ SHARE — QR code and link ════════════════════════════════════════════ -->
+<div class="modal-back" id="share-modal">
+  <div class="modal-card" style="max-width:420px;text-align:center;">
+    <h3>FYP Projects Organizer</h3>
+    <p class="panel-sub" style="text-align:center;">Scan the code or copy the link to share with students.</p>
+    <div id="qrcode"></div>
+    <div class="link-box">
+      <input type="text" id="share-url" readonly onclick="this.select()"/>
+      <button class="btn-ghost" onclick="Share.copy()" id="btn-copy">Copy</button>
+    </div>
+    <div class="modal-foot" style="justify-content:center;">
+      <button class="btn-ghost" onclick="Share.download()"><i class="fas fa-download me-1"></i>Save QR image</button>
+      <button class="btn-primary" onclick="Share.close()">Done</button>
+    </div>
   </div>
 </div>
 
 <!-- ═══ SUPERVISOR LOGIN ════════════════════════════════════════════════════ -->
 <div id="scr-suplogin" class="screen">
   <div class="gate">
-    <div class="panel" style="width:100%;max-width:420px;">
-      <div class="panel-title">Supervisor Sign In</div>
-      <div class="panel-sub">Use the same ID and password as the FYP Management System.</div>
+    <div class="gate-card-wrap narrow">
+      <div class="gate-logo-wrap">
+        <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png"
+             alt="University Logo" class="gate-logo" onerror="this.style.display='none'"/>
+      </div>
+      <div class="gate-title">FYP Projects Organizer</div>
+      <div class="gate-sub">Supervisor Portal — Please sign in to continue</div>
       <div id="login-err" class="alert-box"></div>
       <div class="field">
         <label for="inp-id">Supervisor ID</label>
@@ -312,23 +387,28 @@
         <input type="password" id="inp-pw" placeholder="Enter your password" autocomplete="current-password"
                onkeydown="if(event.key==='Enter')Auth.login()"/>
       </div>
-      <button class="btn-primary w-100" id="btn-login" onclick="Auth.login()">
+      <button class="btn-primary w-100" id="btn-login" onclick="Auth.login()" style="height:48px;">
         <span id="login-label">Sign In</span>
       </button>
+      <div class="share-row">
+        <a class="back-link" onclick="showScreen('gate')"><i class="fas fa-arrow-left"></i> Back</a>
+      </div>
     </div>
-    <a class="back-link" onclick="showScreen('gate')"><i class="fas fa-arrow-left"></i> Back</a>
   </div>
 </div>
 
 <!-- ═══ SUPERVISOR HOME ═════════════════════════════════════════════════════ -->
 <div id="scr-suphome" class="screen">
   <div class="topbar">
-    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo"
-         onerror="this.style.display='none'"/>
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="University Logo"
+         class="topbar-logo" onerror="this.style.display='none'"/>
+    <div class="topbar-sep"></div>
     <div style="flex:1">
+      <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-09-09-2026 R02</span>
+      <span class="topbar-sub">v04-09-09-2026 R03</span>
     </div>
+    <button class="btn-topbar" onclick="Share.open()"><i class="fas fa-qrcode"></i> Share</button>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
   </div>
@@ -410,6 +490,9 @@
             <button class="btn-ghost" onclick="Settings.saveDeadlines()">Save deadlines &amp; sizes</button>
             <div class="submit-spacer"></div>
             <span class="mini-note" id="phase-note"></span>
+            <button class="btn-ghost" id="btn-print-list" onclick="PrintList.open()" style="display:none;">
+              <i class="fas fa-file-pdf me-1"></i>Print project list
+            </button>
             <button class="btn-ghost" id="btn-close-ranking" onclick="Settings.setPhase('RANKING_CLOSED')" style="display:none;">Close ranking</button>
             <button class="btn-ghost" id="btn-reopen-ranking" onclick="Settings.setPhase('RANKING_OPEN')" style="display:none;">Reopen ranking</button>
           </div>
@@ -515,9 +598,13 @@
 <!-- ═══ STUDENT ENTRY ═══════════════════════════════════════════════════════ -->
 <div id="scr-stuentry" class="screen">
   <div class="gate">
-    <div class="panel" style="width:100%;max-width:460px;">
-      <div class="panel-title">Student Access</div>
-      <div class="panel-sub">Enter your details exactly as they appear in your university records.</div>
+    <div class="gate-card-wrap narrow">
+      <div class="gate-logo-wrap">
+        <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png"
+             alt="University Logo" class="gate-logo" onerror="this.style.display='none'"/>
+      </div>
+      <div class="gate-title">FYP Projects Organizer</div>
+      <div class="gate-sub">Student Access — enter your details as they appear in your records</div>
       <div id="stu-err" class="alert-box"></div>
       <div class="field">
         <label for="stu-program">Program</label>
@@ -542,20 +629,24 @@
                onkeydown="if(event.key==='Enter')Student.submitEntry()"/>
         <div class="hint">9 digits starting with 20 — the same ID used across the FYP system.</div>
       </div>
-      <button class="btn-primary w-100" onclick="Student.submitEntry()">Continue</button>
+      <button class="btn-primary w-100" onclick="Student.submitEntry()" style="height:48px;">Continue</button>
+      <div class="share-row">
+        <a class="back-link" onclick="showScreen('gate')"><i class="fas fa-arrow-left"></i> Back</a>
+      </div>
     </div>
-    <a class="back-link" onclick="showScreen('gate')"><i class="fas fa-arrow-left"></i> Back</a>
   </div>
 </div>
 
 <!-- ═══ STUDENT HOME ════════════════════════════════════════════════════════ -->
 <div id="scr-stuhome" class="screen">
   <div class="topbar">
-    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo"
-         onerror="this.style.display='none'"/>
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="University Logo"
+         class="topbar-logo" onerror="this.style.display='none'"/>
+    <div class="topbar-sep"></div>
     <div style="flex:1">
+      <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-09-09-2026 R02</span>
+      <span class="topbar-sub">v04-09-09-2026 R03</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -581,9 +672,10 @@
         </div>
       </div>
       <div class="field">
-        <label for="ng-email">Your email <span style="font-weight:400;color:var(--slate-soft)">(optional)</span></label>
+        <label for="ng-email">Your email <span style="color:var(--red)">*</span></label>
         <input type="email" id="ng-email" placeholder="you@student.bau.edu.lb"/>
-        <div class="hint">Used only to contact your group about the project assignment.</div>
+        <div class="hint">Required. You will be notified here when your project is assigned, and again
+          from the FYP grading portal when the week-14 report is due.</div>
       </div>
       <div class="field">
         <label>Your teammates</label>
@@ -610,14 +702,18 @@
         </div>
         <div id="grp-msg" class="alert-box"></div>
         <div id="grp-members"></div>
-        <div class="btn-row">
+        <div class="btn-row" id="grp-owner-actions">
           <button class="btn-ghost" id="btn-add-member" onclick="Group.promptAdd()">
             <i class="fas fa-user-plus me-1"></i>Add a teammate
           </button>
           <div class="submit-spacer"></div>
-          <button class="btn-ghost" onclick="Group.leave()" style="color:var(--rust);border-color:#f0cfc6;">
-            Leave this group
+          <button class="btn-ghost" onclick="Group.deleteGroup()" style="color:var(--red);border-color:#fecaca;">
+            Delete this group
           </button>
+        </div>
+        <div class="readonly-note" id="grp-readonly" style="display:none;">
+          <i class="fas fa-circle-info" style="margin-top:2px;color:var(--blue);"></i>
+          <span id="grp-readonly-text"></span>
         </div>
       </div>
 
@@ -683,6 +779,13 @@ function showScreen(id){
   el('scr-' + id).classList.add('active');
   window.scrollTo(0, 0);
 }
+// Expands a clamped project description in place (works for both card types)
+function toggleDesc(link, ev) {
+  if (ev) ev.stopPropagation();
+  const card = link.closest('.idea-card') || link.closest('.pick');
+  if (card) card.classList.toggle('open');
+}
+
 function escHtml(s){
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -937,6 +1040,7 @@ const Ideas = {
           </div>`}
         </div>
         <div class="idea-desc">${escHtml(i.description)}</div>
+        ${i.description.length > 120 ? `<span class="more-link" onclick="toggleDesc(this)">Show more / less</span>` : ''}
       </div>`).join('')
       : `<div class="empty-note">
            ${status === 'declared_none'
@@ -1190,6 +1294,7 @@ const Settings = {
     }
 
     el('btn-close-ranking').style.display  = phase === 'RANKING_OPEN' ? '' : 'none';
+    el('btn-print-list').style.display    = phase === 'IDEAS_OPEN' ? 'none' : '';
     el('btn-reopen-ranking').style.display = phase === 'RANKING_CLOSED' ? '' : 'none';
 
     // The assignment console only matters once students have started ranking
@@ -1486,14 +1591,32 @@ const Group = {
       `${r.members.length} member(s)`
       + (r.group.rankedAt ? ` · last change by ${(r.members.find(x => x.id === r.group.rankedBy) || {}).name || 'a teammate'} on ${fmtDate(r.group.rankedAt)}` : ' · no choices saved yet');
 
-    el('grp-members').innerHTML = r.members.map(x => `
-      <div class="member-row">
-        <i class="fas fa-user" style="color:var(--slate-soft)"></i>
-        <span class="nm">${escHtml(x.name)}${x.id === Student.me.id ? ' <span class="you" style="color:var(--accent);font-size:10.5px;font-family:var(--font-mono)">YOU</span>' : ''}</span>
-        <span class="sid">${escHtml(x.id)}</span>
-      </div>`).join('');
+    const frozen  = r.cycle.rankingClosed;
+    const ownerId = r.group.createdBy;
+    const iAmOwner = ownerId === Student.me.id;
+    this.isOwner = iAmOwner;
 
-    const frozen = r.cycle.rankingClosed;
+    // The group creator manages membership; teammates see it read-only and can
+    // still take part in the ranking.
+    el('grp-members').innerHTML = r.members.map(x => {
+      const owner = x.id === ownerId;
+      const canRemove = iAmOwner && !owner && !frozen;
+      return `
+      <div class="member-row">
+        <i class="fas ${owner ? 'fa-user-pen' : 'fa-user'}" style="color:${owner ? 'var(--blue)' : 'var(--slate-soft)'}"></i>
+        <span class="nm">${escHtml(x.name)}${x.id === Student.me.id ? ' <span class="owner-tag" style="background:#e0e7ff;color:#4338ca;">YOU</span>' : ''}${owner ? ' <span class="owner-tag">GROUP CREATOR</span>' : ''}</span>
+        <span class="sid">${escHtml(x.id)}</span>
+        ${canRemove ? `<button class="icon-btn danger" title="Remove ${escHtml(x.name)}"
+             onclick="Group.remove('${escHtml(x.id)}')"><i class="fas fa-xmark"></i></button>` : ''}
+      </div>`;
+    }).join('');
+
+    const ownerName = (r.members.find(m => m.id === ownerId) || {}).name || 'the group creator';
+    el('grp-owner-actions').style.display = (iAmOwner && !frozen) ? 'flex' : 'none';
+    el('grp-readonly').style.display = (!iAmOwner && !frozen) ? 'flex' : 'none';
+    el('grp-readonly-text').innerHTML =
+      `This group was created by <strong>${escHtml(ownerName)}</strong>, who is the only one who can add or `
+      + 'remove members. You can still order the project choices with the rest of your group.';
     el('btn-add-member').style.display = frozen ? 'none' : '';
 
     // Allocation result, once the department has published
@@ -1567,8 +1690,18 @@ const Group = {
     await this.load();
   },
 
-  async leave() {
-    if (!confirm('Leave this group?\n\nIf you are the last member the group and its choices will be deleted.')) return;
+  async remove(targetId) {
+    const who = ((this.data.members || []).find(x => x.id === targetId) || {}).name || targetId;
+    if (!confirm(`Remove ${who} from your group?`)) return;
+    const m = Student.me;
+    const r = await api('orgRemoveMember', m.program, m.campus, m.id, targetId);
+    if (!r.success) { setAlert('grp-msg', r.message, 'err'); return; }
+    setAlert('grp-msg', '');
+    await this.load();
+  },
+
+  async deleteGroup() {
+    if (!confirm('Delete this group?\n\nAll members will be released and your saved project choices will be lost. This cannot be undone.')) return;
     const m = Student.me;
     const r = await api('orgLeaveGroup', m.program, m.campus, m.id);
     if (!r.success) { setAlert('grp-msg', r.message, 'err'); return; }
@@ -1628,9 +1761,19 @@ const Rank = {
     this.chosen = (groupData.ranking || []).map(x => x.ideaId);
     this.size   = (groupData.members || []).length;
 
+    // A supervisor who offers 3 projects but can only take 2 groups may be
+    // chosen at most twice, so the target is the sum of those limits rather
+    // than the raw number of projects.
+    this.limits = new Map();
+    const counts = new Map();
+    this.all.forEach(i => counts.set(i.supervisorId, (counts.get(i.supervisorId) || 0) + 1));
+    this.all.forEach(i => this.limits.set(i.supervisorId,
+      Math.min(counts.get(i.supervisorId), i.supervisorCapacity)));
+    this.quota = [...this.limits.values()].reduce((a, b) => a + b, 0);
+
     el('rank-sub').innerHTML = this.frozen
       ? 'Ranking is closed — your choices are final.'
-      : `Rank <strong>every</strong> project, best first. You can only save once no project is left on the right. `
+      : `Order the projects you want, best first. You need <strong>${this.quota}</strong> in your list to save. `
         + `Deadline: <strong>${fmtDate(groupData.cycle.rankingDeadline)}</strong>`;
     el('btn-save-rank').style.display = this.frozen ? 'none' : '';
     this.render();
@@ -1659,39 +1802,74 @@ const Rank = {
         </div>`;
     }).join('') : '<div class="empty-note">No choices yet — pick projects from the right.</div>';
 
+    // How many of each supervisor's projects are already chosen
+    const used = new Map();
+    this.chosen.forEach(id => {
+      const i = byId.get(id);
+      if (i) used.set(i.supervisorId, (used.get(i.supervisorId) || 0) + 1);
+    });
+
     const avail = this.all.filter(i => !this.chosen.includes(i.id));
-    el('rank-available').innerHTML = avail.length ? avail.map(i => `
-      <div class="pick ${this.frozen ? '' : 'avail'}" ${this.frozen ? '' : `onclick="Rank.add(${i.id})"`}>
+    el('rank-available').innerHTML = avail.length ? avail.map(i => {
+      const limit = this.limits.get(i.supervisorId);
+      const atLimit = (used.get(i.supervisorId) || 0) >= limit;
+      const clickable = !this.frozen && !atLimit;
+      return `
+      <div class="pick ${atLimit ? 'blocked' : (this.frozen ? '' : 'avail')}"
+           ${clickable ? `onclick="Rank.add(${i.id})"` : ''}>
         <div class="body">
           <div class="t">${escHtml(i.title)}</div>
-          <div class="s">${escHtml(i.supervisor)}${i.field ? ' · ' + escHtml(i.field) : ''} · ${i.minStudents}–${i.maxStudents} students</div>
+          <div class="s">${escHtml(i.supervisor)}${i.field ? ' · ' + escHtml(i.field) : ''} · ${i.minStudents}–${i.maxStudents} students
+            <span class="cap-chip" title="Groups this supervisor can take">max ${limit}</span></div>
           <div class="idea-desc" style="margin-top:6px;">${escHtml(i.description)}</div>
+          ${i.description.length > 120 ? `<span class="more-link" onclick="toggleDesc(this, event)">Show more / less</span>` : ''}
           ${i.prerequisites ? `<div class="s" style="margin-top:5px;"><strong>Needs:</strong> ${escHtml(i.prerequisites)}</div>` : ''}
+          ${atLimit ? `<div class="cap-note"><i class="fas fa-lock"></i>
+            ${escHtml(i.supervisor)} can supervise only ${limit} group${limit === 1 ? '' : 's'},
+            and you have already chosen ${limit} of their projects.</div>` : ''}
         </div>
-        ${this.frozen ? '' : '<i class="fas fa-plus" style="color:var(--accent);"></i>'}
-      </div>`).join('')
+        ${clickable ? '<i class="fas fa-plus" style="color:var(--blue);"></i>' : ''}
+      </div>`;
+    }).join('')
       : '<div class="empty-note">You have ranked every available project.</div>';
 
-    // A ranking must cover every project, so saving stays blocked until the
-    // available column is empty.
+    // Saving is blocked until the list reaches the quota — every project that
+    // is still selectable must be in it.
     const btn = el('btn-save-rank');
     if (!this.frozen) {
-      const left = avail.length;
-      btn.disabled = left > 0;
+      const left = this.quota - this.chosen.length;
+      btn.disabled = left !== 0;
       btn.textContent = left > 0
-        ? `Rank ${left} more project${left === 1 ? '' : 's'} to save`
-        : 'Save our choices';
+        ? `Add ${left} more project${left === 1 ? '' : 's'} to save`
+        : (left < 0 ? 'Too many selected' : 'Save our choices');
       if (left > 0 && this.chosen.length) {
         setAlert('rank-msg',
-          `Add the remaining ${left} project${left === 1 ? '' : 's'} to your list — every project must be ranked before you can save.`,
-          'warn');
-      } else if (!left) {
+          `Your list needs ${this.quota} projects — ${left} still to add. Projects marked with a lock are `
+          + 'unavailable because that supervisor has reached the number of groups they can take.', 'warn');
+      } else if (left === 0) {
         setAlert('rank-msg', '');
       }
     }
   },
 
-  add(id)      { this.chosen.push(id); this.render(); },
+  add(id) {
+    const i = this.all.find(x => x.id === id);
+    if (i) {
+      const limit = this.limits.get(i.supervisorId);
+      const used = this.chosen.filter(c => {
+        const o = this.all.find(x => x.id === c);
+        return o && o.supervisorId === i.supervisorId;
+      }).length;
+      if (used >= limit) {
+        setAlert('rank-msg',
+          `${i.supervisor} can supervise only ${limit} group${limit === 1 ? '' : 's'}, so you cannot choose more of their projects.`,
+          'warn');
+        return;
+      }
+    }
+    this.chosen.push(id);
+    this.render();
+  },
   remove(idx)  { this.chosen.splice(idx, 1); this.render(); },
   move(idx, d) {
     const j = idx + d;
@@ -1717,8 +1895,158 @@ const Rank = {
       await Group.load();
     } finally {
       // Only re-enable if the list is still complete — render() owns this state
-      btn.disabled = !(this.all.length && this.chosen.length === this.all.length);
+      btn.disabled = !(this.quota && this.chosen.length === this.quota);
     }
+  },
+};
+
+// ══ Share: QR code and link ═══════════════════════════════════════════════
+const Share = {
+  _built: false,
+
+  url() { return location.origin + '/organizer'; },
+
+  open() {
+    el('share-url').value = this.url();
+    el('share-modal').classList.add('open');
+    if (!this._built && window.QRCode) {
+      new QRCode(el('qrcode'), {
+        text: this.url(), width: 220, height: 220,
+        colorDark: '#0f2040', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H,
+      });
+      this._built = true;
+    }
+  },
+
+  close() { el('share-modal').classList.remove('open'); },
+
+  async copy() {
+    const btn = el('btn-copy');
+    try {
+      await navigator.clipboard.writeText(this.url());
+    } catch {
+      // Clipboard API needs a secure context; fall back to selecting the text
+      el('share-url').select();
+      document.execCommand('copy');
+    }
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+  },
+
+  download() {
+    const src = el('qrcode').querySelector('canvas') || el('qrcode').querySelector('img');
+    if (!src) return;
+    const data = src.tagName === 'CANVAS' ? src.toDataURL('image/png') : src.src;
+    const a = document.createElement('a');
+    a.href = data;
+    a.download = 'FYP-Projects-Organizer-QR.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  },
+};
+
+// ══ Printable project list ════════════════════════════════════════════════
+// Opens a clean, print-ready document (Ctrl+P → Save as PDF) listing every
+// published project for one programme and campus, grouped by supervisor and
+// showing how many groups each can take.
+const PrintList = {
+  async open() {
+    const c = (Settings.data && Settings.data.cycle) || {};
+    const r = await api('orgGetPublishedIdeas', c.program, c.campus);
+    if (!r.success || !r.published) {
+      setAlert('manage-msg', 'The project list is not published yet, so there is nothing to print.', 'warn');
+      return;
+    }
+    const bySup = new Map();
+    r.ideas.forEach(i => {
+      if (!bySup.has(i.supervisorId)) bySup.set(i.supervisorId, { name: i.supervisor, cap: i.supervisorCapacity, items: [] });
+      bySup.get(i.supervisorId).items.push(i);
+    });
+    const sups = [...bySup.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+    const rows = sups.map(s => `
+      <section class="sup">
+        <div class="sup-head">
+          <h2>${escHtml(s.name)}</h2>
+          <span class="cap">Can supervise ${s.cap} group${s.cap === 1 ? '' : 's'}</span>
+        </div>
+        ${s.items.map((i, n) => `
+          <article class="proj">
+            <div class="pt"><span class="pn">${n + 1}</span>${escHtml(i.title)}</div>
+            <div class="pm">
+              ${i.field ? `<span>${escHtml(i.field)}</span>` : ''}
+              <span>${i.minStudents}–${i.maxStudents} students</span>
+              ${i.coSupervisor ? `<span>with ${escHtml(i.coSupervisor)}</span>` : ''}
+            </div>
+            <p class="pd">${escHtml(i.description)}</p>
+            ${i.prerequisites ? `<p class="pr"><strong>Required background:</strong> ${escHtml(i.prerequisites)}</p>` : ''}
+          </article>`).join('')}
+      </section>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>FYP1 Projects — ${escHtml(r.program)} — ${escHtml(r.campus)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  @page{margin:16mm 14mm;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;color:#1e293b;font-size:11pt;line-height:1.5;}
+  header{display:flex;align-items:center;gap:16px;border-bottom:3px solid #0f2040;padding-bottom:14px;margin-bottom:6px;}
+  header img{height:64px;}
+  .uni{font-size:9pt;letter-spacing:.14em;text-transform:uppercase;color:#64748b;}
+  .fac{font-size:15pt;font-weight:700;color:#0f2040;letter-spacing:-.02em;}
+  .dept{font-size:10.5pt;color:#334155;}
+  .banner{display:flex;justify-content:space-between;align-items:baseline;
+    background:#f1f5f9;border-radius:8px;padding:10px 14px;margin:14px 0 6px;}
+  .banner h1{font-size:13pt;color:#0f2040;}
+  .banner span{font-size:10pt;color:#475569;}
+  .note{font-size:9.5pt;color:#475569;background:#fffbeb;border:1px solid #fde68a;
+    border-radius:8px;padding:9px 12px;margin-bottom:16px;}
+  .sup{break-inside:avoid;margin-bottom:16px;}
+  .sup-head{display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:1px solid #cbd5e1;padding-bottom:5px;margin-bottom:9px;}
+  .sup-head h2{font-size:11.5pt;color:#0f2040;}
+  .cap{font-size:9pt;font-weight:600;color:#1d4ed8;background:#dbeafe;border-radius:20px;padding:2px 10px;}
+  .proj{break-inside:avoid;padding:7px 0 9px 0;border-bottom:1px dotted #e2e8f0;}
+  .proj:last-child{border-bottom:none;}
+  .pt{font-weight:600;font-size:11pt;display:flex;gap:8px;}
+  .pn{display:inline-grid;place-items:center;min-width:19px;height:19px;border-radius:5px;
+    background:#0f2040;color:#fff;font-size:8.5pt;flex-shrink:0;margin-top:1px;}
+  .pm{display:flex;gap:14px;font-size:9pt;color:#64748b;margin:3px 0 4px 27px;}
+  .pd{font-size:10pt;color:#334155;margin-left:27px;}
+  .pr{font-size:9pt;color:#475569;margin-left:27px;margin-top:3px;}
+  footer{margin-top:20px;padding-top:9px;border-top:1px solid #cbd5e1;
+    font-size:8.5pt;color:#94a3b8;display:flex;justify-content:space-between;}
+  @media print{ .noprint{display:none;} }
+  .noprint{position:fixed;top:12px;right:12px;display:flex;gap:8px;}
+  .noprint button{font-family:'Inter',sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
+    border:none;background:#2563eb;color:#fff;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.4);}
+</style></head><body>
+<div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+<header>
+  <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt=""
+       onerror="this.style.display='none'"/>
+  <div>
+    <div class="uni">Beirut Arab University</div>
+    <div class="fac">Faculty of Engineering</div>
+    <div class="dept">Department of Electrical and Computer Engineering</div>
+  </div>
+</header>
+<div class="banner">
+  <h1>FYP1 Project Offerings — ${escHtml(r.program)}</h1>
+  <span>${escHtml(r.campus)} Campus &nbsp;·&nbsp; ${escHtml(r.semester)} ${escHtml(r.academicYear)}</span>
+</div>
+<p class="note"><strong>Before you choose:</strong> each supervisor can take only a limited number of
+groups, shown next to their name. Your group may select at most that many projects from any one
+supervisor, so spread your choices across several supervisors.</p>
+${rows}
+<footer><span>${r.ideas.length} project(s) from ${sups.length} supervisor(s)</span>
+<span>Generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'long',year:'numeric'})}</span></footer>
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { setAlert('manage-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
+    w.document.write(html);
+    w.document.close();
   },
 };
 
@@ -1726,8 +2054,13 @@ const Rank = {
 el('idea-modal').addEventListener('click', e => {
   if (e.target === el('idea-modal')) Ideas.closeForm();
 });
+el('share-modal').addEventListener('click', e => {
+  if (e.target === el('share-modal')) Share.close();
+});
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && el('idea-modal').classList.contains('open')) Ideas.closeForm();
+  if (e.key !== 'Escape') return;
+  if (el('idea-modal').classList.contains('open'))  Ideas.closeForm();
+  if (el('share-modal').classList.contains('open')) Share.close();
 });
 
 (async function boot(){
