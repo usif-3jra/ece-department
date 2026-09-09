@@ -409,7 +409,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-09-09-2026 R04</span>
+      <span class="topbar-sub">v04-09-09-2026 R05</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -655,7 +655,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-09-09-2026 R04</span>
+      <span class="topbar-sub">v04-09-09-2026 R05</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -2043,5 +2043,52 @@ const PrintList = {
   @media print{ .noprint{display:none !important;} }
 </style></head><body>
 <div class="noprint" id="toolbar"><button onclick="this.parentElement.style.display='none';window.print();setTimeout(function(){document.getElementById('toolbar').style.display='flex';},600)">Print / Save as PDF</button></div>
+<header>
+  <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt=""
+       onerror="this.style.display='none'"/>
+  <div>
+    <div class="uni">Beirut Arab University</div>
+    <div class="fac">Faculty of Engineering</div>
+    <div class="dept">Department of Electrical and Computer Engineering</div>
+  </div>
+</header>
+<div class="banner">
+  <h1>FYP1 Project Offerings — ${escHtml(r.program)}</h1>
+  <span>${escHtml(r.campus)} Campus &nbsp;·&nbsp; ${escHtml(r.semester)} ${escHtml(r.academicYear)}</span>
+</div>
+<p class="note"><strong>Before you choose:</strong> each supervisor can take only a limited number of
+groups, shown next to their name. Your group may select at most that many projects from any one
+supervisor, so spread your choices across several supervisors.</p>
+${rows}
+<footer><span>${r.ideas.length} project(s) from ${sups.length} supervisor(s)</span>
+<span>Generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'long',year:'numeric'})}</span></footer>
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { setAlert('manage-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
+    w.document.write(html);
+    w.document.close();
+  },
+};
+
+// Close the idea form on backdrop click or Escape
+el('idea-modal').addEventListener('click', e => {
+  if (e.target === el('idea-modal')) Ideas.closeForm();
+});
+el('share-modal').addEventListener('click', e => {
+  if (e.target === el('share-modal')) Share.close();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (el('idea-modal').classList.contains('open'))  Ideas.closeForm();
+  if (el('share-modal').classList.contains('open')) Share.close();
+});
+
+(async function boot(){
+  if (await Auth.restore()) return;
+  if (Student.me) { Student.enterHome(); return; }
+  showScreen('gate');
+})();
+</script>
 </body>
 </html>
