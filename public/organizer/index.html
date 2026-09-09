@@ -274,6 +274,9 @@
     .alloc-card .t{font-size:16px;font-weight:700;font-family:var(--font-display);}
     .alloc-card .s{font-size:12.5px;color:#3d6333;margin-top:4px;}
 
+    .cap-help{color:var(--blue);font-size:12px;margin-left:4px;cursor:help;}
+    .cap-help:hover{color:#1d4ed8;}
+
     /* ── Share / QR ── */
     .share-row{display:flex;justify-content:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft);}
     #qrcode{display:flex;justify-content:center;padding:16px;background:#fff;border:1px solid var(--border);
@@ -406,9 +409,8 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-09-09-2026 R03</span>
+      <span class="topbar-sub">v04-09-09-2026 R04</span>
     </div>
-    <button class="btn-topbar" onclick="Share.open()"><i class="fas fa-qrcode"></i> Share</button>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
   </div>
@@ -444,8 +446,13 @@
         <div id="ideas-list"></div>
         <div class="submit-bar" id="submit-bar">
           <div class="field">
-            <label for="cap-input">Groups you can supervise</label>
-            <input type="number" id="cap-input" min="1" max="10" value="2"/>
+            <label for="cap-input">
+              Groups you can supervise
+              <i class="fas fa-circle-question cap-help"
+                 title="How many student groups you are willing to take in total this semester — not how many ideas you posted. If you offer 3 projects but set this to 1, each group may pick only 1 of your projects, and you will be assigned at most 1 group."></i>
+            </label>
+            <input type="number" id="cap-input" min="1" max="10" value="1"/>
+            <div class="hint">Default is 1. Raise it only if you can take more than one group.</div>
           </div>
           <div class="submit-spacer"></div>
           <button class="btn-ghost" id="btn-none" onclick="Ideas.declareNone()">I have no ideas this semester</button>
@@ -523,6 +530,8 @@
 
         <div class="panel-title" style="font-size:14px;margin-top:22px;">Assign a project to each group</div>
         <div class="panel-sub">Groups are shown by code only — student names stay hidden until the allocation is published.</div>
+        <!-- Capacity warnings sit here, next to the rows that cause them -->
+        <div id="assign-warn" class="alert-box"></div>
         <div id="assign-list"></div>
         <div id="assign-report"></div>
         <div class="btn-row" id="assign-actions">
@@ -646,7 +655,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-09-09-2026 R03</span>
+      <span class="topbar-sub">v04-09-09-2026 R04</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1183,6 +1192,14 @@ const Board = {
           ? ' &middot; <span style="color:var(--olive)">everyone has responded</span>' : '');
     el('board-bar').style.width = pct + '%';
 
+    // The printable list becomes available the moment every expected
+    // supervisor has responded, regardless of the idea deadline.
+    const printBtn = el('btn-print-list');
+    if (printBtn) {
+      const everyoneIn = r.totalExpected > 0 && r.responded === r.totalExpected && r.totalIdeas > 0;
+      printBtn.style.display = everyoneIn ? '' : 'none';
+    }
+
     const meId = (Ideas.data && Ideas.data.me) ? Ideas.data.me.id : '';
     el('board-list').innerHTML = (r.board || []).map(b => {
       const done = b.status === 'submitted';
@@ -1294,7 +1311,8 @@ const Settings = {
     }
 
     el('btn-close-ranking').style.display  = phase === 'RANKING_OPEN' ? '' : 'none';
-    el('btn-print-list').style.display    = phase === 'IDEAS_OPEN' ? 'none' : '';
+    // btn-print-list visibility is owned by Board.render() — it depends on
+    // every supervisor having submitted, not on the phase or the deadline.
     el('btn-reopen-ranking').style.display = phase === 'RANKING_CLOSED' ? '' : 'none';
 
     // The assignment console only matters once students have started ranking
@@ -1433,11 +1451,11 @@ const Assign = {
     }).join('');
 
     if ((r.overloaded || []).length) {
-      setAlert('assign-msg',
+      setAlert('assign-warn',
         r.overloaded.map(o => `${o.supervisor} has ${o.assigned} groups but declared capacity for ${o.capacity}.`).join(' '),
         'warn');
     } else {
-      setAlert('assign-msg', '');
+      setAlert('assign-warn', '');
     }
   },
 
@@ -1951,10 +1969,12 @@ const Share = {
 // showing how many groups each can take.
 const PrintList = {
   async open() {
-    const c = (Settings.data && Settings.data.cycle) || {};
-    const r = await api('orgGetPublishedIdeas', c.program, c.campus);
-    if (!r.success || !r.published) {
-      setAlert('manage-msg', 'The project list is not published yet, so there is nothing to print.', 'warn');
+    const r = await api('orgGetPrintList', Auth.token);
+    if (sessionCheck(r)) return;
+    if (!r.success) {
+      setAlert('manage-msg', r.notReady
+        ? `${r.message} Still waiting on: ${(r.pending || []).join(', ')}.`
+        : r.message, 'warn');
       return;
     }
     const bySup = new Map();
@@ -2016,58 +2036,12 @@ const PrintList = {
   .pr{font-size:9pt;color:#475569;margin-left:27px;margin-top:3px;}
   footer{margin-top:20px;padding-top:9px;border-top:1px solid #cbd5e1;
     font-size:8.5pt;color:#94a3b8;display:flex;justify-content:space-between;}
-  @media print{ .noprint{display:none;} }
   .noprint{position:fixed;top:12px;right:12px;display:flex;gap:8px;}
   .noprint button{font-family:'Inter',sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
     border:none;background:#2563eb;color:#fff;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.4);}
+  /* Declared last and forced, so the toolbar can never reach the paper */
+  @media print{ .noprint{display:none !important;} }
 </style></head><body>
-<div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
-<header>
-  <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt=""
-       onerror="this.style.display='none'"/>
-  <div>
-    <div class="uni">Beirut Arab University</div>
-    <div class="fac">Faculty of Engineering</div>
-    <div class="dept">Department of Electrical and Computer Engineering</div>
-  </div>
-</header>
-<div class="banner">
-  <h1>FYP1 Project Offerings — ${escHtml(r.program)}</h1>
-  <span>${escHtml(r.campus)} Campus &nbsp;·&nbsp; ${escHtml(r.semester)} ${escHtml(r.academicYear)}</span>
-</div>
-<p class="note"><strong>Before you choose:</strong> each supervisor can take only a limited number of
-groups, shown next to their name. Your group may select at most that many projects from any one
-supervisor, so spread your choices across several supervisors.</p>
-${rows}
-<footer><span>${r.ideas.length} project(s) from ${sups.length} supervisor(s)</span>
-<span>Generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'long',year:'numeric'})}</span></footer>
-</body></html>`;
-
-    const w = window.open('', '_blank');
-    if (!w) { setAlert('manage-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
-    w.document.write(html);
-    w.document.close();
-  },
-};
-
-// Close the idea form on backdrop click or Escape
-el('idea-modal').addEventListener('click', e => {
-  if (e.target === el('idea-modal')) Ideas.closeForm();
-});
-el('share-modal').addEventListener('click', e => {
-  if (e.target === el('share-modal')) Share.close();
-});
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  if (el('idea-modal').classList.contains('open'))  Ideas.closeForm();
-  if (el('share-modal').classList.contains('open')) Share.close();
-});
-
-(async function boot(){
-  if (await Auth.restore()) return;
-  if (Student.me) { Student.enterHome(); return; }
-  showScreen('gate');
-})();
-</script>
+<div class="noprint" id="toolbar"><button onclick="this.parentElement.style.display='none';window.print();setTimeout(function(){document.getElementById('toolbar').style.display='flex';},600)">Print / Save as PDF</button></div>
 </body>
 </html>

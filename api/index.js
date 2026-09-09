@@ -304,13 +304,14 @@ async function ensureOrganizerTables(sql) {
   await sql`CREATE TABLE IF NOT EXISTS org_participants (
     cycle_id      INT  NOT NULL,
     supervisor_id TEXT NOT NULL,
-    max_groups    INT  NOT NULL DEFAULT 2,
+    max_groups    INT  NOT NULL DEFAULT 1,
     status        TEXT NOT NULL DEFAULT 'not_started',
     expected      BOOLEAN NOT NULL DEFAULT TRUE,
     submitted_at  TIMESTAMPTZ,
     PRIMARY KEY (cycle_id, supervisor_id)
   )`;
   await sql`ALTER TABLE org_participants ADD COLUMN IF NOT EXISTS expected BOOLEAN NOT NULL DEFAULT TRUE`;
+  await sql`ALTER TABLE org_participants ALTER COLUMN max_groups SET DEFAULT 1`;
 
   await sql`CREATE TABLE IF NOT EXISTS org_ideas (
     id               SERIAL PRIMARY KEY,
@@ -683,7 +684,7 @@ function rankingQuota(ideas, caps) {
   let quota = 0;
   const limits = new Map();
   bySup.forEach((count, supId) => {
-    const cap = caps.get(supId) != null ? caps.get(supId) : 2;
+    const cap = caps.get(supId) != null ? caps.get(supId) : 1;
     const allowed = Math.min(count, cap);
     limits.set(supId, allowed);
     quota += allowed;
@@ -1036,7 +1037,7 @@ module.exports = async function handler(req, res) {
           WHERE program = ${cycle.program} AND campus = ${cycle.campus}
             AND supervisor_id != ${ADMIN_ID} AND supervisor_id != ${sup.supervisor_id} ORDER BY name`;
 
-        const part = partRows[0] || { status: 'not_started', max_groups: 2 };
+        const part = partRows[0] || { status: 'not_started', max_groups: 1 };
         return ok({
           success: true,
           cycle: {
@@ -1138,7 +1139,7 @@ module.exports = async function handler(req, res) {
           return ok({ success: false, message: 'You have no ideas to submit. Add at least one, or declare that you have none this semester.' });
 
         const cap = Number(maxGroups);
-        const capVal = (Number.isInteger(cap) && cap >= 1 && cap <= 10) ? cap : 2;
+        const capVal = (Number.isInteger(cap) && cap >= 1 && cap <= 10) ? cap : 1;
         await sql`UPDATE org_ideas SET status = 'submitted', updated_at = NOW()
           WHERE cycle_id = ${cycle.id} AND supervisor_id = ${sup.supervisor_id}`;
         await sql`INSERT INTO org_participants (cycle_id, supervisor_id, max_groups, status, submitted_at)
@@ -1213,7 +1214,7 @@ module.exports = async function handler(req, res) {
         const nameBy = new Map(sups.map(s => [s.supervisor_id, s.name]));
 
         const board = sups.map(s => {
-          const p = partBy.get(s.supervisor_id) || { status: 'not_started', max_groups: 2, expected: true };
+          const p = partBy.get(s.supervisor_id) || { status: 'not_started', max_groups: 1, expected: true };
           const mine = ideas.filter(i => i.supervisor_id === s.supervisor_id);
           return {
             id: s.supervisor_id, name: s.name, status: p.status,
@@ -1242,6 +1243,50 @@ module.exports = async function handler(req, res) {
           canManage: canManageCycle(session, ctx.sup, cycle),
           deadlinePolicy: cycle.deadline_policy,
           board,
+        });
+      }
+
+      // Supervisor-only view of the full project list, available as soon as
+      // every expected supervisor has responded — it does not wait for the
+      // idea deadline or for the list to be published to students.
+      case 'orgGetPrintList': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok(sessionGone(sessionToken));
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { cycle } = ctx;
+
+        await syncParticipants(sql, cycle);
+        const parts = await sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id} AND expected = TRUE`;
+        const pending = parts.filter(p => p.status !== 'submitted' && p.status !== 'declared_none');
+        if (pending.length) {
+          const names = await sql`SELECT name FROM supervisors
+            WHERE supervisor_id = ANY(${pending.map(p => p.supervisor_id)}) ORDER BY name`;
+          return ok({ success: false, notReady: true, pending: names.map(n => n.name),
+            message: `${pending.length} supervisor(s) have not submitted yet.` });
+        }
+
+        const rows = await sql`SELECT i.*, s.name AS supervisor_name, c.name AS co_name
+          FROM org_ideas i
+          LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
+          LEFT JOIN supervisors c ON c.supervisor_id = i.co_supervisor_id
+          WHERE i.cycle_id = ${cycle.id} ORDER BY s.name, i.id`;
+        if (!rows.length)
+          return ok({ success: false, message: 'There are no project ideas to print.' });
+        const caps = await supervisorCaps(sql, cycle);
+        return ok({
+          success: true,
+          program: cycle.program, campus: cycle.campus,
+          academicYear: cycle.academic_year, semester: cycle.semester,
+          ideas: rows.map(r => ({
+            id: r.id, title: r.title, field: r.field || '', description: r.description || '',
+            prerequisites: r.prerequisites || '',
+            minStudents: Number(r.min_students), maxStudents: Number(r.max_students),
+            supervisor: r.supervisor_name || '', supervisorId: r.supervisor_id,
+            coSupervisor: r.co_name || '',
+            supervisorCapacity: caps.get(r.supervisor_id) != null ? caps.get(r.supervisor_id) : 1,
+          })),
         });
       }
 
@@ -1760,7 +1805,7 @@ module.exports = async function handler(req, res) {
             coSupervisor: r.co_name || '',
             // How many groups this supervisor can take in total — a group may
             // not rank more of their projects than this.
-            supervisorCapacity: caps.get(r.supervisor_id) != null ? caps.get(r.supervisor_id) : 2,
+            supervisorCapacity: caps.get(r.supervisor_id) != null ? caps.get(r.supervisor_id) : 1,
           })),
         });
       }
