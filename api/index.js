@@ -330,10 +330,12 @@ async function ensureOrganizerTables(sql) {
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_ideas_title_idx
     ON org_ideas (cycle_id, lower(title))`;
 
+  // group_code is unique per cycle, not globally: codes restart at G01 each
+  // semester, so EPME-D-G01 recurs legitimately in a later cycle.
   await sql`CREATE TABLE IF NOT EXISTS org_groups (
     id                   SERIAL PRIMARY KEY,
     cycle_id             INT  NOT NULL,
-    group_code           TEXT NOT NULL UNIQUE,
+    group_code           TEXT NOT NULL,
     created_by_student_id TEXT NOT NULL DEFAULT '',
     status               TEXT NOT NULL DEFAULT 'forming',
     rank_version         INT  NOT NULL DEFAULT 0,
@@ -341,6 +343,10 @@ async function ensureOrganizerTables(sql) {
     ranked_at            TIMESTAMPTZ,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
+  // Drops the old global-unique constraint on databases created before codes
+  // became per-cycle, then enforces uniqueness within the cycle instead.
+  await sql`ALTER TABLE org_groups DROP CONSTRAINT IF EXISTS org_groups_group_code_key`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_groups_code_idx ON org_groups (cycle_id, group_code)`;
 
   // The two unique indexes below are the duplicate-prevention mechanism.
   // App-level checks cannot survive two students submitting overlapping groups
@@ -413,6 +419,30 @@ function academicContext(now) {
   return { academic_year: `${y - 1}-${y}`, semester: 'Spring' };
 }
 
+// Publishing is time-driven: once the idea deadline passes, the list opens to
+// students by itself and anyone who never responded is recorded as having no
+// ideas. Supervisors are never asked to wait for or chase each other.
+// There is no scheduler, so this is evaluated whenever a cycle is loaded.
+async function maybeAutoPublish(sql, cycle) {
+  if (!cycle || cycle.phase !== 'IDEAS_OPEN') return cycle;
+  if (!deadlinePassed(cycle.ideas_deadline)) return cycle;
+
+  const ideaCount = await sql`SELECT COUNT(*) AS c FROM org_ideas WHERE cycle_id = ${cycle.id}`;
+  // Nothing to publish — hold the phase open rather than opening an empty list
+  if (Number(ideaCount[0].c) === 0) return cycle;
+
+  await sql`UPDATE org_participants SET status = 'declared_none', submitted_at = NOW()
+    WHERE cycle_id = ${cycle.id} AND expected = TRUE
+      AND status NOT IN ('submitted', 'declared_none')`;
+  await sql`UPDATE org_ideas SET status = 'submitted' WHERE cycle_id = ${cycle.id} AND status = 'draft'`;
+  const updated = await sql`UPDATE org_cycles SET phase = 'RANKING_OPEN', updated_at = NOW()
+    WHERE id = ${cycle.id} AND phase = 'IDEAS_OPEN' RETURNING *`;
+  if (!updated[0]) return cycle; // another request published it first
+  await logAudit(sql, cycle.id, 0, 'system', '', 'System', 'ideas_published',
+    { trigger: 'ideas_deadline_passed' });
+  return updated[0];
+}
+
 // Returns the cycle for this program+campus, creating it on first use so the
 // module works without a separate admin setup step.
 async function getOrCreateCycle(sql, program, campus) {
@@ -421,7 +451,7 @@ async function getOrCreateCycle(sql, program, campus) {
   const found = await sql`SELECT * FROM org_cycles
     WHERE academic_year = ${academic_year} AND semester = ${semester}
       AND program = ${program} AND campus = ${campus}`;
-  if (found[0]) return found[0];
+  if (found[0]) return await maybeAutoPublish(sql, found[0]);
   try {
     const created = await sql`INSERT INTO org_cycles (academic_year, semester, program, campus)
       VALUES (${academic_year}, ${semester}, ${program}, ${campus}) RETURNING *`;
@@ -485,11 +515,49 @@ function sessionGone(token) {
   };
 }
 
-function groupCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
-  let s = '';
-  for (let i = 0; i < 4; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return 'G-' + s;
+// Group codes read as PROGRAM-CAMPUS-Gnn, e.g. EPME-D-G01 for the first group
+// of Electric Power and Machines Engineering at Debbieh.
+const PROGRAM_ABBR = {
+  'Electric Power and Machines Engineering': 'EPME',
+  'Communication and Electronics':           'CEE',
+  'Computer Engineering':                    'CE',
+  'Biomedical Engineering':                  'BME',
+};
+
+// Programmes can be added at runtime, so unknown names fall back to initials.
+function programAbbr(name) {
+  if (PROGRAM_ABBR[name]) return PROGRAM_ABBR[name];
+  const skip = new Set(['and', 'of', 'the', 'for', '&', 'in']);
+  const initials = String(name || '')
+    .split(/[\s-]+/)
+    .filter(w => w && !skip.has(w.toLowerCase()))
+    .map(w => w[0].toUpperCase())
+    .join('');
+  return (initials || 'PRG').slice(0, 5);
+}
+
+function campusLetter(campus) {
+  return String(campus || '?').trim().charAt(0).toUpperCase();
+}
+
+function groupCodePrefix(cycle) {
+  return `${programAbbr(cycle.program)}-${campusLetter(cycle.campus)}-G`;
+}
+
+// Next free sequence number in this cycle. Reads the highest existing number
+// rather than counting rows, so deleting a group never reissues its code.
+async function nextGroupNumber(sql, cycle) {
+  const rows = await sql`SELECT group_code FROM org_groups WHERE cycle_id = ${cycle.id}`;
+  let max = 0;
+  for (const r of rows) {
+    const m = /G(\d+)$/.exec(r.group_code || '');
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return max + 1;
+}
+
+function formatGroupCode(cycle, n) {
+  return groupCodePrefix(cycle) + String(n).padStart(2, '0');
 }
 
 const STUDENT_ID_RE = /^20\d{7}$/;
@@ -1051,30 +1119,12 @@ module.exports = async function handler(req, res) {
           ON CONFLICT (cycle_id, supervisor_id)
           DO UPDATE SET status = 'submitted', max_groups = ${capVal}, submitted_at = NOW()`;
 
-        // Each supervisor submits independently. When the last one in this
-        // program+campus submits, the list publishes itself — no separate
-        // publish step. Until then the submitter is told who is outstanding
-        // and may choose to publish anyway.
-        await syncParticipants(sql, cycle);
-        const parts = await sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id} AND expected = TRUE`;
-        const pending = parts.filter(p => p.status !== 'submitted' && p.status !== 'declared_none');
-
-        if (!pending.length) {
-          await sql`UPDATE org_ideas SET status = 'submitted' WHERE cycle_id = ${cycle.id} AND status = 'draft'`;
-          await sql`UPDATE org_cycles SET phase = 'RANKING_OPEN', updated_at = NOW() WHERE id = ${cycle.id}`;
-          await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
-            'ideas_published', { trigger: 'last_submission' });
-          const total = await sql`SELECT COUNT(*) AS c FROM org_ideas WHERE cycle_id = ${cycle.id}`;
-          return ok({ success: true, count: ideaRows.length, autoPublished: true, totalIdeas: Number(total[0].c) });
-        }
-
-        const names = await sql`SELECT name FROM supervisors
-          WHERE supervisor_id = ANY(${pending.map(p => p.supervisor_id)}) ORDER BY name`;
-        return ok({
-          success: true, count: ideaRows.length, autoPublished: false,
-          pending: names.map(n => n.name),
-          canPublishNow: canManageCycle(session, sup, cycle),
-        });
+        // Submission is entirely individual — no check on what colleagues have
+        // done. The list opens to students when the idea deadline passes
+        // (see maybeAutoPublish).
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'ideas_submitted', { count: ideaRows.length });
+        return ok({ success: true, count: ideaRows.length, ideasDeadline: cycle.ideas_deadline });
       }
 
       case 'orgDeclareNoIdeas': {
@@ -1095,20 +1145,9 @@ module.exports = async function handler(req, res) {
           ON CONFLICT (cycle_id, supervisor_id)
           DO UPDATE SET status = 'declared_none', submitted_at = NOW()`;
 
-        // Declaring "no ideas" is a response too, so it can be the one that
-        // completes the programme and publishes the list.
-        await syncParticipants(sql, cycle);
-        const parts = await sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id} AND expected = TRUE`;
-        const pending = parts.filter(p => p.status !== 'submitted' && p.status !== 'declared_none');
-        const total = await sql`SELECT COUNT(*) AS c FROM org_ideas WHERE cycle_id = ${cycle.id}`;
-        if (!pending.length && Number(total[0].c) > 0) {
-          await sql`UPDATE org_ideas SET status = 'submitted' WHERE cycle_id = ${cycle.id} AND status = 'draft'`;
-          await sql`UPDATE org_cycles SET phase = 'RANKING_OPEN', updated_at = NOW() WHERE id = ${cycle.id}`;
-          await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
-            'ideas_published', { trigger: 'last_response' });
-          return ok({ success: true, autoPublished: true, totalIdeas: Number(total[0].c) });
-        }
-        return ok({ success: true, autoPublished: false });
+        await logAudit(sql, cycle.id, 0, 'supervisor', sup.supervisor_id, sup.name,
+          'declared_no_ideas', {});
+        return ok({ success: true, ideasDeadline: cycle.ideas_deadline });
       }
 
       case 'orgReopenMySubmission': {
@@ -1462,19 +1501,29 @@ module.exports = async function handler(req, res) {
             message: `Already in another group: ${who}. Each student can belong to only one group.` });
         }
 
-        let code = groupCode();
-        for (let i = 0; i < 5; i++) {
-          const exists = await sql`SELECT 1 FROM org_groups WHERE group_code = ${code}`;
-          if (!exists.length) break;
-          code = groupCode();
-        }
-
         const creator = members.find(m => m.creator) || members[0];
-        let groupId = null;
+
+        // Claim the next sequence number. Two groups created at the same instant
+        // both compute the same number; the per-cycle unique index rejects the
+        // loser, which simply tries the next one.
+        let groupId = null, code = '';
+        let n = await nextGroupNumber(sql, cycle);
+        for (let attempt = 0; attempt < 25; attempt++, n++) {
+          code = formatGroupCode(cycle, n);
+          try {
+            const g = await sql`INSERT INTO org_groups (cycle_id, group_code, created_by_student_id, status)
+              VALUES (${cycle.id}, ${code}, ${creator.id}, 'forming') RETURNING *`;
+            groupId = g[0].id;
+            break;
+          } catch (e) {
+            if (e.code === '23505') continue; // code taken, try the next number
+            return ok({ success: false, message: 'Could not create the group: ' + (e.message || e) });
+          }
+        }
+        if (!groupId)
+          return ok({ success: false, message: 'Could not allocate a group number. Please try again.' });
+
         try {
-          const g = await sql`INSERT INTO org_groups (cycle_id, group_code, created_by_student_id, status)
-            VALUES (${cycle.id}, ${code}, ${creator.id}, 'forming') RETURNING *`;
-          groupId = g[0].id;
           for (const m of members) {
             await sql`INSERT INTO org_group_members
               (cycle_id, group_id, student_id, student_name, email, added_by_student_id)

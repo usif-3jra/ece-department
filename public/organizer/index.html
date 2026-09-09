@@ -189,6 +189,10 @@
     .stat-table td{padding:7px 8px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
     .stat-table th.n,.stat-table td.n{text-align:center;width:44px;}
     .stat-table tr:hover td{background:#fbfcfc;}
+    /* The project column stays visible while many group columns scroll */
+    .stat-table th.sticky-col,.stat-table td.sticky-col{position:sticky;left:0;background:#fff;
+      min-width:230px;box-shadow:1px 0 0 var(--line);}
+    .stat-table tr:hover td.sticky-col{background:#fbfcfc;}
     .stat-title{font-weight:600;}
     .stat-sup{font-size:11.5px;color:var(--slate);}
     .cnt{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:6px;
@@ -323,7 +327,7 @@
          onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-09-09-2026 R01</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-09-09-2026 R02</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -551,7 +555,7 @@
          onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-09-09-2026 R01</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-09-09-2026 R02</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1027,43 +1031,18 @@ const Ideas = {
     await this.afterResponse(r, 'Recorded: no ideas from you this semester.');
   },
 
-  // Submitting is individual. The list publishes itself when the last
-  // supervisor responds; before that, the submitter is told who is still
-  // outstanding and may publish anyway.
+  // Submitting is individual — nothing is checked about other supervisors and
+  // nothing is asked of the submitter. The list opens to students by itself
+  // when the idea deadline passes.
   async afterResponse(r, doneMsg) {
     await this.load();
     await Board.load();
     await Settings.load();
-
-    if (r.autoPublished) {
-      alert(`${doneMsg}\n\nEvery supervisor in your programme and campus has now responded, `
-          + `so the list of ${r.totalIdeas} project(s) has been opened to students automatically.`);
-      setAlert('ideas-status', 'All supervisors have responded — students can now rank the projects.', 'info');
-      return;
-    }
-
-    const pending = r.pending || [];
-    if (!pending.length) return;
-
-    const list = pending.map(n => '  •  ' + n).join('\n');
-    if (!r.canPublishNow) {
-      alert(`${doneMsg}\n\nStill waiting on:\n${list}\n\n`
-          + 'The project list opens to students automatically once everyone has responded.');
-      return;
-    }
-    const publishNow = confirm(
-      `${doneMsg}\n\nThese supervisors have not submitted yet:\n${list}\n\n`
-      + 'Publish the list to students now anyway?\n\n'
-      + 'They will be recorded as having no ideas this semester and will not be able to add any.\n\n'
-      + 'Choose Cancel to keep waiting — the list opens by itself once everyone has responded.');
-    if (!publishNow) return;
-
-    const p = await api('orgPublishIdeas', Auth.token, true);
-    if (sessionCheck(p)) return;
-    if (!p.success) { setAlert('ideas-status', p.message, 'err'); return; }
     setAlert('ideas-status',
-      `Published ${p.ideas} idea(s) to students. ${p.autoDeclared} supervisor(s) were recorded as having no ideas.`, 'info');
-    await this.load(); await Board.load(); await Settings.load();
+      doneMsg + (r.ideasDeadline
+        ? ` The project list opens to students automatically after the idea deadline on ${fmtDate(r.ideasDeadline)}.`
+        : ' The project list opens to students once the idea deadline is reached.'),
+      'info');
   },
 
   async reopen() {
@@ -1145,6 +1124,11 @@ function toLocalInput(iso) {
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+function deadlineIsPast(iso) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  return !isNaN(d.getTime()) && d.getTime() < Date.now();
+}
 function fmtDate(iso) {
   if (!iso) return 'not set';
   const d = new Date(iso);
@@ -1189,8 +1173,22 @@ const Settings = {
 
     const phase = c.phase;
     el('phase-note').textContent = phase === 'IDEAS_OPEN'
-      ? 'The project list opens to students automatically once every supervisor has submitted.'
+      ? (c.ideasDeadline
+          ? 'The project list opens to students automatically at the idea deadline.'
+          : 'No idea deadline is set.')
       : 'Current phase: ' + phase.replace(/_/g, ' ').toLowerCase();
+
+    // Publication is driven by the idea deadline, so without one the cycle
+    // never opens to students. Say so rather than letting it sit silently.
+    if (phase === 'IDEAS_OPEN' && !c.ideasDeadline) {
+      setAlert('manage-msg',
+        'No idea submission deadline is set, so the project list will not open to students. '
+        + 'Set the idea deadline below and save.', 'warn');
+    } else if (phase === 'IDEAS_OPEN' && deadlineIsPast(c.ideasDeadline)) {
+      setAlert('manage-msg',
+        'The idea deadline has passed but no project ideas were submitted, so the list cannot open yet.', 'warn');
+    }
+
     el('btn-close-ranking').style.display  = phase === 'RANKING_OPEN' ? '' : 'none';
     el('btn-reopen-ranking').style.display = phase === 'RANKING_CLOSED' ? '' : 'none';
 
@@ -1213,26 +1211,6 @@ const Settings = {
     if (!c.success) { setAlert('manage-msg', c.message, 'err'); return; }
     setAlert('manage-msg', 'Saved.', 'info');
     this.load();
-  },
-
-  async publishIdeas(force) {
-    if (!force && !confirm('Publish the idea list and open ranking for students?\n\nSupervisors will no longer be able to change their ideas.')) return;
-    const r = await api('orgPublishIdeas', Auth.token, !!force);
-    if (!r.success) {
-      if (r.needsForce) {
-        const names = (r.pending || []).join(', ');
-        if (confirm(`${r.message}\n\nNot yet submitted: ${names}\n\nPublish anyway? They will be recorded as having no ideas this semester.`)) {
-          return this.publishIdeas(true);
-        }
-        return;
-      }
-      setAlert('manage-msg', r.message, 'err');
-      return;
-    }
-    setAlert('manage-msg',
-      `Published ${r.ideas} idea(s). Students can now form groups and rank projects.`
-      + (r.autoDeclared ? ` ${r.autoDeclared} supervisor(s) were recorded as having no ideas.` : ''), 'info');
-    await Ideas.load(); await Board.load(); await this.load();
   },
 
   async setPhase(phase) {
@@ -1267,44 +1245,45 @@ const Assign = {
 
     el('stats-sub').innerHTML = ranked.length
       ? `${ranked.length} of ${groups.length} group(s) have submitted their preferences. `
-        + 'Each number is how many groups put that project at that position.'
+        + 'Each cell is the position that group gave that project — <strong>1</strong> is its first choice. '
+        + 'Rows are ordered by how many groups placed the project first.'
       : 'No group has submitted preferences yet.';
 
     if (!ranked.length) { el('stats-table').innerHTML = ''; return; }
 
-    const maxCol = Math.min(5, Math.max(...ranked.map(g => g.prefs.length)));
-    const stats = new Map();
-    (r.ideas || []).forEach(i => stats.set(i.id, { idea: i, counts: {}, total: 0, best: Infinity }));
-    ranked.forEach(g => g.prefs.forEach(p => {
-      const s = stats.get(p.ideaId);
-      if (!s) return;
-      s.counts[p.rank] = (s.counts[p.rank] || 0) + 1;
-      s.total++;
-      if (p.rank < s.best) s.best = p.rank;
+    // One column per group, one row per project. The cell holds the position
+    // that group gave that project, so it is clear which group wants what.
+    const cols = ranked.slice().sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    const rankOf = new Map();      // ideaId -> Map(groupId -> rank)
+    const firsts = new Map();      // ideaId -> how many groups placed it first
+    (r.ideas || []).forEach(i => { rankOf.set(i.id, new Map()); firsts.set(i.id, 0); });
+    cols.forEach(g => g.prefs.forEach(p => {
+      if (!rankOf.has(p.ideaId)) { rankOf.set(p.ideaId, new Map()); firsts.set(p.ideaId, 0); }
+      rankOf.get(p.ideaId).set(g.id, p.rank);
+      if (p.rank === 1) firsts.set(p.ideaId, firsts.get(p.ideaId) + 1);
     }));
 
-    const rows = [...stats.values()].sort((a, b) =>
-      (b.counts[1] || 0) - (a.counts[1] || 0) || b.total - a.total || a.idea.title.localeCompare(b.idea.title));
+    const rows = (r.ideas || []).slice().sort((a, b) =>
+      (firsts.get(b.id) || 0) - (firsts.get(a.id) || 0) || a.title.localeCompare(b.title));
 
-    const head = '<tr><th>Project</th>'
-      + Array.from({ length: maxCol }, (_, i) => `<th class="n">#${i + 1}</th>`).join('')
-      + '<th class="n">Total</th><th>Demand</th></tr>';
+    const head = '<tr><th class="sticky-col">Project</th>'
+      + cols.map(g => `<th class="n" title="${escHtml(g.code)} — ${g.size} students">${escHtml(g.code.replace(/^.*-G/, 'G'))}</th>`).join('')
+      + '<th class="n">1st</th></tr>';
 
-    el('stats-table').innerHTML = head + rows.map(s => {
-      const firsts = s.counts[1] || 0;
-      const cells = Array.from({ length: maxCol }, (_, i) => {
-        const n = s.counts[i + 1] || 0;
-        const cls = n === 0 ? 'zero' : (i === 0 ? 'first' : 'some');
-        return `<td class="n"><span class="cnt ${cls}">${n || '·'}</span></td>`;
+    el('stats-table').innerHTML = head + rows.map(i => {
+      const marks = rankOf.get(i.id) || new Map();
+      const cells = cols.map(g => {
+        const rk = marks.get(g.id);
+        if (!rk) return '<td class="n"><span class="cnt zero">·</span></td>';
+        const cls = rk === 1 ? 'first' : (rk <= 3 ? 'some' : 'zero');
+        return `<td class="n"><span class="cnt ${cls}">${rk}</span></td>`;
       }).join('');
-      const demand = firsts > 1 ? `<span class="demand hot">${firsts} groups want it first</span>`
-        : (s.total === 0 ? '<span class="demand cold">not chosen</span>' : '');
+      const f = firsts.get(i.id) || 0;
       return `<tr>
-        <td><div class="stat-title">${escHtml(s.idea.title)}</div>
-            <div class="stat-sup">${escHtml(s.idea.supervisor)} · ${s.idea.minStudents}–${s.idea.maxStudents} students</div></td>
+        <td class="sticky-col"><div class="stat-title">${escHtml(i.title)}</div>
+            <div class="stat-sup">${escHtml(i.supervisor)} · ${i.minStudents}–${i.maxStudents} students</div></td>
         ${cells}
-        <td class="n"><span class="cnt ${s.total ? 'some' : 'zero'}">${s.total || '·'}</span></td>
-        <td>${demand}</td>
+        <td class="n"><span class="cnt ${f ? 'first' : 'zero'}">${f || '·'}</span></td>
       </tr>`;
     }).join('');
   },

@@ -1,6 +1,6 @@
 # FYP Projects Organizer — v4 Design Specification
 
-**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-09-09-2026 R01
+**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-09-09-2026 R02
 
 ## Scope decisions (confirmed)
 
@@ -24,7 +24,7 @@ IDEAS_OPEN -> RANKING_OPEN -> RANKING_CLOSED -> ALLOCATED
 ```
 
 - **IDEAS_OPEN** — supervisors draft/submit ideas. Students see "not yet open".
-- **RANKING_OPEN** — reached automatically the moment the **last** expected supervisor submits or declares no ideas. There is no manual publish button. A supervisor who submits while others are outstanding is shown their names and may choose to publish early, which records the non-responders as having no ideas. Groups rank; editable until the ranking deadline. (Groups may be formed during IDEAS_OPEN too, so students can organise early.)
+- **RANKING_OPEN** — reached automatically when the **idea deadline passes**; anyone who never responded is then recorded as having no ideas. There is no manual publish button and no supervisor is ever asked about, or shown, another supervisor's progress at submission time. Because there is no scheduler, the deadline is evaluated whenever a cycle is loaded (`maybeAutoPublish`). If no idea deadline is set the list never opens, so the control panel warns about it. Groups rank; editable until the ranking deadline. (Groups may be formed during IDEAS_OPEN too, so students can organise early.)
 - **RANKING_CLOSED** — ranking frozen; matching can run.
 - **ALLOCATED** — allocation published; projects + students rows created in the live FYP tables.
 
@@ -45,6 +45,9 @@ ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS campus TEXT NOT NULL DEFAULT ''
 `UNIQUE INDEX (cycle_id, lower(title))`
 
 **org_groups** — id, cycle_id, group_code, created_by_student_id, status ('forming' | 'ranked' | 'allocated'), rank_version, ranked_by_student_id, ranked_at, created_at.
+`UNIQUE INDEX (cycle_id, group_code)` — codes are unique per cycle, not globally, so numbering restarts each semester.
+
+Group codes read `PROGRAM-CAMPUS-Gnn`, e.g. **EPME-D-G01** (Electric Power and Machines Engineering, Debbieh, group 1) or **CE-T-G03**. The campus letter comes from the cycle, and `nn` is the next unused number in that cycle — taken from the highest existing code rather than a row count, so deleting a group never reissues its code. Abbreviations: EPME, CEE, CE, BME; any programme added later falls back to its initials.
 
 **org_group_members** — id, cycle_id, group_id, student_id, student_name, email (optional), added_by_student_id, joined_at.
 `UNIQUE (cycle_id, student_id)` and `UNIQUE INDEX (cycle_id, lower(student_name))`
@@ -77,7 +80,7 @@ The allocation decision stays with the doctors. There is **no automatic matching
 
 **Assignment console** (coordinator / any supervisor of that program+campus, per the deadline policy):
 
-- Opens with a **distribution table** — for every project, how many groups placed it #1, #2, #3 … and its total. Since supervisors never see which group chose what, this is their only basis for assigning sensibly.
+- Opens with a **preference matrix** — one row per project, one column per group, each cell holding the position that group gave that project. Rows are ordered by how many groups placed the project first. Groups appear by code only, so student names stay hidden while supervisors can still see exactly which group wants which project.
 - Then lists every group — anonymous code + size + its ranked preferences in order.
 - Each row has an idea dropdown. Assignment is entirely by hand.
 - Live conflict flags:
