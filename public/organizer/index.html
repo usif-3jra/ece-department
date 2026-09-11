@@ -274,6 +274,8 @@
     .alloc-card .t{font-size:16px;font-weight:700;font-family:var(--font-display);}
     .alloc-card .s{font-size:12.5px;color:#3d6333;margin-top:4px;}
 
+    .optional-tag{display:inline-block;font-size:10px;font-weight:700;font-family:var(--font-mono);
+      letter-spacing:.05em;background:#fef3c7;color:#92400e;border-radius:20px;padding:2px 8px;margin-right:6px;}
     .cap-help{color:var(--blue);font-size:12px;margin-left:4px;cursor:help;}
     .cap-help:hover{color:#1d4ed8;}
 
@@ -352,6 +354,34 @@
   </div>
 </div>
 
+<!-- ═══ GROUP'S OWN IDEA ════════════════════════════════════════════════════ -->
+<div class="modal-back" id="ouridea-modal">
+  <div class="modal-card">
+    <h3>Your Group's Project Idea</h3>
+    <div class="readonly-note" style="margin-top:0;margin-bottom:16px;">
+      <i class="fas fa-circle-info" style="margin-top:2px;color:var(--blue);"></i>
+      <span>This is completely optional. It does not replace ranking the supervisors' projects —
+        your group still orders that list as normal. A supervisor may pick this idea up if it
+        suits them.</span>
+    </div>
+    <div id="oi-err" class="alert-box"></div>
+    <div class="field">
+      <label for="oi-title">Project title</label>
+      <input type="text" id="oi-title" maxlength="160" placeholder="e.g. Solar-Powered Water Purification Unit"/>
+    </div>
+    <div class="field">
+      <label for="oi-desc">Short description</label>
+      <textarea id="oi-desc" maxlength="1200" placeholder="In a few sentences: what you want to build or study, and why."></textarea>
+      <div class="hint">A short answer is enough — a few sentences.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="btn-oi-remove" onclick="OurIdea.remove()" style="margin-right:auto;color:var(--red);border-color:#fecaca;">Remove idea</button>
+      <button class="btn-ghost" onclick="OurIdea.closeForm()">Cancel</button>
+      <button class="btn-primary" id="btn-oi-save" onclick="OurIdea.save()">Save idea</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ SHARE — QR code and link ════════════════════════════════════════════ -->
 <div class="modal-back" id="share-modal">
   <div class="modal-card" style="max-width:420px;text-align:center;">
@@ -409,7 +439,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-09-09-2026 R05</span>
+      <span class="topbar-sub">v04-11-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -467,6 +497,18 @@
         <div class="panel-sub" id="board-progress">Loading…</div>
         <div class="progress-track"><div class="progress-fill" id="board-bar" style="width:0%"></div></div>
         <div id="board-list"></div>
+      </div>
+
+      <!-- ── Student groups (visible before you submit your own ideas) ── -->
+      <div class="panel" id="panel-stugroups">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Student Groups</div>
+            <div class="panel-sub" id="stugroups-sub">Loading…</div>
+          </div>
+          <button class="btn-ghost" onclick="StuGroups.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+        </div>
+        <div id="stugroups-list"></div>
       </div>
 
       <!-- ── Deadlines, phase & publishing ── -->
@@ -655,7 +697,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-09-09-2026 R05</span>
+      <span class="topbar-sub">v04-11-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -724,6 +766,25 @@
           <i class="fas fa-circle-info" style="margin-top:2px;color:var(--blue);"></i>
           <span id="grp-readonly-text"></span>
         </div>
+      </div>
+
+      <!-- Optional: the group's own project idea -->
+      <div class="panel" id="panel-ouridea">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Do you already have a project idea of your own?</div>
+            <div class="panel-sub">
+              <span class="optional-tag">OPTIONAL</span>
+              Most groups leave this empty and simply choose from the supervisors' list.
+              Fill it in only if your group has its own idea you would like to propose.
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-our-idea" onclick="OurIdea.openForm()">
+            <i class="fas fa-lightbulb me-1"></i><span id="our-idea-btn-label">Add our project idea</span>
+          </button>
+        </div>
+        <div id="our-idea-msg" class="alert-box"></div>
+        <div id="our-idea-body"></div>
       </div>
 
       <!-- Assigned project (after publication) -->
@@ -867,6 +928,7 @@ const Auth = {
       Ideas.load()
         .then(() => Board.load())
         .then(() => Settings.load())
+        .then(() => StuGroups.load())
         .then(() => Live.start());
     }
     showScreen('suphome');
@@ -1238,6 +1300,22 @@ const Board = {
 
 // ══ Boot ══════════════════════════════════════════════════════════════════
 // ══ Supervisor: deadlines, phase and publishing ═══════════════════════════
+// A datetime-local input yields "2026-09-20T10:00" with no timezone. Sent as
+// is, the server parses it in ITS zone (UTC on Render), so a Beirut 10:00 was
+// stored as 10:00Z and read back as 13:00. Parsing here first is correct,
+// because in the browser a naive string means the user's own local time; the
+// ISO string that comes out is an unambiguous instant.
+function fromLocalInput(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? '' : d.toISOString();
+}
+
+function localZoneName() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'your local time'; }
+  catch { return 'your local time'; }
+}
+
 function toLocalInput(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -1281,7 +1359,8 @@ const Settings = {
 
     el('manage-sub').innerHTML =
       `Ideas close <strong>${fmtDate(c.ideasDeadline)}</strong> &middot; `
-      + `ranking closes <strong>${fmtDate(c.rankingDeadline)}</strong>`;
+      + `ranking closes <strong>${fmtDate(c.rankingDeadline)}</strong>`
+      + ` &middot; times shown in ${escHtml(localZoneName())}`;
 
     // Visibility follows the policy the admin set
     el('manage-body').style.display   = r.canManage ? 'block' : 'none';
@@ -1325,9 +1404,9 @@ const Settings = {
 
   async saveDeadlines() {
     setAlert('manage-msg', '');
-    const a = await api('orgSetDeadline', Auth.token, 'ideas',   el('dl-ideas').value || '');
+    const a = await api('orgSetDeadline', Auth.token, 'ideas',   fromLocalInput(el('dl-ideas').value));
     if (!a.success) { setAlert('manage-msg', a.message, 'err'); return; }
-    const b = await api('orgSetDeadline', Auth.token, 'ranking', el('dl-rank').value || '');
+    const b = await api('orgSetDeadline', Auth.token, 'ranking', fromLocalInput(el('dl-rank').value));
     if (!b.success) { setAlert('manage-msg', b.message, 'err'); return; }
     const c = await api('orgSetGroupSizes', Auth.token,
       parseInt(el('gs-min').value, 10), parseInt(el('gs-max').value, 10));
@@ -1508,6 +1587,44 @@ const Assign = {
   },
 };
 
+// ══ Supervisor: the groups students have formed ═══════════════════════════
+const StuGroups = {
+  async load() {
+    if (!Auth.token) return;
+    let r;
+    try { r = await api('orgGetStudentGroups', Auth.token); }
+    catch { return; }
+    if (sessionCheck(r)) return;
+    if (!r.success) { el('stugroups-sub').textContent = r.message; return; }
+
+    const gs = r.groups || [];
+    el('stugroups-sub').innerHTML = gs.length
+      ? `${gs.length} group(s) formed so far &middot; <strong>${r.withIdea}</strong> proposed an idea of their own. `
+        + 'Student names stay hidden until the allocation is published.'
+      : 'No student groups have been formed yet.';
+
+    el('stugroups-list').innerHTML = gs.length ? gs.map(g => `
+      <div class="board-row">
+        <div class="board-head plain">
+          <span class="status-dot ${g.proposedTitle ? 'ok' : 'none'}">
+            <i class="fas ${g.proposedTitle ? 'fa-lightbulb' : 'fa-users'}"></i>
+          </span>
+          <span class="board-name">${escHtml(g.code)}
+            <span class="chip">${g.size} student${g.size === 1 ? '' : 's'}</span>
+          </span>
+          <span class="board-note">${g.proposedTitle ? 'Has its own idea' : 'No idea proposed'}</span>
+        </div>
+        ${g.proposedTitle ? `<div class="board-body">
+          <div class="board-idea">
+            <div class="t">${escHtml(g.proposedTitle)}</div>
+            <div class="d">${escHtml(g.proposedDesc)}</div>
+          </div>
+        </div>` : ''}
+      </div>`).join('')
+      : '<div class="empty-note">Groups will appear here as students form them.</div>';
+  },
+};
+
 // ══ Live refresh ══════════════════════════════════════════════════════════
 // The supervisor page keeps itself current after sign-in — colleague
 // submissions and student rankings appear without pressing anything.
@@ -1534,6 +1651,7 @@ const Live = {
     try {
       await Board.load();
       await Settings.load();
+      await StuGroups.load();
     } catch { /* a failed refresh must not break the page */ }
   },
 };
@@ -1637,6 +1755,8 @@ const Group = {
       + 'remove members. You can still order the project choices with the rest of your group.';
     el('btn-add-member').style.display = frozen ? 'none' : '';
 
+    OurIdea.render(r);
+
     // Allocation result, once the department has published
     if (r.allocation) {
       el('panel-alloc').style.display = 'block';
@@ -1644,9 +1764,11 @@ const Group = {
       el('alloc-sup').textContent   = 'Supervisor: ' + (r.allocation.supervisor || '—');
       el('alloc-desc').textContent  = r.allocation.description || '';
       el('panel-rank').style.display = 'none';
+      el('panel-ouridea').style.display = 'none';
     } else {
       el('panel-alloc').style.display = 'none';
       el('panel-rank').style.display = 'block';
+      el('panel-ouridea').style.display = 'block';
       await Rank.load(r);
     }
 
@@ -1750,6 +1872,70 @@ function describeAudit(a) {
     default: return a.action.replace(/_/g, ' ');
   }
 }
+
+// ══ Student: the group's own project idea (optional) ══════════════════════
+const OurIdea = {
+  render(groupData) {
+    const g = groupData.group;
+    const isOwner = g.createdBy === Student.me.id;
+    const frozen  = groupData.cycle.rankingClosed;
+    const has = !!g.proposedTitle;
+
+    el('our-idea-btn-label').textContent = has ? 'Edit our idea' : 'Add our project idea';
+    el('btn-our-idea').style.display = (isOwner && !frozen) ? '' : 'none';
+
+    el('our-idea-body').innerHTML = has ? `
+      <div class="idea-card open" style="margin-bottom:0;">
+        <div class="idea-title">${escHtml(g.proposedTitle)}</div>
+        <div class="idea-desc">${escHtml(g.proposedDesc)}</div>
+        <div class="idea-meta"><span class="chip">Proposed ${fmtDate(g.proposedAt)}</span></div>
+      </div>`
+      : `<div class="empty-note">
+           No idea entered — that is perfectly fine. Your group will simply rank the supervisors' projects.
+         </div>`;
+
+    if (!isOwner && !frozen) {
+      setAlert('our-idea-msg',
+        'Only the student who created the group can enter or change the group idea.', 'info');
+    } else {
+      setAlert('our-idea-msg', '');
+    }
+  },
+
+  openForm() {
+    const g = (Group.data && Group.data.group) || {};
+    el('oi-title').value = g.proposedTitle || '';
+    el('oi-desc').value  = g.proposedDesc || '';
+    el('btn-oi-remove').style.display = g.proposedTitle ? '' : 'none';
+    setAlert('oi-err', '');
+    el('ouridea-modal').classList.add('open');
+    el('oi-title').focus();
+  },
+
+  closeForm() { el('ouridea-modal').classList.remove('open'); },
+
+  async save() {
+    const m = Student.me;
+    const btn = el('btn-oi-save');
+    btn.disabled = true;
+    try {
+      const r = await api('orgSaveGroupIdea', m.program, m.campus, m.id,
+        el('oi-title').value, el('oi-desc').value);
+      if (!r.success) { setAlert('oi-err', r.message); return; }
+      this.closeForm();
+      await Group.load();
+    } finally { btn.disabled = false; }
+  },
+
+  async remove() {
+    if (!confirm('Remove your group’s project idea?')) return;
+    const m = Student.me;
+    const r = await api('orgSaveGroupIdea', m.program, m.campus, m.id, '', '');
+    if (!r.success) { setAlert('oi-err', r.message); return; }
+    this.closeForm();
+    await Group.load();
+  },
+};
 
 // ══ Student: ranking ══════════════════════════════════════════════════════
 const Rank = {
@@ -2078,10 +2264,14 @@ el('idea-modal').addEventListener('click', e => {
 el('share-modal').addEventListener('click', e => {
   if (e.target === el('share-modal')) Share.close();
 });
+el('ouridea-modal').addEventListener('click', e => {
+  if (e.target === el('ouridea-modal')) OurIdea.closeForm();
+});
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (el('idea-modal').classList.contains('open'))  Ideas.closeForm();
-  if (el('share-modal').classList.contains('open')) Share.close();
+  if (el('idea-modal').classList.contains('open'))    Ideas.closeForm();
+  if (el('share-modal').classList.contains('open'))   Share.close();
+  if (el('ouridea-modal').classList.contains('open')) OurIdea.closeForm();
 });
 
 (async function boot(){

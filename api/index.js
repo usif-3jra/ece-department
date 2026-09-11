@@ -348,6 +348,11 @@ async function ensureOrganizerTables(sql) {
   // became per-cycle, then enforces uniqueness within the cycle instead.
   await sql`ALTER TABLE org_groups DROP CONSTRAINT IF EXISTS org_groups_group_code_key`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_groups_code_idx ON org_groups (cycle_id, group_code)`;
+  // A group may optionally propose a project of its own. Never required.
+  await sql`ALTER TABLE org_groups ADD COLUMN IF NOT EXISTS proposed_title TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE org_groups ADD COLUMN IF NOT EXISTS proposed_desc  TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE org_groups ADD COLUMN IF NOT EXISTS proposed_by    TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE org_groups ADD COLUMN IF NOT EXISTS proposed_at    TIMESTAMPTZ`;
 
   // The two unique indexes below are the duplicate-prevention mechanism.
   // App-level checks cannot survive two students submitting overlapping groups
@@ -1328,6 +1333,11 @@ module.exports = async function handler(req, res) {
         if (!canManageCycle(session, sup, cycle))
           return ok({ success: false, message: 'The admin has restricted who can change deadlines for your program.' });
 
+        // Must carry a timezone. A bare "2026-09-20T10:00" would be read in the
+        // server's zone (UTC on Render) and silently shift the time, so it is
+        // refused rather than guessed at — the page sends a full ISO instant.
+        if (value && !/(Z|[+-]\d{2}:?\d{2})$/.test(String(value)))
+          return ok({ success: false, message: 'This page is out of date — please refresh (Ctrl+F5) and set the deadline again.' });
         const ts = value ? new Date(value) : null;
         if (value && isNaN(ts.getTime())) return ok({ success: false, message: 'That date is not valid.' });
         if (which === 'ideas') {
@@ -1674,6 +1684,9 @@ module.exports = async function handler(req, res) {
             rankVersion: Number(found.group.rank_version),
             rankedBy: found.group.ranked_by_student_id, rankedAt: found.group.ranked_at,
             createdBy: found.group.created_by_student_id,
+            proposedTitle: found.group.proposed_title || '',
+            proposedDesc:  found.group.proposed_desc || '',
+            proposedAt:    found.group.proposed_at || null,
           },
           members: found.members.map(m => ({ id: m.student_id, name: m.student_name, email: m.email || '' })),
           ranking: ranks.map(r => ({
@@ -1710,6 +1723,74 @@ module.exports = async function handler(req, res) {
         await logAudit(sql, cycle.id, found.group.id, 'student', sid, me ? me.student_name : sid,
           'group_deleted', { members: found.members.length });
         return ok({ success: true, groupDeleted: true });
+      }
+
+      // A group's own project proposal — entirely optional, and stored on the
+      // group rather than in org_ideas so it never enters the ranking list.
+      case 'orgSaveGroupIdea': {
+        const [program, campus, studentId, title, description] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'Projects have already been assigned.' });
+        const sid = String(studentId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({ success: false, message: 'You are not in a group.' });
+        if (found.group.created_by_student_id !== sid)
+          return ok({ success: false, message: 'Only the student who created this group can enter or change the group idea.' });
+
+        const t = String(title || '').trim();
+        const d = String(description || '').trim();
+        const me = found.members.find(m => m.student_id === sid);
+        const who = me ? me.student_name : sid;
+
+        if (!t && !d) {
+          await sql`UPDATE org_groups SET proposed_title = '', proposed_desc = '',
+            proposed_by = '', proposed_at = NULL WHERE id = ${found.group.id}`;
+          await logAudit(sql, cycle.id, found.group.id, 'student', sid, who, 'group_idea_cleared', {});
+          return ok({ success: true, cleared: true });
+        }
+        if (t.length < 5)  return ok({ success: false, message: 'Please give your idea a title of at least 5 characters.' });
+        if (d.length < 20) return ok({ success: false, message: 'Please describe your idea in at least 20 characters.' });
+        if (t.length > 160) return ok({ success: false, message: 'Please keep the title under 160 characters.' });
+        if (d.length > 1200) return ok({ success: false, message: 'Please keep the description under 1200 characters.' });
+
+        await sql`UPDATE org_groups SET proposed_title = ${t}, proposed_desc = ${d},
+          proposed_by = ${sid}, proposed_at = NOW() WHERE id = ${found.group.id}`;
+        await logAudit(sql, cycle.id, found.group.id, 'student', sid, who, 'group_idea_saved', { title: t });
+        return ok({ success: true });
+      }
+
+      // Supervisors can see the groups that have formed, and any idea they
+      // proposed, before deciding what to submit themselves.
+      case 'orgGetStudentGroups': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok(sessionGone(sessionToken));
+        const ctx = await orgContext(sql, session);
+        if (ctx.error) return ok({ success: false, message: ctx.error });
+        const { cycle } = ctx;
+
+        const groups = await sql`SELECT * FROM org_groups WHERE cycle_id = ${cycle.id} ORDER BY group_code`;
+        const members = await sql`SELECT group_id FROM org_group_members WHERE cycle_id = ${cycle.id}`;
+        const sizeBy = new Map();
+        members.forEach(m => sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1));
+        return ok({
+          success: true,
+          phase: cycle.phase,
+          groups: groups.map(g => ({
+            // Group code and size only — student names stay hidden until the
+            // allocation is published.
+            code: g.group_code,
+            size: sizeBy.get(g.id) || 0,
+            createdAt: g.created_at,
+            proposedTitle: g.proposed_title || '',
+            proposedDesc:  g.proposed_desc || '',
+            proposedAt:    g.proposed_at || null,
+          })),
+          withIdea: groups.filter(g => (g.proposed_title || '').trim()).length,
+        });
       }
 
       case 'orgRemoveMember': {
