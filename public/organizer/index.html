@@ -274,6 +274,8 @@
     .alloc-card .t{font-size:16px;font-weight:700;font-family:var(--font-display);}
     .alloc-card .s{font-size:12.5px;color:#3d6333;margin-top:4px;}
 
+    .cgpa-chip{font-family:var(--font-mono);font-size:11.5px;font-weight:600;background:var(--blue-lt);
+      color:#1d4ed8;border-radius:20px;padding:2px 9px;flex-shrink:0;}
     .optional-tag{display:inline-block;font-size:10px;font-weight:700;font-family:var(--font-mono);
       letter-spacing:.05em;background:#fef3c7;color:#92400e;border-radius:20px;padding:2px 8px;margin-right:6px;}
     .cap-help{color:var(--blue);font-size:12px;margin-left:4px;cursor:help;}
@@ -350,6 +352,31 @@
           <i class="fas fa-qrcode me-1"></i>Share this page
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD A TEAMMATE ══════════════════════════════════════════════════════ -->
+<div class="modal-back" id="member-modal">
+  <div class="modal-card" style="max-width:430px;">
+    <h3>Add a Teammate</h3>
+    <div id="am-err" class="alert-box"></div>
+    <div class="field">
+      <label for="am-name">Full name</label>
+      <input type="text" id="am-name" placeholder="e.g. Sara Khoury"/>
+    </div>
+    <div class="field">
+      <label for="am-id">Student ID</label>
+      <input type="text" id="am-id" class="mono" maxlength="9" placeholder="20xxxxxxx"/>
+    </div>
+    <div class="field">
+      <label for="am-cgpa">CGPA</label>
+      <input type="text" id="am-cgpa" class="mono" maxlength="4" inputmode="decimal" placeholder="e.g. 3.25"/>
+      <div class="hint">Out of 4.00, to two decimal places.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="Group.closeAdd()">Cancel</button>
+      <button class="btn-primary" id="btn-am-save" onclick="Group.confirmAdd()">Add to group</button>
     </div>
   </div>
 </div>
@@ -439,7 +466,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-11-09-2026 R02</span>
+      <span class="topbar-sub">v04-16-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -697,7 +724,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-11-09-2026 R02</span>
+      <span class="topbar-sub">v04-16-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -721,6 +748,11 @@
           <span class="nm" id="ng-me-name"></span>
           <span class="sid" id="ng-me-id"></span>
         </div>
+      </div>
+      <div class="field">
+        <label for="ng-me-cgpa">Your CGPA <span style="color:var(--red)">*</span></label>
+        <input type="text" id="ng-me-cgpa" class="mono" inputmode="decimal" placeholder="e.g. 3.25" maxlength="4"/>
+        <div class="hint">Out of 4.00, to two decimal places.</div>
       </div>
       <div class="field">
         <label for="ng-email">Your email <span style="color:var(--red)">*</span></label>
@@ -1521,7 +1553,7 @@ const Assign = {
       return `
         <div class="assign-row ${g.published ? 'pub' : (g.assignedIdeaId ? 'done' : '')}">
           <span class="assign-code">${escHtml(g.code)}</span>
-          <span class="assign-size">${g.size} student${g.size === 1 ? '' : 's'}</span>
+          <span class="assign-size">${g.size} student${g.size === 1 ? '' : 's'}${g.avgCgpa != null ? `<br/><span class="cgpa-chip">${g.avgCgpa.toFixed(2)}</span>` : ''}</span>
           <select ${locked ? 'disabled' : ''} onchange="Assign.set(${g.id}, this.value)">${opts}</select>
           <span>${g.assignedRank ? `<span class="rank-badge">#${g.assignedRank}</span>` : ''}</span>
           <div class="pref-line">${prefs}</div>
@@ -1611,6 +1643,7 @@ const StuGroups = {
           </span>
           <span class="board-name">${escHtml(g.code)}
             <span class="chip">${g.size} student${g.size === 1 ? '' : 's'}</span>
+            ${g.avgCgpa != null ? `<span class="cgpa-chip" title="Average CGPA of the group">CGPA ${g.avgCgpa.toFixed(2)}</span>` : ''}
           </span>
           <span class="board-note">${g.proposedTitle ? 'Has its own idea' : 'No idea proposed'}</span>
         </div>
@@ -1723,8 +1756,11 @@ const Group = {
     el('panel-newgroup').style.display = 'none';
     el('group-wrap').style.display = 'block';
     el('grp-code').textContent = r.group.code;
+    const cg = r.members.map(x => x.cgpa).filter(v => v != null).map(Number);
+    const avg = cg.length ? (cg.reduce((a, b) => a + b, 0) / cg.length).toFixed(2) : null;
     el('grp-sub').textContent =
       `${r.members.length} member(s)`
+      + (avg ? ` · average CGPA ${avg}` : '')
       + (r.group.rankedAt ? ` · last change by ${(r.members.find(x => x.id === r.group.rankedBy) || {}).name || 'a teammate'} on ${fmtDate(r.group.rankedAt)}` : ' · no choices saved yet');
 
     const frozen  = r.cycle.rankingClosed;
@@ -1742,6 +1778,7 @@ const Group = {
         <i class="fas ${owner ? 'fa-user-pen' : 'fa-user'}" style="color:${owner ? 'var(--blue)' : 'var(--slate-soft)'}"></i>
         <span class="nm">${escHtml(x.name)}${x.id === Student.me.id ? ' <span class="owner-tag" style="background:#e0e7ff;color:#4338ca;">YOU</span>' : ''}${owner ? ' <span class="owner-tag">GROUP CREATOR</span>' : ''}</span>
         <span class="sid">${escHtml(x.id)}</span>
+        <span class="cgpa-chip" title="CGPA out of 4.00">${x.cgpa == null ? '—' : Number(x.cgpa).toFixed(2)}</span>
         ${canRemove ? `<button class="icon-btn danger" title="Remove ${escHtml(x.name)}"
              onclick="Group.remove('${escHtml(x.id)}')"><i class="fas fa-xmark"></i></button>` : ''}
       </div>`;
@@ -1787,7 +1824,8 @@ const Group = {
     div.id = 'ngrow-' + i;
     div.innerHTML = `
       <input type="text" id="ngn-${i}" placeholder="Full name" style="flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;"/>
-      <input type="text" id="ngi-${i}" placeholder="20xxxxxxx" maxlength="9" class="mono" style="width:110px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;"/>
+      <input type="text" id="ngi-${i}" placeholder="20xxxxxxx" maxlength="9" class="mono" style="width:104px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;"/>
+      <input type="text" id="ngc-${i}" placeholder="CGPA" maxlength="4" inputmode="decimal" class="mono" title="CGPA out of 4.00" style="width:66px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;"/>
       <button class="icon-btn danger" onclick="Group.removeRow(${i})"><i class="fas fa-xmark"></i></button>`;
     el('ng-members').appendChild(div);
   },
@@ -1803,31 +1841,49 @@ const Group = {
     document.querySelectorAll('#ng-members .member-row').forEach(row => {
       const n = row.querySelector('input[id^="ngn-"]');
       const d = row.querySelector('input[id^="ngi-"]');
+      const c = row.querySelector('input[id^="ngc-"]');
       if (!n || !d) return;
-      if (!n.value.trim() && !d.value.trim()) return; // blank row, ignore
-      others.push({ name: n.value, id: d.value });
+      // a wholly blank row is simply ignored
+      if (!n.value.trim() && !d.value.trim() && !(c && c.value.trim())) return;
+      others.push({ name: n.value, id: d.value, cgpa: c ? c.value : '' });
     });
     const btn = el('btn-create-group');
     btn.disabled = true;
     try {
       const m = Student.me;
       const r = await api('orgCreateGroup', m.program, m.campus,
-        { id: m.id, name: m.name, email: el('ng-email').value.trim() }, others);
+        { id: m.id, name: m.name, email: el('ng-email').value.trim(), cgpa: el('ng-me-cgpa').value },
+        others);
       if (!r.success) { setAlert('newgroup-err', r.message); return; }
       await this.load();
     } finally { btn.disabled = false; }
   },
 
-  async promptAdd() {
-    const name = prompt('Full name of the student to add:');
-    if (!name) return;
-    const id = prompt('Their student ID (9 digits starting with 20):');
-    if (!id) return;
-    const m = Student.me;
-    const r = await api('orgAddMember', m.program, m.campus, m.id, { name, id });
-    if (!r.success) { setAlert('grp-msg', r.message, 'err'); return; }
-    setAlert('grp-msg', '');
-    await this.load();
+  // A dialog rather than a chain of prompt() boxes — there are three fields now
+  promptAdd() {
+    el('am-name').value = '';
+    el('am-id').value   = '';
+    el('am-cgpa').value = '';
+    setAlert('am-err', '');
+    el('member-modal').classList.add('open');
+    el('am-name').focus();
+  },
+
+  closeAdd() { el('member-modal').classList.remove('open'); },
+
+  async confirmAdd() {
+    const btn = el('btn-am-save');
+    btn.disabled = true;
+    try {
+      const m = Student.me;
+      const r = await api('orgAddMember', m.program, m.campus, m.id, {
+        name: el('am-name').value, id: el('am-id').value, cgpa: el('am-cgpa').value,
+      });
+      if (!r.success) { setAlert('am-err', r.message); return; }
+      this.closeAdd();
+      setAlert('grp-msg', '');
+      await this.load();
+    } finally { btn.disabled = false; }
   },
 
   async remove(targetId) {
@@ -2267,11 +2323,15 @@ el('share-modal').addEventListener('click', e => {
 el('ouridea-modal').addEventListener('click', e => {
   if (e.target === el('ouridea-modal')) OurIdea.closeForm();
 });
+el('member-modal').addEventListener('click', e => {
+  if (e.target === el('member-modal')) Group.closeAdd();
+});
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (el('idea-modal').classList.contains('open'))    Ideas.closeForm();
   if (el('share-modal').classList.contains('open'))   Share.close();
   if (el('ouridea-modal').classList.contains('open')) OurIdea.closeForm();
+  if (el('member-modal').classList.contains('open'))  Group.closeAdd();
 });
 
 (async function boot(){
