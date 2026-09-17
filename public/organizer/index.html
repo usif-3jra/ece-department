@@ -275,7 +275,10 @@
     .alloc-card .s{font-size:12.5px;color:#3d6333;margin-top:4px;}
 
     .cgpa-chip{font-family:var(--font-mono);font-size:11.5px;font-weight:600;background:var(--blue-lt);
-      color:#1d4ed8;border-radius:20px;padding:2px 9px;flex-shrink:0;}
+      color:#1d4ed8;border-radius:20px;padding:2px 9px;flex-shrink:0;border:none;}
+    .cgpa-chip.missing{background:#fef3c7;color:#92400e;border:1px dashed #d97706;}
+    button.cgpa-chip.missing{cursor:pointer;}
+    button.cgpa-chip.missing:hover{background:#fde68a;}
     .optional-tag{display:inline-block;font-size:10px;font-weight:700;font-family:var(--font-mono);
       letter-spacing:.05em;background:#fef3c7;color:#92400e;border-radius:20px;padding:2px 8px;margin-right:6px;}
     .cap-help{color:var(--blue);font-size:12px;margin-left:4px;cursor:help;}
@@ -362,21 +365,39 @@
     <h3>Add a Teammate</h3>
     <div id="am-err" class="alert-box"></div>
     <div class="field">
-      <label for="am-name">Full name</label>
+      <label for="am-name">Full name <span style="color:var(--red)">*</span></label>
       <input type="text" id="am-name" placeholder="e.g. Sara Khoury"/>
     </div>
     <div class="field">
-      <label for="am-id">Student ID</label>
+      <label for="am-id">Student ID <span style="color:var(--red)">*</span></label>
       <input type="text" id="am-id" class="mono" maxlength="9" placeholder="20xxxxxxx"/>
     </div>
     <div class="field">
-      <label for="am-cgpa">CGPA</label>
+      <label for="am-cgpa">CGPA <span style="color:var(--red)">*</span></label>
       <input type="text" id="am-cgpa" class="mono" maxlength="4" inputmode="decimal" placeholder="e.g. 3.25"/>
       <div class="hint">Out of 4.00, to two decimal places.</div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost" onclick="Group.closeAdd()">Cancel</button>
       <button class="btn-primary" id="btn-am-save" onclick="Group.confirmAdd()">Add to group</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FILL IN A MISSING CGPA ══════════════════════════════════════════════ -->
+<div class="modal-back" id="cgpa-modal">
+  <div class="modal-card" style="max-width:380px;">
+    <h3>Add CGPA</h3>
+    <div class="panel-sub" id="cg-who"></div>
+    <div id="cg-err" class="alert-box"></div>
+    <div class="field">
+      <label for="cg-value">CGPA <span style="color:var(--red)">*</span></label>
+      <input type="text" id="cg-value" class="mono" maxlength="4" inputmode="decimal" placeholder="e.g. 3.25"/>
+      <div class="hint">Out of 4.00, to two decimal places.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="Group.closeCgpa()">Cancel</button>
+      <button class="btn-primary" id="btn-cg-save" onclick="Group.saveCgpa()">Save</button>
     </div>
   </div>
 </div>
@@ -466,7 +487,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-16-09-2026 R01</span>
+      <span class="topbar-sub">v04-17-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -724,7 +745,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-16-09-2026 R01</span>
+      <span class="topbar-sub">v04-17-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -761,7 +782,8 @@
           from the FYP grading portal when the week-14 report is due.</div>
       </div>
       <div class="field">
-        <label>Your teammates</label>
+        <label>Your teammates <span style="color:var(--red)">*</span></label>
+        <div class="hint" style="margin:0 0 7px 0;">Full name, student ID and CGPA are all required for every teammate.</div>
         <div id="ng-members"></div>
         <button class="btn-ghost" onclick="Group.addMemberRow()" style="margin-top:6px;">
           <i class="fas fa-plus me-1"></i>Add a teammate
@@ -1355,6 +1377,15 @@ function toLocalInput(iso) {
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+// Mirrors parseCgpa() in api/index.js — 0.00 to 4.00, at most two decimals.
+// The server is still the authority; this only gives immediate feedback.
+function validCgpa(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!/^\d(?:\.\d{1,2})?$/.test(t)) return false;
+  const n = Number(t);
+  return isFinite(n) && n >= 0 && n <= 4;
+}
+
 function deadlineIsPast(iso) {
   if (!iso) return false;
   const d = new Date(iso);
@@ -1778,11 +1809,29 @@ const Group = {
         <i class="fas ${owner ? 'fa-user-pen' : 'fa-user'}" style="color:${owner ? 'var(--blue)' : 'var(--slate-soft)'}"></i>
         <span class="nm">${escHtml(x.name)}${x.id === Student.me.id ? ' <span class="owner-tag" style="background:#e0e7ff;color:#4338ca;">YOU</span>' : ''}${owner ? ' <span class="owner-tag">GROUP CREATOR</span>' : ''}</span>
         <span class="sid">${escHtml(x.id)}</span>
-        <span class="cgpa-chip" title="CGPA out of 4.00">${x.cgpa == null ? '—' : Number(x.cgpa).toFixed(2)}</span>
+        ${x.cgpa == null
+          ? (iAmOwner && !frozen
+              ? `<button class="cgpa-chip missing" title="This CGPA is required"
+                    onclick="Group.openCgpa('${escHtml(x.id)}')">Add CGPA</button>`
+              : '<span class="cgpa-chip missing" title="This CGPA is still required">missing</span>')
+          : `<span class="cgpa-chip" title="CGPA out of 4.00">${Number(x.cgpa).toFixed(2)}</span>`}
         ${canRemove ? `<button class="icon-btn danger" title="Remove ${escHtml(x.name)}"
              onclick="Group.remove('${escHtml(x.id)}')"><i class="fas fa-xmark"></i></button>` : ''}
       </div>`;
     }).join('');
+
+    // CGPA is mandatory; anyone registered before it existed still needs one
+    const missing = r.members.filter(m => m.cgpa == null);
+    if (missing.length) {
+      setAlert('grp-msg',
+        `${missing.length} member(s) still need a CGPA: ${missing.map(m => m.name).join(', ')}. `
+        + (iAmOwner
+            ? 'Click "Add CGPA" beside each name to complete the group.'
+            : 'Ask the group creator to add it.'),
+        'warn');
+    } else {
+      setAlert('grp-msg', '');
+    }
 
     const ownerName = (r.members.find(m => m.id === ownerId) || {}).name || 'the group creator';
     el('grp-owner-actions').style.display = (iAmOwner && !frozen) ? 'flex' : 'none';
@@ -1845,8 +1894,24 @@ const Group = {
       if (!n || !d) return;
       // a wholly blank row is simply ignored
       if (!n.value.trim() && !d.value.trim() && !(c && c.value.trim())) return;
-      others.push({ name: n.value, id: d.value, cgpa: c ? c.value : '' });
+      others.push({ name: n.value, id: d.value, cgpa: c ? c.value : '', _cgpaEl: c, _nameEl: n });
     });
+
+    // Catch a missing CGPA here rather than after a round trip
+    if (!validCgpa(el('ng-me-cgpa').value)) {
+      setAlert('newgroup-err', 'Please enter your CGPA — a number between 0.00 and 4.00.');
+      el('ng-me-cgpa').focus();
+      return;
+    }
+    for (const o of others) {
+      if (!validCgpa(o.cgpa)) {
+        setAlert('newgroup-err',
+          `Please enter a CGPA for ${o.name.trim() || 'every teammate'} — a number between 0.00 and 4.00.`);
+        if (o._cgpaEl) o._cgpaEl.focus();
+        return;
+      }
+    }
+    others.forEach(o => { delete o._cgpaEl; delete o._nameEl; });
     const btn = el('btn-create-group');
     btn.disabled = true;
     try {
@@ -1875,6 +1940,11 @@ const Group = {
     const btn = el('btn-am-save');
     btn.disabled = true;
     try {
+      if (!validCgpa(el('am-cgpa').value)) {
+        setAlert('am-err', 'Please enter a CGPA between 0.00 and 4.00.');
+        el('am-cgpa').focus();
+        return;
+      }
       const m = Student.me;
       const r = await api('orgAddMember', m.program, m.campus, m.id, {
         name: el('am-name').value, id: el('am-id').value, cgpa: el('am-cgpa').value,
@@ -1882,6 +1952,35 @@ const Group = {
       if (!r.success) { setAlert('am-err', r.message); return; }
       this.closeAdd();
       setAlert('grp-msg', '');
+      await this.load();
+    } finally { btn.disabled = false; }
+  },
+
+  openCgpa(targetId) {
+    const who = ((this.data.members || []).find(x => x.id === targetId) || {});
+    this._cgpaTarget = targetId;
+    el('cg-who').textContent = `For ${who.name || targetId}`;
+    el('cg-value').value = '';
+    setAlert('cg-err', '');
+    el('cgpa-modal').classList.add('open');
+    el('cg-value').focus();
+  },
+
+  closeCgpa() { el('cgpa-modal').classList.remove('open'); },
+
+  async saveCgpa() {
+    if (!validCgpa(el('cg-value').value)) {
+      setAlert('cg-err', 'Please enter a CGPA between 0.00 and 4.00.');
+      return;
+    }
+    const btn = el('btn-cg-save');
+    btn.disabled = true;
+    try {
+      const m = Student.me;
+      const r = await api('orgSetMemberCgpa', m.program, m.campus, m.id,
+        this._cgpaTarget, el('cg-value').value);
+      if (!r.success) { setAlert('cg-err', r.message); return; }
+      this.closeCgpa();
       await this.load();
     } finally { btn.disabled = false; }
   },
@@ -2326,12 +2425,16 @@ el('ouridea-modal').addEventListener('click', e => {
 el('member-modal').addEventListener('click', e => {
   if (e.target === el('member-modal')) Group.closeAdd();
 });
+el('cgpa-modal').addEventListener('click', e => {
+  if (e.target === el('cgpa-modal')) Group.closeCgpa();
+});
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (el('idea-modal').classList.contains('open'))    Ideas.closeForm();
   if (el('share-modal').classList.contains('open'))   Share.close();
   if (el('ouridea-modal').classList.contains('open')) OurIdea.closeForm();
   if (el('member-modal').classList.contains('open'))  Group.closeAdd();
+  if (el('cgpa-modal').classList.contains('open'))    Group.closeCgpa();
 });
 
 (async function boot(){

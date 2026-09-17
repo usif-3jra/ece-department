@@ -367,6 +367,7 @@ async function ensureOrganizerTables(sql) {
     added_by_student_id TEXT NOT NULL DEFAULT '',
     joined_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
+  await sql`ALTER TABLE org_group_members ADD COLUMN IF NOT EXISTS cgpa NUMERIC(4,2)`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_id_idx
     ON org_group_members (cycle_id, student_id)`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_name_idx
@@ -568,6 +569,18 @@ function formatGroupCode(cycle, n) {
 
 const STUDENT_ID_RE = /^20\d{7}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// CGPA on the standard 4.00 scale. Returned as a number, or null when the
+// value is missing or outside the scale.
+const CGPA_MAX = 4;
+function parseCgpa(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return null;
+  if (!/^\d(?:\.\d{1,2})?$/.test(t)) return null;
+  const n = Number(t);
+  if (!isFinite(n) || n < 0 || n > CGPA_MAX) return null;
+  return Math.round(n * 100) / 100;
+}
 function normName(s) { return String(s || '').trim().replace(/\s+/g, ' '); }
 
 // Student-side cycle resolution. Refuses to create a cycle for a program+campus
@@ -1563,7 +1576,11 @@ module.exports = async function handler(req, res) {
             return ok({ success: false, message: `"${sid || '(blank)'}" is not a valid student ID — it must be 9 digits starting with 20.` });
           if (name.split(' ').length < 2)
             return ok({ success: false, message: `Please give a full name for student ${sid}.` });
-          members.push({ id: sid, name, email: String((m && m.email) || '').trim(), creator: !!m.creator });
+          const cgpa = parseCgpa(m && m.cgpa);
+          if (cgpa === null)
+            return ok({ success: false,
+              message: `Please enter a valid CGPA for ${name || sid} — a number between 0.00 and ${CGPA_MAX.toFixed(2)}.` });
+          members.push({ id: sid, name, email: String((m && m.email) || '').trim(), cgpa, creator: !!m.creator });
         }
         if (members.length < Number(cycle.min_group_size))
           return ok({ success: false, message: `A group needs at least ${cycle.min_group_size} students.` });
@@ -1615,8 +1632,8 @@ module.exports = async function handler(req, res) {
         try {
           for (const m of members) {
             await sql`INSERT INTO org_group_members
-              (cycle_id, group_id, student_id, student_name, email, added_by_student_id)
-              VALUES (${cycle.id}, ${groupId}, ${m.id}, ${m.name}, ${m.email}, ${creator.id})`;
+              (cycle_id, group_id, student_id, student_name, email, cgpa, added_by_student_id)
+              VALUES (${cycle.id}, ${groupId}, ${m.id}, ${m.name}, ${m.email}, ${m.cgpa}, ${creator.id})`;
           }
         } catch (e) {
           // Roll back so a half-built group never blocks the students in it
@@ -1688,7 +1705,10 @@ module.exports = async function handler(req, res) {
             proposedDesc:  found.group.proposed_desc || '',
             proposedAt:    found.group.proposed_at || null,
           },
-          members: found.members.map(m => ({ id: m.student_id, name: m.student_name, email: m.email || '' })),
+          members: found.members.map(m => ({
+            id: m.student_id, name: m.student_name, email: m.email || '',
+            cgpa: m.cgpa == null ? null : Number(m.cgpa),
+          })),
           ranking: ranks.map(r => ({
             rank: Number(r.rank), ideaId: r.idea_id, title: r.title, field: r.field || '',
             minStudents: Number(r.min_students), maxStudents: Number(r.max_students),
@@ -1773,9 +1793,16 @@ module.exports = async function handler(req, res) {
         const { cycle } = ctx;
 
         const groups = await sql`SELECT * FROM org_groups WHERE cycle_id = ${cycle.id} ORDER BY group_code`;
-        const members = await sql`SELECT group_id FROM org_group_members WHERE cycle_id = ${cycle.id}`;
-        const sizeBy = new Map();
-        members.forEach(m => sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1));
+        const members = await sql`SELECT group_id, cgpa FROM org_group_members WHERE cycle_id = ${cycle.id}`;
+        const sizeBy = new Map(), cgpaBy = new Map();
+        members.forEach(m => {
+          sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1);
+          if (m.cgpa != null) cgpaBy.set(m.group_id, (cgpaBy.get(m.group_id) || []).concat(Number(m.cgpa)));
+        });
+        const avgCgpa = gid => {
+          const v = cgpaBy.get(gid);
+          return v && v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : null;
+        };
         return ok({
           success: true,
           phase: cycle.phase,
@@ -1784,6 +1811,7 @@ module.exports = async function handler(req, res) {
             // allocation is published.
             code: g.group_code,
             size: sizeBy.get(g.id) || 0,
+            avgCgpa: avgCgpa(g.id),
             createdAt: g.created_at,
             proposedTitle: g.proposed_title || '',
             proposedDesc:  g.proposed_desc || '',
@@ -1791,6 +1819,37 @@ module.exports = async function handler(req, res) {
           })),
           withIdea: groups.filter(g => (g.proposed_title || '').trim()).length,
         });
+      }
+
+      // Fills in a CGPA that is still missing. Members registered before CGPA
+      // became mandatory have a NULL, and nothing else would ever ask for it.
+      case 'orgSetMemberCgpa': {
+        const [program, campus, studentId, targetId, cgpa] = args;
+        const cy = await studentCycle(sql, program, campus);
+        if (cy.error) return ok({ success: false, message: cy.error });
+        const cycle = cy.cycle;
+        if (cycle.phase === 'ALLOCATED')
+          return ok({ success: false, message: 'Projects have already been assigned.' });
+        const sid = String(studentId || '').trim();
+        const tid = String(targetId || '').trim();
+        const found = await findStudentGroup(sql, cycle.id, sid);
+        if (!found) return ok({ success: false, message: 'You are not in a group.' });
+        if (found.group.created_by_student_id !== sid)
+          return ok({ success: false, message: 'Only the student who created this group can enter a CGPA.' });
+        const target = found.members.find(m => m.student_id === tid);
+        if (!target) return ok({ success: false, message: 'That student is not in your group.' });
+
+        const value = parseCgpa(cgpa);
+        if (value === null)
+          return ok({ success: false,
+            message: `Please enter a valid CGPA — a number between 0.00 and ${CGPA_MAX.toFixed(2)}.` });
+
+        await sql`UPDATE org_group_members SET cgpa = ${value}
+          WHERE cycle_id = ${cycle.id} AND student_id = ${tid}`;
+        const me = found.members.find(m => m.student_id === sid);
+        await logAudit(sql, cycle.id, found.group.id, 'student', sid, me ? me.student_name : sid,
+          'cgpa_set', { student: target.student_name, cgpa: value });
+        return ok({ success: true });
       }
 
       case 'orgRemoveMember': {
@@ -1842,12 +1901,16 @@ module.exports = async function handler(req, res) {
           return ok({ success: false, message: 'Student ID must be 9 digits starting with 20.' });
         if (name.split(' ').length < 2)
           return ok({ success: false, message: 'Please enter their full name.' });
+        const newCgpa = parseCgpa(newMember && newMember.cgpa);
+        if (newCgpa === null)
+          return ok({ success: false,
+            message: `Please enter a valid CGPA for ${name} — a number between 0.00 and ${CGPA_MAX.toFixed(2)}.` });
 
         try {
           await sql`INSERT INTO org_group_members
-            (cycle_id, group_id, student_id, student_name, email, added_by_student_id)
+            (cycle_id, group_id, student_id, student_name, email, cgpa, added_by_student_id)
             VALUES (${cycle.id}, ${found.group.id}, ${nid}, ${name},
-                    ${String((newMember && newMember.email) || '').trim()}, ${sid})`;
+                    ${String((newMember && newMember.email) || '').trim()}, ${newCgpa}, ${sid})`;
         } catch (e) {
           if (e.code === '23505')
             return ok({ success: false, message: `${name} (${nid}) is already in a group.` });
@@ -1994,10 +2057,17 @@ module.exports = async function handler(req, res) {
           sql`SELECT * FROM org_allocations WHERE cycle_id = ${cycle.id}`,
           sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id}`,
         ]);
-        const memberRows = await sql`SELECT group_id, student_id FROM org_group_members WHERE cycle_id = ${cycle.id}`;
+        const memberRows = await sql`SELECT group_id, student_id, cgpa FROM org_group_members WHERE cycle_id = ${cycle.id}`;
 
-        const sizeBy = new Map();
-        memberRows.forEach(m => sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1));
+        const sizeBy = new Map(), cgpaLists = new Map();
+        memberRows.forEach(m => {
+          sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1);
+          if (m.cgpa != null) cgpaLists.set(m.group_id, (cgpaLists.get(m.group_id) || []).concat(Number(m.cgpa)));
+        });
+        const groupAvg = gid => {
+          const v = cgpaLists.get(gid);
+          return v && v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : null;
+        };
         const ideaBy  = new Map(ideas.map(i => [i.id, i]));
         const allocBy = new Map(allocs.map(a => [a.group_id, a]));
         const capBy   = new Map(parts.map(p => [p.supervisor_id, Number(p.max_groups)]));
@@ -2017,6 +2087,7 @@ module.exports = async function handler(req, res) {
           }
           return {
             id: g.id, code: g.group_code, size, status: g.status,
+            avgCgpa: groupAvg(g.id),
             prefs,
             assignedIdeaId: a ? a.idea_id : null,
             assignedTitle: assignedIdea ? assignedIdea.title : '',
