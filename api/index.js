@@ -1492,6 +1492,114 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // Admin-only directory of everything in the current term, across every
+      // programme and campus. This is the one view that shows student names
+      // alongside their group — supervisors only ever see group codes.
+      case 'orgAdminDirectory': {
+        const [sessionToken] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok(sessionGone(sessionToken));
+        if (!isAdminUser(session)) return ok({ success: false, message: 'Only the admin can view this.' });
+        await ensureOrganizerTables(sql);
+
+        const { academic_year, semester } = academicContext();
+        const cycles = await sql`SELECT * FROM org_cycles
+          WHERE academic_year = ${academic_year} AND semester = ${semester}
+          ORDER BY program, campus`;
+        if (!cycles.length)
+          return ok({ success: true, academicYear: academic_year, semester, programs: [], totals: {} });
+
+        const ids = cycles.map(c => c.id);
+        const [groups, members, ideas, parts, ranks] = await Promise.all([
+          sql`SELECT * FROM org_groups WHERE cycle_id = ANY(${ids}) ORDER BY group_code`,
+          sql`SELECT * FROM org_group_members WHERE cycle_id = ANY(${ids}) ORDER BY id`,
+          sql`SELECT i.*, s.name AS supervisor_name, c.name AS co_name
+              FROM org_ideas i
+              LEFT JOIN supervisors s ON s.supervisor_id = i.supervisor_id
+              LEFT JOIN supervisors c ON c.supervisor_id = i.co_supervisor_id
+              WHERE i.cycle_id = ANY(${ids}) ORDER BY s.name, i.id`,
+          sql`SELECT p.*, s.name AS supervisor_name FROM org_participants p
+              LEFT JOIN supervisors s ON s.supervisor_id = p.supervisor_id
+              WHERE p.cycle_id = ANY(${ids})`,
+          sql`SELECT g.cycle_id, r.group_id FROM org_rankings r
+              JOIN org_groups g ON g.id = r.group_id WHERE g.cycle_id = ANY(${ids})`,
+        ]);
+
+        const rankedGroups = new Set(ranks.map(r => r.group_id));
+        const byProgram = new Map();
+        let tGroups = 0, tStudents = 0, tIdeas = 0, tWithIdea = 0;
+
+        for (const cyc of cycles) {
+          const cycGroups = groups.filter(g => g.cycle_id === cyc.id);
+          const cycIdeas  = ideas.filter(i => i.cycle_id === cyc.id);
+          const cycParts  = parts.filter(p => p.cycle_id === cyc.id);
+
+          const groupRows = cycGroups.map(g => {
+            const mem = members.filter(m => m.group_id === g.id);
+            const cg = mem.map(m => m.cgpa).filter(v => v != null).map(Number);
+            return {
+              code: g.group_code,
+              size: mem.length,
+              createdAt: g.created_at,
+              hasRanked: rankedGroups.has(g.id),
+              avgCgpa: cg.length ? Math.round((cg.reduce((a, b) => a + b, 0) / cg.length) * 100) / 100 : null,
+              proposedTitle: g.proposed_title || '',
+              proposedDesc:  g.proposed_desc || '',
+              members: mem.map(m => ({
+                name: m.student_name, id: m.student_id,
+                cgpa: m.cgpa == null ? null : Number(m.cgpa),
+                email: m.email || '',
+                isCreator: m.student_id === g.created_by_student_id,
+              })),
+            };
+          });
+
+          // Supervisors of this programme+campus, each with the ideas they wrote
+          const supMap = new Map();
+          cycParts.forEach(p => supMap.set(p.supervisor_id, {
+            id: p.supervisor_id, name: p.supervisor_name || p.supervisor_id,
+            capacity: Number(p.max_groups), status: p.status,
+            expected: p.expected !== false, ideas: [],
+          }));
+          cycIdeas.forEach(i => {
+            if (!supMap.has(i.supervisor_id)) {
+              supMap.set(i.supervisor_id, {
+                id: i.supervisor_id, name: i.supervisor_name || i.supervisor_id,
+                capacity: 1, status: 'submitted', expected: true, ideas: [],
+              });
+            }
+            supMap.get(i.supervisor_id).ideas.push({
+              title: i.title, field: i.field || '', description: i.description || '',
+              prerequisites: i.prerequisites || '',
+              minStudents: Number(i.min_students), maxStudents: Number(i.max_students),
+              coSupervisor: i.co_name || '', status: i.status,
+            });
+          });
+
+          const withIdea = groupRows.filter(g => g.proposedTitle).length;
+          const students = groupRows.reduce((a, g) => a + g.size, 0);
+          tGroups += groupRows.length; tStudents += students;
+          tIdeas += cycIdeas.length;   tWithIdea += withIdea;
+
+          if (!byProgram.has(cyc.program)) byProgram.set(cyc.program, []);
+          byProgram.get(cyc.program).push({
+            campus: cyc.campus, cycleId: cyc.id, phase: cyc.phase,
+            groupCount: groupRows.length, studentCount: students,
+            ideaCount: cycIdeas.length, groupsWithIdea: withIdea,
+            groups: groupRows,
+            supervisors: [...supMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+          });
+        }
+
+        return ok({
+          success: true, academicYear: academic_year, semester,
+          programs: [...byProgram.entries()]
+            .map(([program, campuses]) => ({ program, campuses }))
+            .sort((a, b) => a.program.localeCompare(b.program)),
+          totals: { groups: tGroups, students: tStudents, ideas: tIdeas, groupsWithIdea: tWithIdea },
+        });
+      }
+
       case 'orgSetDeadlinePolicy': {
         const [sessionToken, cycleId, policy, delegateId] = args;
         const session = await verifySession(sessionToken);

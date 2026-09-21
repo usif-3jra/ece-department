@@ -284,6 +284,39 @@
     .cap-help{color:var(--blue);font-size:12px;margin-left:4px;cursor:help;}
     .cap-help:hover{color:#1d4ed8;}
 
+    /* ── Admin directory ── */
+    .dir-prog{margin-bottom:18px;}
+    .dir-prog-head{font-size:14px;font-weight:700;color:var(--navy);padding:8px 0 6px;
+      border-bottom:2px solid var(--blue);margin-bottom:10px;}
+    .dir-campus{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;
+      background:rgba(255,255,255,.75);}
+    .dir-campus-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:9px;}
+    .dir-campus-name{font-size:13px;font-weight:600;color:var(--navy);margin-right:4px;}
+    .dir-toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--gray);
+      cursor:pointer;padding:7px 0;border-top:1px solid var(--line-soft);}
+    .dir-toggle:hover{color:var(--navy);}
+    .dir-toggle i{width:10px;font-size:10px;}
+    .dir-inner{padding:4px 0 8px 18px;}
+    .dir-group{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff;}
+    .dir-group-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+    .dir-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+    .dir-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;
+      color:var(--slate-soft);font-weight:600;border-bottom:1px solid var(--line);padding:4px 6px;}
+    .dir-table td{padding:5px 6px;border-bottom:1px solid var(--line-soft);}
+    .dir-table tr:last-child td{border-bottom:none;}
+    .dir-table td.n,.dir-table th.n{text-align:center;width:66px;}
+    .dir-email{color:var(--gray);font-size:11.5px;}
+    .dir-own{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--olive-dim);border:1px solid #a7f3d0;}
+    .dir-own .t{font-size:12.5px;font-weight:600;color:#3d6333;}
+    .dir-own .d{font-size:12px;color:#3d6333;margin-top:3px;line-height:1.5;}
+    .dir-idea{padding:7px 0;border-bottom:1px dashed var(--line-soft);}
+    .dir-idea:last-child{border-bottom:none;}
+    .dir-idea .t{font-size:12.5px;font-weight:600;display:flex;gap:7px;align-items:flex-start;}
+    .dir-idea .d{font-size:12px;color:var(--gray);line-height:1.5;margin-top:3px;margin-left:25px;}
+    .dir-idea .pn{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:5px;
+      background:var(--navy);color:#fff;font-size:10px;font-family:var(--font-mono);flex-shrink:0;}
+    .chip.olive{background:var(--olive-dim);color:#3d6333;border-color:#a7f3d0;}
+
     /* ── Share / QR ── */
     .share-row{display:flex;justify-content:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft);}
     #qrcode{display:flex;justify-content:center;padding:16px;background:#fff;border:1px solid var(--border);
@@ -487,7 +520,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-17-09-2026 R01</span>
+      <span class="topbar-sub">v04-21-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -640,6 +673,22 @@
         <div id="admin-msg" class="alert-box"></div>
         <div id="admin-list"></div>
       </div>
+
+      <!-- ── Admin: everything, across every programme ── -->
+      <div class="panel" id="panel-directory" style="display:none;">
+        <div class="panel-head-row">
+          <div>
+            <div class="panel-title">Admin — All Groups &amp; Project Ideas</div>
+            <div class="panel-sub" id="dir-sub">Loading…</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn-ghost" onclick="Directory.print()"><i class="fas fa-file-pdf me-1"></i>Print</button>
+            <button class="btn-ghost" onclick="Directory.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+          </div>
+        </div>
+        <div id="dir-msg" class="alert-box"></div>
+        <div id="dir-body"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -745,7 +794,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-17-09-2026 R01</span>
+      <span class="topbar-sub">v04-21-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1462,7 +1511,12 @@ const Settings = {
     el('panel-assign').style.display = showAssign ? 'block' : 'none';
     if (showAssign) Assign.load();
 
-    if (r.isAdmin) { el('panel-admin').style.display = 'block'; AdminPanel.load(); }
+    if (r.isAdmin) {
+      el('panel-admin').style.display = 'block';
+      el('panel-directory').style.display = 'block';
+      AdminPanel.load();
+      Directory.load();
+    }
   },
 
   async saveDeadlines() {
@@ -1686,6 +1740,209 @@ const StuGroups = {
         </div>` : ''}
       </div>`).join('')
       : '<div class="empty-note">Groups will appear here as students form them.</div>';
+  },
+};
+
+// ══ Admin: full directory across every programme ══════════════════════════
+// The only view that pairs student names with their group. Supervisors see
+// group codes only; the admin sees everything.
+const Directory = {
+  data: null,
+  _open: {},
+
+  async load() {
+    if (!Auth.token) return;
+    let r;
+    try { r = await api('orgAdminDirectory', Auth.token); }
+    catch (e) { setAlert('dir-msg', 'Could not load: ' + (e.message || e), 'err'); return; }
+    if (sessionCheck(r)) return;
+    if (!r.success) { setAlert('dir-msg', r.message, 'warn'); return; }
+    this.data = r;
+    this.render();
+  },
+
+  render() {
+    const r = this.data;
+    const t = r.totals || {};
+    el('dir-sub').innerHTML =
+      `${escHtml(r.semester)} ${escHtml(r.academicYear)} &middot; `
+      + `<strong>${t.groups || 0}</strong> group(s), <strong>${t.students || 0}</strong> student(s), `
+      + `<strong>${t.ideas || 0}</strong> supervisor idea(s), `
+      + `<strong>${t.groupsWithIdea || 0}</strong> group(s) with an idea of their own`;
+
+    if (!r.programs.length) {
+      el('dir-body').innerHTML = '<div class="empty-note">Nothing has been created for this term yet.</div>';
+      return;
+    }
+
+    el('dir-body').innerHTML = r.programs.map(p => `
+      <div class="dir-prog">
+        <div class="dir-prog-head">${escHtml(p.program)}</div>
+        ${p.campuses.map(c => this._campus(p.program, c)).join('')}
+      </div>`).join('');
+  },
+
+  _campus(program, c) {
+    const key = program + '|' + c.campus;
+    const openG = this._open['G' + key], openI = this._open['I' + key];
+    return `
+      <div class="dir-campus">
+        <div class="dir-campus-head">
+          <span class="dir-campus-name"><i class="fas fa-location-dot"></i> ${escHtml(c.campus)}</span>
+          <span class="chip teal">${escHtml(c.phase.replace(/_/g, ' '))}</span>
+          <span class="chip">${c.groupCount} group(s)</span>
+          <span class="chip">${c.studentCount} student(s)</span>
+          <span class="chip">${c.ideaCount} idea(s)</span>
+          ${c.groupsWithIdea ? `<span class="chip olive">${c.groupsWithIdea} own idea(s)</span>` : ''}
+        </div>
+
+        <div class="dir-toggle" onclick="Directory.toggle('G${escHtml(key)}')">
+          <i class="fas fa-chevron-${openG ? 'down' : 'right'}"></i>
+          Student groups (${c.groupCount})
+        </div>
+        ${openG ? `<div class="dir-inner">${c.groups.length
+          ? c.groups.map(g => this._group(g)).join('')
+          : '<div class="empty-note">No groups formed yet.</div>'}</div>` : ''}
+
+        <div class="dir-toggle" onclick="Directory.toggle('I${escHtml(key)}')">
+          <i class="fas fa-chevron-${openI ? 'down' : 'right'}"></i>
+          Supervisor project ideas (${c.ideaCount})
+        </div>
+        ${openI ? `<div class="dir-inner">${c.supervisors.length
+          ? c.supervisors.map(s => this._sup(s)).join('')
+          : '<div class="empty-note">No supervisors registered here.</div>'}</div>` : ''}
+      </div>`;
+  },
+
+  _group(g) {
+    return `
+      <div class="dir-group">
+        <div class="dir-group-head">
+          <span class="assign-code">${escHtml(g.code)}</span>
+          <span class="chip">${g.size} student(s)</span>
+          ${g.avgCgpa != null ? `<span class="cgpa-chip">avg ${g.avgCgpa.toFixed(2)}</span>` : ''}
+          <span class="chip ${g.hasRanked ? 'olive' : ''}">${g.hasRanked ? 'ranked' : 'not ranked'}</span>
+          ${g.proposedTitle
+            ? '<span class="chip olive"><i class="fas fa-lightbulb"></i> own idea</span>'
+            : '<span class="chip">no own idea</span>'}
+        </div>
+        <table class="dir-table">
+          <tr><th>Student name</th><th>ID</th><th class="n">CGPA</th><th>Email</th></tr>
+          ${g.members.map(m => `
+            <tr>
+              <td>${escHtml(m.name)}${m.isCreator ? ' <span class="owner-tag">CREATOR</span>' : ''}</td>
+              <td class="mono">${escHtml(m.id)}</td>
+              <td class="n mono">${m.cgpa == null ? '<span style="color:var(--amber)">missing</span>' : m.cgpa.toFixed(2)}</td>
+              <td class="dir-email">${escHtml(m.email) || '—'}</td>
+            </tr>`).join('')}
+        </table>
+        ${g.proposedTitle ? `
+          <div class="dir-own">
+            <div class="t"><i class="fas fa-lightbulb"></i> ${escHtml(g.proposedTitle)}</div>
+            <div class="d">${escHtml(g.proposedDesc)}</div>
+          </div>` : ''}
+      </div>`;
+  },
+
+  _sup(s) {
+    const label = { submitted: 'submitted', declared_none: 'no ideas this semester',
+                    draft: 'draft', not_started: 'not started' }[s.status] || s.status;
+    return `
+      <div class="dir-group">
+        <div class="dir-group-head">
+          <span style="font-weight:600;">${escHtml(s.name)}</span>
+          <span class="chip">can take ${s.capacity} group(s)</span>
+          <span class="chip ${s.status === 'submitted' ? 'olive' : ''}">${escHtml(label)}</span>
+          ${!s.expected ? '<span class="chip">not expected</span>' : ''}
+        </div>
+        ${s.ideas.length ? s.ideas.map((i, n) => `
+          <div class="dir-idea">
+            <div class="t"><span class="pn">${n + 1}</span>${escHtml(i.title)}</div>
+            <div class="idea-meta">
+              ${i.field ? `<span class="chip teal">${escHtml(i.field)}</span>` : ''}
+              <span class="chip">${i.minStudents}–${i.maxStudents} students</span>
+              ${i.coSupervisor ? `<span class="chip">with ${escHtml(i.coSupervisor)}</span>` : ''}
+            </div>
+            <div class="d">${escHtml(i.description)}</div>
+            ${i.prerequisites ? `<div class="d"><strong>Needs:</strong> ${escHtml(i.prerequisites)}</div>` : ''}
+          </div>`).join('')
+          : '<div class="dir-idea"><div class="d">No ideas entered.</div></div>'}
+      </div>`;
+  },
+
+  toggle(key) { this._open[key] = !this._open[key]; this.render(); },
+
+  expandAll(on) {
+    const r = this.data;
+    if (!r) return;
+    this._open = {};
+    if (on) r.programs.forEach(p => p.campuses.forEach(c => {
+      this._open['G' + p.program + '|' + c.campus] = true;
+      this._open['I' + p.program + '|' + c.campus] = true;
+    }));
+    this.render();
+  },
+
+  // Opens the whole directory as a print-ready document
+  print() {
+    const r = this.data;
+    if (!r) { setAlert('dir-msg', 'Nothing loaded to print yet.', 'warn'); return; }
+    const body = r.programs.map(p => `
+      <h2>${escHtml(p.program)}</h2>
+      ${p.campuses.map(c => `
+        <h3>${escHtml(c.campus)} Campus — ${c.groupCount} group(s), ${c.studentCount} student(s), ${c.ideaCount} idea(s)</h3>
+        ${c.groups.map(g => `
+          <div class="blk">
+            <div class="hd">${escHtml(g.code)} — ${g.size} student(s)${g.avgCgpa != null ? ` — average CGPA ${g.avgCgpa.toFixed(2)}` : ''}
+              ${g.proposedTitle ? ' — has its own idea' : ''}</div>
+            <table><tr><th>Student</th><th>ID</th><th>CGPA</th></tr>
+            ${g.members.map(m => `<tr><td>${escHtml(m.name)}${m.isCreator ? ' (creator)' : ''}</td>
+              <td>${escHtml(m.id)}</td><td>${m.cgpa == null ? 'missing' : m.cgpa.toFixed(2)}</td></tr>`).join('')}
+            </table>
+            ${g.proposedTitle ? `<p class="own"><strong>Own idea:</strong> ${escHtml(g.proposedTitle)} — ${escHtml(g.proposedDesc)}</p>` : ''}
+          </div>`).join('')}
+        ${c.supervisors.filter(s => s.ideas.length).map(s => `
+          <div class="blk">
+            <div class="hd">${escHtml(s.name)} — can take ${s.capacity} group(s)</div>
+            ${s.ideas.map((i, n) => `<p class="idea"><strong>${n + 1}. ${escHtml(i.title)}</strong>
+              (${i.minStudents}–${i.maxStudents} students)<br/>${escHtml(i.description)}</p>`).join('')}
+          </div>`).join('')}
+      `).join('')}`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>FYP Organizer — Full Directory</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  @page{margin:14mm;} *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;color:#1e293b;font-size:10pt;line-height:1.45;}
+  header{display:flex;align-items:center;gap:14px;border-bottom:3px solid #0f2040;padding-bottom:12px;margin-bottom:14px;}
+  header img{height:56px;}
+  .uni{font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#64748b;}
+  .fac{font-size:14pt;font-weight:700;color:#0f2040;}
+  .dept{font-size:10pt;color:#334155;}
+  h2{font-size:12.5pt;color:#0f2040;margin:16px 0 4px;border-bottom:1px solid #cbd5e1;padding-bottom:3px;}
+  h3{font-size:10.5pt;color:#334155;margin:10px 0 6px;}
+  .blk{break-inside:avoid;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:8px;}
+  .hd{font-weight:600;font-size:10pt;margin-bottom:5px;color:#0f2040;}
+  table{width:100%;border-collapse:collapse;font-size:9pt;}
+  th{text-align:left;color:#64748b;font-size:8pt;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding:3px 4px;}
+  td{padding:3px 4px;border-bottom:1px solid #f1f5f9;}
+  .own,.idea{font-size:9pt;margin-top:5px;color:#334155;}
+  .noprint{position:fixed;top:12px;right:12px;}
+  .noprint button{font-family:'Inter',sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
+    border:none;background:#2563eb;color:#fff;cursor:pointer;}
+  @media print{ .noprint{display:none !important;} }
+</style></head><body>
+<div class="noprint" id="toolbar"><button onclick="this.parentElement.style.display='none';window.print();setTimeout(function(){document.getElementById('toolbar').style.display='block';},600)">Print / Save as PDF</button></div>
+<header><img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="" onerror="this.style.display='none'"/>
+<div><div class="uni">Beirut Arab University</div><div class="fac">Faculty of Engineering</div>
+<div class="dept">Electrical and Computer Engineering — FYP1 ${escHtml(r.semester)} ${escHtml(r.academicYear)}</div></div></header>
+${body}
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { setAlert('dir-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
+    w.document.write(html);
+    w.document.close();
   },
 };
 
