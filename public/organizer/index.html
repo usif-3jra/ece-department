@@ -302,12 +302,21 @@
     .dir-inner{padding:4px 0 8px 18px;}
     .dir-group{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff;}
     .dir-group-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
-    .dir-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+    /* table-layout:fixed keeps the ID, CGPA and email columns in the same
+       place in every group — without it each table sizes its own columns and
+       a long student name shifts everything after it. */
+    .dir-table-wrap{overflow-x:auto;}
+    .dir-table{width:100%;min-width:520px;border-collapse:collapse;font-size:12.5px;table-layout:fixed;}
+    .dir-table col.c-name {width:auto;}
+    .dir-table col.c-id   {width:112px;}
+    .dir-table col.c-cgpa {width:78px;}
+    .dir-table col.c-email{width:210px;}
     .dir-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;
       color:var(--slate-soft);font-weight:600;border-bottom:1px solid var(--line);padding:4px 6px;}
-    .dir-table td{padding:5px 6px;border-bottom:1px solid var(--line-soft);}
+    .dir-table td{padding:5px 6px;border-bottom:1px solid var(--line-soft);
+      overflow-wrap:anywhere;vertical-align:top;}
     .dir-table tr:last-child td{border-bottom:none;}
-    .dir-table td.n,.dir-table th.n{text-align:center;width:66px;}
+    .dir-table td.n,.dir-table th.n{text-align:center;}
     .dir-email{color:var(--gray);font-size:11.5px;}
     .dir-own{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--olive-dim);border:1px solid #a7f3d0;}
     .dir-own .t{font-size:12.5px;font-weight:600;color:#3d6333;}
@@ -523,7 +532,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-21-09-2026 R02</span>
+      <span class="topbar-sub">v04-21-09-2026 R03</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -797,7 +806,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-21-09-2026 R02</span>
+      <span class="topbar-sub">v04-21-09-2026 R03</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1856,7 +1865,8 @@ const Directory = {
             ? '<span class="chip olive"><i class="fas fa-lightbulb"></i> own idea</span>'
             : '<span class="chip">no own idea</span>'}
         </div>
-        <table class="dir-table">
+        <div class="dir-table-wrap"><table class="dir-table">
+          <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/><col class="c-email"/></colgroup>
           <tr><th>Student name</th><th>ID</th><th class="n">CGPA</th><th>Email</th></tr>
           ${g.members.map(m => `
             <tr>
@@ -1865,7 +1875,7 @@ const Directory = {
               <td class="n mono">${m.cgpa == null ? '<span style="color:var(--amber)">missing</span>' : m.cgpa.toFixed(2)}</td>
               <td class="dir-email">${escHtml(m.email) || '—'}</td>
             </tr>`).join('')}
-        </table>
+        </table></div>
         ${g.proposedTitle ? `
           <div class="dir-own">
             <div class="t"><i class="fas fa-lightbulb"></i> ${escHtml(g.proposedTitle)}</div>
@@ -1925,9 +1935,11 @@ const Directory = {
           <div class="blk">
             <div class="hd">${escHtml(g.code)} — ${g.size} student(s)${g.avgCgpa != null ? ` — average CGPA ${g.avgCgpa.toFixed(2)}` : ''}
               ${g.proposedTitle ? ' — has its own idea' : ''}</div>
-            <table><tr><th>Student</th><th>ID</th><th>CGPA</th></tr>
+            <table>
+            <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/></colgroup>
+            <tr><th>Student</th><th>ID</th><th class="n">CGPA</th></tr>
             ${g.members.map(m => `<tr><td>${escHtml(m.name)}${m.isCreator ? ' (creator)' : ''}</td>
-              <td>${escHtml(m.id)}</td><td>${m.cgpa == null ? 'missing' : m.cgpa.toFixed(2)}</td></tr>`).join('')}
+              <td>${escHtml(m.id)}</td><td class="n">${m.cgpa == null ? 'missing' : m.cgpa.toFixed(2)}</td></tr>`).join('')}
             </table>
             ${g.proposedTitle ? `<p class="own"><strong>Own idea:</strong> ${escHtml(g.proposedTitle)} — ${escHtml(g.proposedDesc)}</p>` : ''}
           </div>`).join('')}
@@ -1954,9 +1966,14 @@ const Directory = {
   h3{font-size:10.5pt;color:#334155;margin:10px 0 6px;}
   .blk{break-inside:avoid;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:8px;}
   .hd{font-weight:600;font-size:10pt;margin-bottom:5px;color:#0f2040;}
-  table{width:100%;border-collapse:collapse;font-size:9pt;}
+  /* Fixed columns so the ID and CGPA line up down the page, whatever the
+     length of the student name above them. */
+  table{width:100%;border-collapse:collapse;font-size:9pt;table-layout:fixed;}
+  col.c-name{width:auto;} col.c-id{width:26mm;} col.c-cgpa{width:18mm;}
   th{text-align:left;color:#64748b;font-size:8pt;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding:3px 4px;}
-  td{padding:3px 4px;border-bottom:1px solid #f1f5f9;}
+  td{padding:3px 4px;border-bottom:1px solid #f1f5f9;overflow-wrap:anywhere;vertical-align:top;
+     font-variant-numeric:tabular-nums;}
+  td.n,th.n{text-align:center;}
   .own,.idea{font-size:9pt;margin-top:5px;color:#334155;}
   .noprint{position:fixed;top:12px;right:12px;}
   .noprint button{font-family:'Inter',sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
