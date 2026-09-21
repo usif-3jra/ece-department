@@ -285,13 +285,16 @@
     .cap-help:hover{color:#1d4ed8;}
 
     /* ── Admin directory ── */
-    .dir-prog{margin-bottom:18px;}
-    .dir-prog-head{font-size:14px;font-weight:700;color:var(--navy);padding:8px 0 6px;
-      border-bottom:2px solid var(--blue);margin-bottom:10px;}
+    .dir-campus-section{margin-bottom:22px;}
+    .dir-campus-banner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+      background:linear-gradient(135deg,var(--navy) 0%,#162d56 100%);color:#fff;
+      border-radius:12px;padding:11px 16px;margin-bottom:11px;font-size:14px;font-weight:700;}
+    .dir-campus-counts{font-size:11.5px;font-weight:500;color:rgba(255,255,255,.75);
+      font-family:var(--font-mono);}
     .dir-campus{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;
       background:rgba(255,255,255,.75);}
     .dir-campus-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:9px;}
-    .dir-campus-name{font-size:13px;font-weight:600;color:var(--navy);margin-right:4px;}
+    .dir-campus-name{font-size:13px;font-weight:700;color:var(--navy);margin-right:4px;}
     .dir-toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--gray);
       cursor:pointer;padding:7px 0;border-top:1px solid var(--line-soft);}
     .dir-toggle:hover{color:var(--navy);}
@@ -520,7 +523,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-21-09-2026 R01</span>
+      <span class="topbar-sub">v04-21-09-2026 R02</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -532,7 +535,7 @@
     <div id="campus-warn" class="alert-box" style="margin-top:16px;"></div>
 
     <div id="sup-content" style="display:none;">
-      <div class="cycle-bar">
+      <div class="cycle-bar" id="cycle-bar">
         <span class="cycle-bit"><i class="fas fa-calendar-days" style="color:var(--slate-soft)"></i>
           <strong id="cyc-term"></strong></span>
         <span class="cycle-bit"><i class="fas fa-graduation-cap" style="color:var(--slate-soft)"></i>
@@ -543,7 +546,7 @@
       </div>
 
       <!-- ── My ideas ── -->
-      <div class="panel" style="margin-top:18px;">
+      <div class="panel" id="panel-myideas" style="margin-top:18px;">
         <div class="panel-head-row">
           <div>
             <div class="panel-title">Your Project Ideas</div>
@@ -573,7 +576,7 @@
       </div>
 
       <!-- ── Colleague board ── -->
-      <div class="panel">
+      <div class="panel" id="panel-board">
         <div class="panel-title">Submission Status</div>
         <div class="panel-sub" id="board-progress">Loading…</div>
         <div class="progress-track"><div class="progress-fill" id="board-bar" style="width:0%"></div></div>
@@ -794,7 +797,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-21-09-2026 R01</span>
+      <span class="topbar-sub">v04-21-09-2026 R02</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1014,8 +1017,28 @@ const Auth = {
 
   enterHome() {
     const s = Auth.supervisor || {};
+    const isAdmin = !!s.isAdmin;
     el('sup-name').textContent  = s.name || '';
     el('sup-greet').textContent = s.name || 'Supervisor';
+
+    // The admin supervises nothing, so a campus would be meaningless for him.
+    // He gets the cross-campus view instead of the per-programme panels.
+    const supOnly = ['cycle-bar', 'panel-myideas', 'panel-board', 'panel-stugroups',
+                     'panel-manage', 'panel-assign'];
+    supOnly.forEach(id => { const n = el(id); if (n) n.style.display = isAdmin ? 'none' : ''; });
+
+    if (isAdmin) {
+      el('sup-context').textContent = 'Administrator — all programmes, both campuses';
+      setAlert('campus-warn', '');
+      el('sup-content').style.display = 'block';
+      el('panel-admin').style.display = 'block';
+      el('panel-directory').style.display = 'block';
+      AdminPanel.load();
+      Directory.load().then(() => Live.start());
+      showScreen('suphome');
+      return;
+    }
+
     el('sup-context').textContent =
       (s.program || 'Program not set') + (s.campus ? ' — ' + s.campus + ' campus' : '');
     // A supervisor with no campus cannot be placed in a program+campus idea list,
@@ -1028,6 +1051,7 @@ const Auth = {
       el('sup-content').style.display = 'none';
     } else {
       setAlert('campus-warn', '');
+      el('sup-content').style.display = 'block';
       Ideas.load()
         .then(() => Board.load())
         .then(() => Settings.load())
@@ -1770,46 +1794,52 @@ const Directory = {
       + `<strong>${t.ideas || 0}</strong> supervisor idea(s), `
       + `<strong>${t.groupsWithIdea || 0}</strong> group(s) with an idea of their own`;
 
-    if (!r.programs.length) {
+    if (!r.campuses.length) {
       el('dir-body').innerHTML = '<div class="empty-note">Nothing has been created for this term yet.</div>';
       return;
     }
 
-    el('dir-body').innerHTML = r.programs.map(p => `
-      <div class="dir-prog">
-        <div class="dir-prog-head">${escHtml(p.program)}</div>
-        ${p.campuses.map(c => this._campus(p.program, c)).join('')}
+    // Campus first — one section per campus — then programme inside it
+    el('dir-body').innerHTML = r.campuses.map(c => `
+      <div class="dir-campus-section">
+        <div class="dir-campus-banner">
+          <span><i class="fas fa-location-dot me-2"></i>${escHtml(c.campus)} Campus</span>
+          <span class="dir-campus-counts">
+            ${c.totals.groups} group(s) &middot; ${c.totals.students} student(s) &middot; ${c.totals.ideas} idea(s)
+          </span>
+        </div>
+        ${c.programs.map(p => this._program(c.campus, p)).join('')}
       </div>`).join('');
   },
 
-  _campus(program, c) {
-    const key = program + '|' + c.campus;
+  _program(campus, p) {
+    const key = campus + '|' + p.program;
     const openG = this._open['G' + key], openI = this._open['I' + key];
     return `
       <div class="dir-campus">
         <div class="dir-campus-head">
-          <span class="dir-campus-name"><i class="fas fa-location-dot"></i> ${escHtml(c.campus)}</span>
-          <span class="chip teal">${escHtml(c.phase.replace(/_/g, ' '))}</span>
-          <span class="chip">${c.groupCount} group(s)</span>
-          <span class="chip">${c.studentCount} student(s)</span>
-          <span class="chip">${c.ideaCount} idea(s)</span>
-          ${c.groupsWithIdea ? `<span class="chip olive">${c.groupsWithIdea} own idea(s)</span>` : ''}
+          <span class="dir-campus-name">${escHtml(p.program)}</span>
+          <span class="chip teal">${escHtml(p.phase.replace(/_/g, ' '))}</span>
+          <span class="chip">${p.groupCount} group(s)</span>
+          <span class="chip">${p.studentCount} student(s)</span>
+          <span class="chip">${p.ideaCount} idea(s)</span>
+          ${p.groupsWithIdea ? `<span class="chip olive">${p.groupsWithIdea} own idea(s)</span>` : ''}
         </div>
 
         <div class="dir-toggle" onclick="Directory.toggle('G${escHtml(key)}')">
           <i class="fas fa-chevron-${openG ? 'down' : 'right'}"></i>
-          Student groups (${c.groupCount})
+          Student groups (${p.groupCount})
         </div>
-        ${openG ? `<div class="dir-inner">${c.groups.length
-          ? c.groups.map(g => this._group(g)).join('')
+        ${openG ? `<div class="dir-inner">${p.groups.length
+          ? p.groups.map(g => this._group(g)).join('')
           : '<div class="empty-note">No groups formed yet.</div>'}</div>` : ''}
 
         <div class="dir-toggle" onclick="Directory.toggle('I${escHtml(key)}')">
           <i class="fas fa-chevron-${openI ? 'down' : 'right'}"></i>
-          Supervisor project ideas (${c.ideaCount})
+          Supervisor project ideas (${p.ideaCount})
         </div>
-        ${openI ? `<div class="dir-inner">${c.supervisors.length
-          ? c.supervisors.map(s => this._sup(s)).join('')
+        ${openI ? `<div class="dir-inner">${p.supervisors.length
+          ? p.supervisors.map(s => this._sup(s)).join('')
           : '<div class="empty-note">No supervisors registered here.</div>'}</div>` : ''}
       </div>`;
   },
@@ -1876,9 +1906,9 @@ const Directory = {
     const r = this.data;
     if (!r) return;
     this._open = {};
-    if (on) r.programs.forEach(p => p.campuses.forEach(c => {
-      this._open['G' + p.program + '|' + c.campus] = true;
-      this._open['I' + p.program + '|' + c.campus] = true;
+    if (on) r.campuses.forEach(c => c.programs.forEach(p => {
+      this._open['G' + c.campus + '|' + p.program] = true;
+      this._open['I' + c.campus + '|' + p.program] = true;
     }));
     this.render();
   },
@@ -1887,11 +1917,11 @@ const Directory = {
   print() {
     const r = this.data;
     if (!r) { setAlert('dir-msg', 'Nothing loaded to print yet.', 'warn'); return; }
-    const body = r.programs.map(p => `
-      <h2>${escHtml(p.program)}</h2>
-      ${p.campuses.map(c => `
-        <h3>${escHtml(c.campus)} Campus — ${c.groupCount} group(s), ${c.studentCount} student(s), ${c.ideaCount} idea(s)</h3>
-        ${c.groups.map(g => `
+    const body = r.campuses.map(c => `
+      <h2>${escHtml(c.campus)} Campus</h2>
+      ${c.programs.map(p => `
+        <h3>${escHtml(p.program)} — ${p.groupCount} group(s), ${p.studentCount} student(s), ${p.ideaCount} idea(s)</h3>
+        ${p.groups.map(g => `
           <div class="blk">
             <div class="hd">${escHtml(g.code)} — ${g.size} student(s)${g.avgCgpa != null ? ` — average CGPA ${g.avgCgpa.toFixed(2)}` : ''}
               ${g.proposedTitle ? ' — has its own idea' : ''}</div>
@@ -1901,7 +1931,7 @@ const Directory = {
             </table>
             ${g.proposedTitle ? `<p class="own"><strong>Own idea:</strong> ${escHtml(g.proposedTitle)} — ${escHtml(g.proposedDesc)}</p>` : ''}
           </div>`).join('')}
-        ${c.supervisors.filter(s => s.ideas.length).map(s => `
+        ${p.supervisors.filter(s => s.ideas.length).map(s => `
           <div class="blk">
             <div class="hd">${escHtml(s.name)} — can take ${s.capacity} group(s)</div>
             ${s.ideas.map((i, n) => `<p class="idea"><strong>${n + 1}. ${escHtml(i.title)}</strong>
@@ -1970,6 +2000,8 @@ const Live = {
     if (!Auth.token || document.hidden) return;
     if (el('idea-modal').classList.contains('open')) return; // don't disturb an open form
     try {
+      // The admin has none of the per-programme panels, only the directory
+      if (Auth.supervisor && Auth.supervisor.isAdmin) { await Directory.load(); return; }
       await Board.load();
       await Settings.load();
       await StuGroups.load();

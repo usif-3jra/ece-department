@@ -1507,7 +1507,7 @@ module.exports = async function handler(req, res) {
           WHERE academic_year = ${academic_year} AND semester = ${semester}
           ORDER BY program, campus`;
         if (!cycles.length)
-          return ok({ success: true, academicYear: academic_year, semester, programs: [], totals: {} });
+          return ok({ success: true, academicYear: academic_year, semester, campuses: [], totals: {} });
 
         const ids = cycles.map(c => c.id);
         const [groups, members, ideas, parts, ranks] = await Promise.all([
@@ -1526,7 +1526,8 @@ module.exports = async function handler(req, res) {
         ]);
 
         const rankedGroups = new Set(ranks.map(r => r.group_id));
-        const byProgram = new Map();
+        // Campus is the top-level split, programme sits inside it
+        const byCampus = new Map();
         let tGroups = 0, tStudents = 0, tIdeas = 0, tWithIdea = 0;
 
         for (const cyc of cycles) {
@@ -1581,9 +1582,9 @@ module.exports = async function handler(req, res) {
           tGroups += groupRows.length; tStudents += students;
           tIdeas += cycIdeas.length;   tWithIdea += withIdea;
 
-          if (!byProgram.has(cyc.program)) byProgram.set(cyc.program, []);
-          byProgram.get(cyc.program).push({
-            campus: cyc.campus, cycleId: cyc.id, phase: cyc.phase,
+          if (!byCampus.has(cyc.campus)) byCampus.set(cyc.campus, []);
+          byCampus.get(cyc.campus).push({
+            program: cyc.program, cycleId: cyc.id, phase: cyc.phase,
             groupCount: groupRows.length, studentCount: students,
             ideaCount: cycIdeas.length, groupsWithIdea: withIdea,
             groups: groupRows,
@@ -1591,11 +1592,27 @@ module.exports = async function handler(req, res) {
           });
         }
 
+        // Debbieh before Tripoli, matching CAMPUSES; anything else after
+        const campusOrder = c => {
+          const i = CAMPUSES.indexOf(c);
+          return i === -1 ? CAMPUSES.length : i;
+        };
+        const campuses = [...byCampus.entries()]
+          .map(([campus, programs]) => ({
+            campus,
+            programs: programs.sort((a, b) => a.program.localeCompare(b.program)),
+            totals: programs.reduce((t, p) => ({
+              groups: t.groups + p.groupCount,
+              students: t.students + p.studentCount,
+              ideas: t.ideas + p.ideaCount,
+              groupsWithIdea: t.groupsWithIdea + p.groupsWithIdea,
+            }), { groups: 0, students: 0, ideas: 0, groupsWithIdea: 0 }),
+          }))
+          .sort((a, b) => campusOrder(a.campus) - campusOrder(b.campus));
+
         return ok({
           success: true, academicYear: academic_year, semester,
-          programs: [...byProgram.entries()]
-            .map(([program, campuses]) => ({ program, campuses }))
-            .sort((a, b) => a.program.localeCompare(b.program)),
+          campuses,
           totals: { groups: tGroups, students: tStudents, ideas: tIdeas, groupsWithIdea: tWithIdea },
         });
       }
