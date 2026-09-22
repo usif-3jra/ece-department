@@ -11,6 +11,7 @@ const PWD_SALT          = process.env.PWD_SALT || 'bau-fyp-salt-2025';
 
 const ADMIN_ID          = 'A20160170';
 const SESSION_TTL       = 8 * 60 * 60 * 1000;
+const MAIL_MAX_RECIPIENTS = 200;   // guard against a runaway paste in the mailer
 const MAX_TRIES         = 5;
 const LOCKOUT_MS        = 15 * 60 * 1000;
 const TOKEN_EXPIRY_DAYS = 30;
@@ -717,6 +718,87 @@ function mapIdea(r) {
     maxStudents: Number(r.max_students), coSupervisorId: r.co_supervisor_id || '',
     status: r.status, supervisorId: r.supervisor_id,
   };
+}
+
+// ── Department mailer ─────────────────────────────────────────────────────
+// Any signed-in supervisor may send from the department address, so every
+// send is recorded: who, to whom, and what subject.
+let _mailLogReady = false;
+async function ensureMailLog(sql) {
+  if (_mailLogReady) return;
+  await sql`CREATE TABLE IF NOT EXISTS email_log (
+    id            SERIAL PRIMARY KEY,
+    supervisor_id TEXT NOT NULL,
+    supervisor_name TEXT NOT NULL DEFAULT '',
+    subject       TEXT NOT NULL DEFAULT '',
+    recipients    TEXT NOT NULL DEFAULT '',
+    sent_count    INT  NOT NULL DEFAULT 0,
+    failed_count  INT  NOT NULL DEFAULT 0,
+    sent_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS email_log_when_idx ON email_log (sent_at DESC)`;
+  _mailLogReady = true;
+}
+
+// Wraps free text in the same frame the system's own notifications use.
+function mailLetterhead({ title, subtitle, content, footer, logo }) {
+  const useLogo = logo && logo !== 'none'
+    ? logo : (logo === 'none' ? '' : 'https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png');
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
+<body style="margin:0;padding:0;background:#f4f6fb;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;">
+<tr><td align="center" style="padding:32px 16px;">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+  ${useLogo ? `<tr><td align="center" style="background:#ffffff;padding:28px 40px 16px;">
+    <img src="${useLogo}" alt="" width="130" style="display:block;max-width:130px;height:auto;"/></td></tr>` : ''}
+  ${title ? `<tr><td style="background:#0a1f44;padding:24px 40px;text-align:center;">
+    <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:.02em;margin-bottom:6px;">${title}</div>
+    ${subtitle ? `<div style="color:#94a3b8;font-size:13px;">${subtitle}</div>` : ''}</td></tr>` : ''}
+  <tr><td style="padding:32px 40px;color:#2d2d2d;font-size:15px;line-height:1.7;">
+${content}
+  </td></tr>
+  <tr><td style="border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;color:#9ca3af;font-size:11px;background:#f9fafb;">
+    ${footer || '&copy; ' + new Date().getFullYear() + ' Beirut Arab University — Faculty of Engineering — ECE Department'}
+  </td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+// Plain text to simple paragraphs, so nobody has to write HTML
+function mailTextToHtml(text) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(text).split(/\n\s*\n/).map(block => {
+    const lines = block.split('\n').map(l => esc(l.trim())).filter(Boolean);
+    return lines.length ? `<p style="margin:0 0 16px;">${lines.join('<br/>')}</p>` : '';
+  }).filter(Boolean).join('\n');
+}
+
+function buildMailBody(p) {
+  const content = p.mode === 'text' ? mailTextToHtml(p.body || '') : String(p.body || '');
+  return p.letterhead
+    ? mailLetterhead({ title: p.title, subtitle: p.subtitle, content, footer: p.footer, logo: p.logo })
+    : content;
+}
+
+// Same transport as the rest of the system, plus a reply-to so answers reach
+// the supervisor who wrote the message rather than the no-reply address.
+async function sendEmailAs(to, subject, html, fromName, replyTo) {
+  const payload = {
+    from: { email: SENDER_EMAIL, name: fromName || 'ECE Department — BAU' },
+    to: [{ email: String(to) }],
+    subject,
+    html,
+  };
+  if (replyTo) payload.reply_to = { email: replyTo };
+  const res = await fetch('https://send.api.mailtrap.io/api/send', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${MAILTRAP_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => String(res.status));
+    throw new Error(`${res.status}: ${err.slice(0, 300)}`);
+  }
 }
 
 async function isMeetingDelegate(sql, supervisorId) {
@@ -4563,6 +4645,103 @@ module.exports = async function handler(req, res) {
         if (isAdminUser(session)) return ok({ success: true, isDelegate: true, isAdmin: true });
         const isDelegate = await isMeetingDelegate(sql, session.supervisor_id);
         return ok({ success: true, isDelegate, isAdmin: false });
+      }
+
+      // ─── Department mailer (any signed-in supervisor) ────────────────
+
+      case 'mailPreview': {
+        const [token, payload] = args;
+        if (!await verifySession(token)) return ok({ success: false, message: 'Session expired.' });
+        return ok({ success: true, html: buildMailBody(payload || {}) });
+      }
+
+      case 'mailRecipientBook': {
+        // Colleagues, so addresses can be picked rather than typed
+        const [token] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        const rows = await sql`SELECT name, email, program FROM supervisors
+          WHERE supervisor_id != ${ADMIN_ID} AND email != '' ORDER BY name`;
+        const seen = new Set(), people = [];
+        for (const r of rows) {
+          const e = (r.email || '').trim().toLowerCase();
+          if (!e || seen.has(e)) continue;
+          seen.add(e);
+          people.push({ name: r.name, email: r.email, program: r.program || '' });
+        }
+        return ok({ success: true, people });
+      }
+
+      case 'mailSend': {
+        const [token, payload] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        if (!MAILTRAP_API_KEY || !SENDER_EMAIL)
+          return ok({ success: false, message: 'Email is not configured on the server.' });
+
+        const p = payload || {};
+        const subject = String(p.subject || '').trim();
+        if (!subject) return ok({ success: false, message: 'Please enter a subject.' });
+        if (!String(p.body || '').trim()) return ok({ success: false, message: 'The message is empty.' });
+
+        const raw = String(p.to || '').split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
+        const seen = new Set(), list = [], bad = [];
+        for (const addr of raw) {
+          const a = addr.toLowerCase();
+          if (seen.has(a)) continue;
+          seen.add(a);
+          (EMAIL_RE.test(a) ? list : bad).push(addr);
+        }
+        if (bad.length) return ok({ success: false, message: `Not a valid address: ${bad.slice(0, 5).join(', ')}` });
+        if (!list.length) return ok({ success: false, message: 'Please enter at least one recipient.' });
+        if (list.length > MAIL_MAX_RECIPIENTS)
+          return ok({ success: false, message: `That is ${list.length} recipients — the limit is ${MAIL_MAX_RECIPIENTS}.` });
+
+        const supRows = await sql`SELECT name, email FROM supervisors WHERE supervisor_id = ${session.supervisor_id}`;
+        const me = supRows[0] || { name: session.name || '', email: '' };
+        const fromName = `${me.name || 'ECE Department'} — ECE Department, BAU`;
+        const html = buildMailBody(p);
+
+        const sent = [], failed = [];
+        for (const to of list) {
+          try {
+            await sendEmailAs(to, subject, html, fromName, me.email || '');
+            sent.push(to);
+          } catch (e) {
+            failed.push({ email: to, error: e.message || String(e) });
+          }
+          if (list.length > 1) await new Promise(r => setTimeout(r, 150));
+        }
+
+        // Recorded because the message leaves the department's own address
+        try {
+          await ensureMailLog(sql);
+          await sql`INSERT INTO email_log
+            (supervisor_id, supervisor_name, subject, recipients, sent_count, failed_count)
+            VALUES (${session.supervisor_id}, ${me.name || ''}, ${subject},
+                    ${list.join(', ').slice(0, 4000)}, ${sent.length}, ${failed.length})`;
+        } catch { /* logging must never block a delivered message */ }
+
+        return ok({ success: true, sent, failed, replyTo: me.email || '' });
+      }
+
+      case 'mailHistory': {
+        const [token, mineOnly] = args;
+        const session = await verifySession(token);
+        if (!session) return ok({ success: false, message: 'Session expired.' });
+        await ensureMailLog(sql);
+        const rows = isAdminUser(session) && !mineOnly
+          ? await sql`SELECT * FROM email_log ORDER BY sent_at DESC LIMIT 100`
+          : await sql`SELECT * FROM email_log WHERE supervisor_id = ${session.supervisor_id}
+                      ORDER BY sent_at DESC LIMIT 100`;
+        return ok({
+          success: true,
+          isAdmin: isAdminUser(session),
+          items: rows.map(r => ({
+            at: r.sent_at, by: r.supervisor_name || r.supervisor_id, subject: r.subject,
+            recipients: r.recipients, sent: Number(r.sent_count), failed: Number(r.failed_count),
+          })),
+        });
       }
 
       case 'getMeetingSupervisors': {

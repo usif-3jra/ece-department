@@ -168,6 +168,61 @@
       .page-body{padding:18px 14px;}
       .jury-grid{grid-template-columns:1fr;}
     }
+  
+    /* ── Email composer ── */
+    .mail-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;}
+    @media (max-width:1050px){ .mail-cols{grid-template-columns:1fr;} }
+    .mail-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow);padding:16px;}
+    .mail-card + .mail-card{margin-top:14px;}
+    .mail-cols > div:last-child{position:sticky;top:16px;}
+    .mail-field{margin-bottom:13px;}
+    .mail-field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+    .mail-field input,.mail-field textarea{width:100%;padding:9px 12px;border:1px solid var(--line);
+      border-radius:8px;font-family:var(--font-body);font-size:14px;color:var(--ink);background:#fff;}
+    .mail-field textarea{resize:vertical;line-height:1.55;}
+    .mail-field textarea.mono,.mail-field input.mono{font-family:var(--font-mono);font-size:12.5px;}
+    .mail-field input:focus,.mail-field textarea:focus{outline:none;border-color:var(--accent);
+      box-shadow:0 0 0 3px var(--accent-dim);}
+    .mail-hint{font-size:11.5px;color:var(--slate-soft);margin-top:4px;}
+    .mail-row{display:flex;gap:12px;flex-wrap:wrap;}
+    .mail-row > *{flex:1;min-width:180px;}
+    .mail-chip{font-family:var(--font-mono);font-size:11px;background:var(--accent-dim);color:var(--accent);
+      border-radius:20px;padding:2px 9px;margin-left:5px;}
+    .mail-chip.bad{background:var(--rust-dim);color:var(--rust);}
+    .mail-link{background:none;border:none;color:var(--accent);font-size:11.5px;cursor:pointer;
+      font-family:var(--font-body);padding:0;margin-left:8px;text-decoration:underline;}
+    .mail-seg{display:inline-flex;background:var(--line-soft);border:1px solid var(--line);
+      border-radius:9px;padding:3px;gap:3px;margin-bottom:8px;}
+    .mail-seg button{border:none;background:transparent;border-radius:6px;padding:5px 13px;font-size:12.5px;
+      font-weight:600;color:var(--slate);cursor:pointer;font-family:var(--font-body);}
+    .mail-seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+    .mail-switch{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-soft);cursor:pointer;}
+    .mail-switch input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+    .mail-alert{border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;display:none;line-height:1.5;}
+    .mail-alert.err{background:var(--rust-dim);color:var(--rust);border:1px solid #f0cfc6;display:block;}
+    .mail-alert.ok{background:var(--olive-dim);color:var(--olive);border:1px solid #cfe3c7;display:block;}
+    .mail-alert.warn{background:var(--amber-dim);color:#8a5e18;border:1px solid #edd9ad;display:block;}
+    .mail-alert.info{background:var(--accent-dim);color:var(--accent);border:1px solid #bfdedb;display:block;}
+    #mail-preview{width:100%;height:600px;border:1px solid var(--line);border-radius:10px;background:#fff;}
+    .mail-results{font-size:12.5px;margin-top:10px;}
+    .mail-results div{padding:4px 0;border-bottom:1px dashed var(--line-soft);display:flex;gap:8px;align-items:baseline;}
+    .mail-results div:last-child{border-bottom:none;}
+    .mail-results .em{font-family:var(--font-mono);font-size:11.5px;}
+    .mail-results .good{color:var(--olive);}
+    .mail-results .bad{color:var(--rust);}
+    .mail-book{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:6px;}
+    .mail-book label{display:flex;align-items:center;gap:9px;padding:6px 8px;font-size:13px;
+      border-radius:6px;cursor:pointer;}
+    .mail-book label:hover{background:var(--line-soft);}
+    .mail-book .who{flex:1;}
+    .mail-book .em{font-family:var(--font-mono);font-size:11px;color:var(--slate);}
+  
+    .mailbox-back{position:fixed;inset:0;background:rgba(16,24,38,.45);display:none;
+      align-items:flex-start;justify-content:center;padding:44px 18px;overflow-y:auto;z-index:90;}
+    .mailbox-back.open{display:flex;}
+    .mailbox-card{background:var(--card);border-radius:var(--radius);box-shadow:0 20px 60px rgba(16,24,38,.25);
+      width:100%;max-width:520px;padding:22px;}
   </style>
 </head>
 <body>
@@ -195,7 +250,7 @@
     <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
     <div style="flex:1">
       <div class="topbar-title">Meeting Organizer</div>
-      <span class="topbar-sub">ECE Department — BAU &middot; v04-21-09-2026 R03</span>
+      <span class="topbar-sub">ECE Department — BAU &middot; v04-22-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="dash-sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -207,6 +262,9 @@
         <div class="page-sub">Click a session to add or view your agenda points</div>
       </div>
       <div id="dash-actions" class="d-flex gap-2">
+        <button class="btn-ghost" onclick="Mailer.open()">
+          <i class="fas fa-envelope me-1"></i> Send Email
+        </button>
         <button class="btn-primary" onclick="Dashboard.createSession()">
           <i class="fas fa-plus me-1"></i> New Session
         </button>
@@ -305,6 +363,116 @@
 </div>
 
 <!-- ═══ EXPORT SCREEN ════════════════════════════════════════════════════════ -->
+<!-- ═══ MAILER OVERLAY ═══════════════════════════════════════════════════════ -->
+<div id="mailbox-back" class="mailbox-back">
+  <div class="mailbox-card">
+    <h5 id="mailbox-title" style="font-size:16px;margin-bottom:12px;"></h5>
+    <div id="mailbox-body"></div>
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <button class="btn-ghost" onclick="MailBox.close()">Close</button>
+      <button class="btn-primary" id="mailbox-ok" onclick="MailBox.confirm()">Use selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EMAIL COMPOSER ════════════════════════════════════════════════════════ -->
+<div id="scr-mail" class="screen">
+  <div class="topbar">
+    <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_w.png" alt="BAU" class="topbar-logo" onerror="this.style.display='none'"/>
+    <div style="flex:1">
+      <div class="topbar-title">Send Email</div>
+      <span class="topbar-sub">ECE Department — BAU</span>
+    </div>
+    <span class="topbar-name" id="mail-sup-name"></span>
+    <button class="btn-topbar" onclick="showScreen('dash')"><i class="fas fa-arrow-left"></i> Back</button>
+  </div>
+
+  <div class="page-body">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <div class="page-heading">Compose a message</div>
+        <div class="page-sub">Sent from the department address, with replies going to you</div>
+      </div>
+      <button class="btn-ghost" onclick="Mailer.history()"><i class="fas fa-clock-rotate-left me-1"></i> History</button>
+    </div>
+
+    <div id="mail-msg" class="mail-alert"></div>
+
+    <div class="mail-cols">
+      <div>
+        <div class="mail-card">
+          <div class="mail-field">
+            <label>Recipients <span id="mail-count" class="mail-chip">0</span>
+              <button class="mail-link" onclick="Mailer.book()">choose colleagues</button>
+            </label>
+            <textarea id="mail-to" rows="3" class="mono"
+              placeholder="one@bau.edu.lb, two@bau.edu.lb" oninput="Mailer.count()"></textarea>
+            <div class="mail-hint">Commas, spaces or new lines. Everyone gets their own copy — no one sees the other addresses.</div>
+          </div>
+
+          <div class="mail-field">
+            <label for="mail-subject">Subject</label>
+            <input type="text" id="mail-subject" oninput="Mailer.touch()" placeholder="e.g. Department meeting — Thursday"/>
+          </div>
+
+          <div class="mail-field">
+            <label>Content</label>
+            <div class="mail-seg">
+              <button id="mail-mode-text" class="on" onclick="Mailer.mode('text')">Plain text</button>
+              <button id="mail-mode-html" onclick="Mailer.mode('html')">HTML</button>
+            </div>
+            <textarea id="mail-body" rows="13" oninput="Mailer.touch()"
+              placeholder="Write your message.&#10;&#10;Leave a blank line between paragraphs."></textarea>
+            <div class="mail-hint" id="mail-mode-hint">Blank lines become paragraphs; single line breaks stay as breaks.</div>
+          </div>
+        </div>
+
+        <div class="mail-card">
+          <label class="mail-switch">
+            <input type="checkbox" id="mail-lh" checked onchange="Mailer.touch()"/>
+            Use the department letterhead
+          </label>
+          <div id="mail-lh-fields" style="margin-top:12px;">
+            <div class="mail-row">
+              <div class="mail-field">
+                <label for="mail-title">Header title</label>
+                <input type="text" id="mail-title" value="Beirut Arab University" oninput="Mailer.touch()"/>
+              </div>
+              <div class="mail-field">
+                <label for="mail-sub">Header subtitle</label>
+                <input type="text" id="mail-sub" value="Faculty of Engineering — ECE Department" oninput="Mailer.touch()"/>
+              </div>
+            </div>
+            <div class="mail-field">
+              <label for="mail-footer">Footer line <span style="font-weight:400;color:#8A939B">(optional)</span></label>
+              <input type="text" id="mail-footer" oninput="Mailer.touch()" placeholder="Leave blank for the default"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="mail-card">
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <button class="btn-ghost" onclick="Mailer.test()">Send a test to myself</button>
+            <div style="flex:1"></div>
+            <button class="btn-ghost" onclick="Mailer.clear()">Clear</button>
+            <button class="btn-primary" id="mail-send" onclick="Mailer.send()">Send</button>
+          </div>
+          <div id="mail-results" class="mail-results"></div>
+        </div>
+      </div>
+
+      <div class="mail-card">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div><strong style="font-size:13px;">Preview</strong>
+            <div class="mail-hint" style="margin:0;">Exactly what will be sent</div></div>
+          <button class="btn-ghost" onclick="Mailer.refresh()">Refresh</button>
+        </div>
+        <iframe id="mail-preview" title="Email preview"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="scr-export" class="screen">
   <div class="topbar">
     <button class="btn-topbar btn-back" onclick="showScreen('session');Session.startPolling()"><i class="fas fa-arrow-left"></i></button>
@@ -508,6 +676,8 @@ document.addEventListener('click',e=>{
 });
 
 function el(id){return document.getElementById(id);}
+// commas, semicolons, spaces or new lines all separate addresses
+const SPLIT_RE = /[\s,;]+/;
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 async function translateToArabic(text) {
@@ -519,6 +689,198 @@ async function translateToArabic(text) {
     return data[0].map(x=>x[0]).join('');
   } catch { return ''; }
 }
+
+
+// ══ Small overlay used by the mailer (address book / history) ═════════════
+const MailBox = {
+  _onOk: null,
+  show(title, html, onOk) {
+    el('mailbox-title').textContent = title;
+    el('mailbox-body').innerHTML = html;
+    el('mailbox-ok').style.display = onOk ? '' : 'none';
+    this._onOk = onOk || null;
+    el('mailbox-back').classList.add('open');
+  },
+  close() { el('mailbox-back').classList.remove('open'); this._onOk = null; },
+  confirm() { const f = this._onOk; this.close(); if (f) f(); },
+};
+
+// ══ Department mailer ═════════════════════════════════════════════════════
+// Any signed-in supervisor may send from the department address. Every message
+// carries their name and a reply-to pointing at them, and each send is logged.
+const Mailer = {
+  _mode: 'text',
+  _timer: null,
+
+  open() {
+    el('mail-sup-name').textContent = (Auth.supervisor && Auth.supervisor.name) || '';
+    this.restore();
+    showScreen('mail');
+    this.count();
+    this.refresh();
+  },
+
+  note(text, kind) {
+    const b = el('mail-msg');
+    if (!text) { b.className = 'mail-alert'; b.innerHTML = ''; return; }
+    b.className = 'mail-alert ' + (kind || 'err');
+    b.innerHTML = text;
+  },
+
+  mode(m) {
+    this._mode = m;
+    el('mail-mode-text').classList.toggle('on', m === 'text');
+    el('mail-mode-html').classList.toggle('on', m === 'html');
+    el('mail-body').classList.toggle('mono', m === 'html');
+    el('mail-mode-hint').textContent = m === 'text'
+      ? 'Blank lines become paragraphs; single line breaks stay as breaks.'
+      : 'Your markup is sent as-is. Use inline styles — mail clients ignore style blocks.';
+    this.touch();
+  },
+
+  list() {
+    return String(el('mail-to').value || '').split(SPLIT_RE).map(t => t.trim()).filter(Boolean);
+  },
+
+  count() {
+    const n = this.list().length;
+    const c = el('mail-count');
+    c.textContent = n;
+    c.className = 'mail-chip' + (n > 200 ? ' bad' : '');
+    this.save();
+  },
+
+  payload() {
+    return {
+      to: el('mail-to').value,
+      subject: el('mail-subject').value,
+      body: el('mail-body').value,
+      mode: this._mode,
+      letterhead: el('mail-lh').checked,
+      title: el('mail-title').value,
+      subtitle: el('mail-sub').value,
+      footer: el('mail-footer').value,
+    };
+  },
+
+  touch() {
+    el('mail-lh-fields').style.display = el('mail-lh').checked ? '' : 'none';
+    this.save();
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this.refresh(), 400);
+  },
+
+  async refresh() {
+    const r = await api('mailPreview', Auth.token, this.payload());
+    if (!r || !r.success) return;
+    const d = el('mail-preview').contentDocument;
+    d.open();
+    d.write(r.html || '<p style="font-family:sans-serif;color:#888">Nothing to preview yet.</p>');
+    d.close();
+  },
+
+  async book() {
+    const r = await api('mailRecipientBook', Auth.token);
+    if (!r.success) { this.note(r.message, 'err'); return; }
+    const already = new Set(this.list().map(e => e.toLowerCase()));
+    const rows = r.people.map(pn =>
+      '<label><input type="checkbox" data-em="' + pn.email + '" ' +
+      (already.has(pn.email.toLowerCase()) ? 'checked' : '') + '/>' +
+      '<span class="who">' + pn.name +
+      (pn.program ? ' <span class="em">· ' + pn.program + '</span>' : '') + '</span>' +
+      '<span class="em">' + pn.email + '</span></label>').join('');
+    MailBox.show('Choose colleagues',
+      '<div class="mail-book" id="book-list">' +
+      (rows || '<p class="small text-secondary">No colleague addresses on file.</p>') + '</div>',
+      () => {
+        const picked = [].slice.call(document.querySelectorAll('#book-list input:checked'))
+          .map(c => c.dataset.em);
+        el('mail-to').value = picked.join(', ');
+        this.count();
+      });
+  },
+
+  async send(one) {
+    const p = this.payload();
+    if (one) p.to = one;
+    const n = one ? 1 : this.list().length;
+    if (!one && n > 1 && !confirm('Send this message to ' + n + ' recipients?')) return;
+
+    const btn = el('mail-send');
+    btn.disabled = true;
+    this.note('Sending…', 'info');
+    el('mail-results').innerHTML = '';
+    try {
+      const r = await api('mailSend', Auth.token, p);
+      if (!r.success) { this.note(r.message, 'err'); return; }
+      const okN = r.sent.length, badN = r.failed.length;
+      this.note(badN
+        ? 'Sent ' + okN + ', failed ' + badN + '. See below.'
+        : 'Sent to ' + okN + ' recipient' + (okN === 1 ? '' : 's') + '.' +
+          (r.replyTo ? ' Replies will come to ' + r.replyTo + '.' : ''),
+        badN ? 'warn' : 'ok');
+      el('mail-results').innerHTML =
+        r.sent.map(e => '<div><span class="good">&#10003;</span><span class="em">' + e + '</span></div>').join('') +
+        r.failed.map(f => '<div><span class="bad">&#10007;</span><span class="em">' + f.email +
+          '</span><span style="color:var(--rust)">' + f.error + '</span></div>').join('');
+    } catch (e) {
+      this.note('Could not reach the server: ' + (e.message || e), 'err');
+    } finally { btn.disabled = false; }
+  },
+
+  test() {
+    const me = (Auth.supervisor && Auth.supervisor.email) || '';
+    const to = prompt('Send a test copy to which address?', me);
+    if (to) this.send(to);
+  },
+
+  clear() {
+    if (!confirm('Clear the recipients, subject and message?')) return;
+    ['mail-to', 'mail-subject', 'mail-body'].forEach(id => { el(id).value = ''; });
+    el('mail-results').innerHTML = '';
+    this.note('');
+    this.count();
+    this.refresh();
+  },
+
+  async history() {
+    const r = await api('mailHistory', Auth.token, false);
+    if (!r.success) { this.note(r.message, 'err'); return; }
+    const rows = r.items.map(i =>
+      '<div style="padding:8px 0;border-bottom:1px dashed #e2e8f0;">' +
+      '<div style="font-size:13px;font-weight:600;">' + (i.subject || '(no subject)') + '</div>' +
+      '<div style="font-size:11.5px;color:#55606B;margin-top:2px;">' +
+      new Date(i.at).toLocaleString() + ' · by ' + i.by + ' · ' + i.sent + ' sent' +
+      (i.failed ? ', ' + i.failed + ' failed' : '') + '</div>' +
+      '<div style="font-size:11px;color:#8A939B;font-family:var(--font-mono);margin-top:3px;' +
+      'word-break:break-all;">' + i.recipients + '</div></div>').join('');
+    MailBox.show(r.isAdmin ? 'Email history — everyone' : 'Your sent messages',
+      '<div style="max-height:400px;overflow-y:auto;">' +
+      (rows || '<p class="small text-secondary">Nothing sent yet.</p>') + '</div>');
+  },
+
+  save() {
+    try {
+      sessionStorage.setItem('mtg_mail',
+        JSON.stringify(Object.assign(this.payload(), { mode: this._mode })));
+    } catch (e) { /* storage may be unavailable */ }
+  },
+
+  restore() {
+    let d = null;
+    try { d = JSON.parse(sessionStorage.getItem('mtg_mail') || 'null'); } catch (e) { d = null; }
+    if (!d) { this.mode('text'); return; }
+    el('mail-to').value = d.to || '';
+    el('mail-subject').value = d.subject || '';
+    el('mail-body').value = d.body || '';
+    el('mail-lh').checked = d.letterhead !== false;
+    if (d.title) el('mail-title').value = d.title;
+    if (d.subtitle) el('mail-sub').value = d.subtitle;
+    if (d.footer) el('mail-footer').value = d.footer;
+    this.mode(d.mode === 'html' ? 'html' : 'text');
+    el('mail-lh-fields').style.display = el('mail-lh').checked ? '' : 'none';
+  },
+};
 
 // ── Auth ───────────────────────────────────────────────────────────────────
 const Auth = {
