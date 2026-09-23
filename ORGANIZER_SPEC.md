@@ -1,6 +1,6 @@
 # FYP Projects Organizer — v4 Design Specification
 
-**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-22-09-2026 R01
+**Status:** build steps 1–8 complete (step 9, email notifications, not built) · **Base:** v3 (frozen) · **Stamp:** v04-23-09-2026 R01
 
 ## Scope decisions (confirmed)
 
@@ -35,7 +35,7 @@ ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS campus TEXT NOT NULL DEFAULT ''
 -- v3 reads supervisors with SELECT *, so this is safe for the frozen version.
 ```
 
-**org_cycles** — id, academic_year, semester, program, campus, phase, ideas_deadline, ranking_deadline, deadline_policy ('open' | 'locked' | 'delegate'), deadline_delegate, min_group_size (2), max_group_size (5), timestamps.
+**org_cycles** — id, academic_year, semester, program, campus, phase, ideas_deadline, ranking_deadline, deadline_policy ('open' | 'locked' | 'delegate'), deadline_delegate, min_group_size (1), max_group_size (5), timestamps.
 `UNIQUE (academic_year, semester, program, campus)`
 
 **org_participants** — cycle_id, supervisor_id, max_groups (default 2), status ('not_started' | 'draft' | 'submitted' | 'declared_none'), submitted_at.

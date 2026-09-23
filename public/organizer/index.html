@@ -532,7 +532,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-22-09-2026 R01</span>
+      <span class="topbar-sub">v04-23-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -806,7 +806,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-22-09-2026 R01</span>
+      <span class="topbar-sub">v04-23-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -843,8 +843,8 @@
           from the FYP grading portal when the week-14 report is due.</div>
       </div>
       <div class="field">
-        <label>Your teammates <span style="color:var(--red)">*</span></label>
-        <div class="hint" style="margin:0 0 7px 0;">Full name, student ID and CGPA are all required for every teammate.</div>
+        <label>Your teammates <span style="font-weight:400;color:var(--slate-soft)">(optional — leave blank to work alone)</span></label>
+        <div class="hint" style="margin:0 0 7px 0;">For each teammate you do add, full name, student ID and CGPA are all required.</div>
         <div id="ng-members"></div>
         <button class="btn-ghost" onclick="Group.addMemberRow()" style="margin-top:6px;">
           <i class="fas fa-plus me-1"></i>Add a teammate
@@ -2084,9 +2084,15 @@ const Group = {
       el('group-wrap').style.display = 'none';
       el('ng-me-name').textContent = m.name;
       el('ng-me-id').textContent   = m.id;
-      if (!this._rows) { this.addMemberRow(); this.addMemberRow(); }
+      if (!this._rows) { this.addMemberRow(); }
       el('newgroup-sub').textContent =
-        `A group needs between ${r.cycle && r.cycle.minGroupSize || 2} and ${r.cycle && r.cycle.maxGroupSize || 5} students, including you.`;
+        (function(){
+          const mn = (r.cycle && r.cycle.minGroupSize) || 1;
+          const mx = (r.cycle && r.cycle.maxGroupSize) || 5;
+          return mn <= 1
+            ? `You can work alone or add up to ${mx - 1} teammate${mx - 1 === 1 ? '' : 's'}.`
+            : `A group needs between ${mn} and ${mx} students, including you.`;
+        })();
       return;
     }
     this.data = r;
