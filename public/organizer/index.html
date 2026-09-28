@@ -532,7 +532,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-23-09-2026 R01</span>
+      <span class="topbar-sub">v04-28-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -599,7 +599,10 @@
             <div class="panel-title">Student Groups</div>
             <div class="panel-sub" id="stugroups-sub">Loading…</div>
           </div>
-          <button class="btn-ghost" onclick="StuGroups.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+          <div class="d-flex gap-2">
+            <button class="btn-ghost" onclick="StuGroups.print()"><i class="fas fa-file-pdf me-1"></i>Print / download</button>
+            <button class="btn-ghost" onclick="StuGroups.load()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+          </div>
         </div>
         <div id="stugroups-list"></div>
       </div>
@@ -806,7 +809,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-23-09-2026 R01</span>
+      <span class="topbar-sub">v04-28-09-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1765,12 +1768,23 @@ const StuGroups = {
           </span>
           <span class="board-note">${g.proposedTitle ? 'Has its own idea' : 'No idea proposed'}</span>
         </div>
-        ${g.proposedTitle ? `<div class="board-body">
-          <div class="board-idea">
-            <div class="t">${escHtml(g.proposedTitle)}</div>
+        <div class="board-body">
+          <div class="dir-table-wrap"><table class="dir-table">
+            <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/><col class="c-email"/></colgroup>
+            <tr><th>Student name</th><th>ID</th><th class="n">CGPA</th><th>Email</th></tr>
+            ${(g.members || []).map(m => `
+              <tr>
+                <td>${escHtml(m.name)}${m.isCreator ? ' <span class="owner-tag">CREATOR</span>' : ''}</td>
+                <td class="mono">${escHtml(m.id)}</td>
+                <td class="n mono">${m.cgpa == null ? '<span style="color:var(--amber)">missing</span>' : m.cgpa.toFixed(2)}</td>
+                <td class="dir-email">${escHtml(m.email) || '—'}</td>
+              </tr>`).join('')}
+          </table></div>
+          ${g.proposedTitle ? `<div class="dir-own" style="margin-top:9px;">
+            <div class="t"><i class="fas fa-lightbulb"></i> ${escHtml(g.proposedTitle)}</div>
             <div class="d">${escHtml(g.proposedDesc)}</div>
-          </div>
-        </div>` : ''}
+          </div>` : ''}
+        </div>
       </div>`).join('')
       : '<div class="empty-note">Groups will appear here as students form them.</div>';
   },
@@ -1988,6 +2002,77 @@ ${body}
 </body></html>`;
     const w = window.open('', '_blank');
     if (!w) { setAlert('dir-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
+    w.document.write(html);
+    w.document.close();
+  },
+
+  // A printable roster for this supervisor's own programme and campus
+  print() {
+    const r = this.data;
+    if (!r || !(r.groups || []).length) {
+      el('stugroups-sub').textContent = 'There are no groups to print yet.';
+      return;
+    }
+    const blocks = r.groups.map(g => `
+      <div class="blk">
+        <div class="hd">${escHtml(g.code)} — ${g.size} student${g.size === 1 ? '' : 's'}${
+          g.avgCgpa != null ? ` — average CGPA ${g.avgCgpa.toFixed(2)}` : ''}</div>
+        <table>
+          <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/></colgroup>
+          <tr><th>Student</th><th>ID</th><th class="n">CGPA</th></tr>
+          ${(g.members || []).map(m => `<tr>
+            <td>${escHtml(m.name)}${m.isCreator ? ' (creator)' : ''}</td>
+            <td>${escHtml(m.id)}</td>
+            <td class="n">${m.cgpa == null ? 'missing' : m.cgpa.toFixed(2)}</td></tr>`).join('')}
+        </table>
+        ${g.proposedTitle ? `<p class="own"><strong>Group's own idea:</strong> ${escHtml(g.proposedTitle)} — ${escHtml(g.proposedDesc)}</p>` : ''}
+      </div>`).join('');
+
+    const total = r.groups.reduce((a, g) => a + g.size, 0);
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<title>Student Groups — ${escHtml(r.program || '')} — ${escHtml(r.campus || '')}</title>
+<style>
+  @page{margin:14mm;} *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;font-size:10pt;line-height:1.45;}
+  header{display:flex;align-items:center;gap:14px;border-bottom:3px solid #0f2040;padding-bottom:12px;margin-bottom:14px;}
+  header img{height:56px;}
+  .uni{font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#64748b;}
+  .fac{font-size:14pt;font-weight:700;color:#0f2040;}
+  .dept{font-size:10pt;color:#334155;}
+  h2{font-size:12pt;color:#0f2040;margin:6px 0 3px;}
+  .meta{font-size:9.5pt;color:#64748b;margin-bottom:12px;}
+  .blk{break-inside:avoid;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:8px;}
+  .hd{font-weight:600;font-size:10pt;margin-bottom:5px;color:#0f2040;}
+  table{width:100%;border-collapse:collapse;font-size:9pt;table-layout:fixed;}
+  col.c-name{width:auto;} col.c-id{width:26mm;} col.c-cgpa{width:18mm;}
+  th{text-align:left;color:#64748b;font-size:8pt;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding:3px 4px;}
+  td{padding:3px 4px;border-bottom:1px solid #f1f5f9;overflow-wrap:anywhere;vertical-align:top;
+     font-variant-numeric:tabular-nums;}
+  td.n,th.n{text-align:center;}
+  .own{font-size:9pt;margin-top:5px;color:#334155;}
+  footer{margin-top:16px;padding-top:8px;border-top:1px solid #cbd5e1;font-size:8.5pt;color:#94a3b8;
+    display:flex;justify-content:space-between;}
+  .noprint{position:fixed;top:12px;right:12px;}
+  .noprint button{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
+    border:none;background:#2563eb;color:#fff;cursor:pointer;}
+  @media print{ .noprint{display:none !important;} }
+</style></head><body>
+<div class="noprint" id="toolbar"><button onclick="this.parentElement.style.display='none';window.print();setTimeout(function(){document.getElementById('toolbar').style.display='block';},600)">Print / Save as PDF</button></div>
+<header>
+  <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="" onerror="this.style.display='none'"/>
+  <div><div class="uni">Beirut Arab University</div><div class="fac">Faculty of Engineering</div>
+  <div class="dept">Electrical and Computer Engineering</div></div>
+</header>
+<h2>Student Groups — ${escHtml(r.program || '')}</h2>
+<div class="meta">${escHtml(r.campus || '')} Campus &nbsp;·&nbsp; FYP1 ${escHtml(r.semester || '')} ${escHtml(r.academicYear || '')}
+  &nbsp;·&nbsp; ${r.groups.length} group(s), ${total} student(s)</div>
+${blocks}
+<footer><span>${r.withIdea} group(s) proposed an idea of their own</span>
+<span>Generated ${new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })}</span></footer>
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { el('stugroups-sub').textContent = 'Your browser blocked the print window — allow pop-ups for this site.'; return; }
     w.document.write(html);
     w.document.close();
   },
