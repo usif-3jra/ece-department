@@ -22,7 +22,18 @@ const apiLimiter = rateLimit({
 });
 
 // ── Health check ─────────────────────────────────────────────────────────
-app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+// `build` is read straight out of api/index.js, so opening /health in a browser
+// tells you which version of the API is actually running on the server.
+const API_BUILD = (() => {
+  try {
+    const src = require('fs').readFileSync(path.join(__dirname, 'api', 'index.js'), 'utf8');
+    const m = /const API_BUILD = '([^']+)'/.exec(src);
+    return m ? m[1] : 'unknown';
+  } catch { return 'unknown'; }
+})();
+
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', build: API_BUILD, ts: new Date().toISOString() }));
 
 // ── Portal landing page (root entry point) ───────────────────────────────
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'landing.html')));

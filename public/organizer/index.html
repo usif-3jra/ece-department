@@ -532,7 +532,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-28-09-2026 R01</span>
+      <span class="topbar-sub">v04-28-09-2026 R02</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -809,7 +809,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-28-09-2026 R01</span>
+      <span class="topbar-sub">v04-28-09-2026 R02</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1471,6 +1471,37 @@ function validCgpa(v) {
   return isFinite(n) && n >= 0 && n <= 4;
 }
 
+// Opens a generated document for printing. Blocked pop-ups are common, so it
+// falls back to a hidden iframe, which prints without opening a window.
+function openPrintable(html, onBlocked) {
+  let w = null;
+  try { w = window.open('', '_blank'); } catch (e) { w = null; }
+  if (w && w.document) {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    return true;
+  }
+  try {
+    const old = document.getElementById('print-frame');
+    if (old) old.remove();
+    const f = document.createElement('iframe');
+    f.id = 'print-frame';
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(f);
+    const d = f.contentWindow.document;
+    d.open();
+    // The on-screen toolbar is pointless inside a hidden frame
+    d.write(html.replace(/<div class="noprint"[\s\S]*?<\/div>/, ''));
+    d.close();
+    setTimeout(function () { f.contentWindow.focus(); f.contentWindow.print(); }, 350);
+    return true;
+  } catch (e) {
+    if (onBlocked) onBlocked();
+    return false;
+  }
+}
+
 function deadlineIsPast(iso) {
   if (!iso) return false;
   const d = new Date(iso);
@@ -1486,6 +1517,9 @@ function fmtDate(iso) {
 const Settings = {
   data: null,
 
+  // The stamp baked into this page, compared against the running API
+  PAGE_BUILD: 'v04-28-09-2026 R02',
+
   async load() {
     if (!Auth.token) { Auth.forceSignOut('Please sign in again.'); return; }
     let r;
@@ -1497,6 +1531,17 @@ const Settings = {
     }
     if (sessionCheck(r)) return;
     if (!r.success) { setAlert('manage-msg', r.message, 'warn'); return; }
+
+    // A half-deployed build is otherwise very hard to spot: the pages update
+    // but the API keeps its old behaviour.
+    if (r.build && r.build !== this.PAGE_BUILD) {
+      setAlert('manage-msg',
+        `<strong>The server is running an older build.</strong> This page is `
+        + `<code>${escHtml(this.PAGE_BUILD)}</code> but the API reports `
+        + `<code>${escHtml(r.build)}</code>. Redeploy so both match — until then some `
+        + `features will behave as they did before.`, 'warn');
+    }
+
     this.data = r;
     const c = r.cycle;
 
@@ -2000,10 +2045,8 @@ const Directory = {
 <div class="dept">Electrical and Computer Engineering — FYP1 ${escHtml(r.semester)} ${escHtml(r.academicYear)}</div></div></header>
 ${body}
 </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) { setAlert('dir-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
-    w.document.write(html);
-    w.document.close();
+    openPrintable(html, () => setAlert('dir-msg',
+      'Could not open the print view — allow pop-ups for this site and try again.', 'warn'));
   },
 
   // A printable roster for this supervisor's own programme and campus
@@ -2071,10 +2114,10 @@ ${blocks}
 <span>Generated ${new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })}</span></footer>
 </body></html>`;
 
-    const w = window.open('', '_blank');
-    if (!w) { el('stugroups-sub').textContent = 'Your browser blocked the print window — allow pop-ups for this site.'; return; }
-    w.document.write(html);
-    w.document.close();
+    openPrintable(html, () => {
+      el('stugroups-sub').textContent =
+        'Could not open the print view — allow pop-ups for this site and try again.';
+    });
   },
 };
 
@@ -2802,10 +2845,8 @@ ${rows}
 <span>Generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'long',year:'numeric'})}</span></footer>
 </body></html>`;
 
-    const w = window.open('', '_blank');
-    if (!w) { setAlert('manage-msg', 'Your browser blocked the print window — allow pop-ups for this site.', 'warn'); return; }
-    w.document.write(html);
-    w.document.close();
+    openPrintable(html, () => setAlert('manage-msg',
+      'Could not open the print view — allow pop-ups for this site and try again.', 'warn'));
   },
 };
 
