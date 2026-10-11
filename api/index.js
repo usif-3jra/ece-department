@@ -15,7 +15,7 @@ const MAIL_MAX_RECIPIENTS = 200;   // guard against a runaway paste in the maile
 
 // Bumped with every change, and compared against the page's own stamp so a
 // half-deployed build announces itself instead of behaving strangely.
-const API_BUILD = 'v04-11-10-2026 R01';
+const API_BUILD = 'v04-11-10-2026 R02';
 const MAX_TRIES         = 5;
 const LOCKOUT_MS        = 15 * 60 * 1000;
 const TOKEN_EXPIRY_DAYS = 30;

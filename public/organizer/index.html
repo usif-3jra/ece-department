@@ -539,7 +539,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-11-10-2026 R01</span>
+      <span class="topbar-sub">v04-11-10-2026 R02</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -816,7 +816,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-11-10-2026 R01</span>
+      <span class="topbar-sub">v04-11-10-2026 R02</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1525,7 +1525,7 @@ const Settings = {
   data: null,
 
   // The stamp baked into this page, compared against the running API
-  PAGE_BUILD: 'v04-11-10-2026 R01',
+  PAGE_BUILD: 'v04-11-10-2026 R02',
 
   async load() {
     if (!Auth.token) { Auth.forceSignOut('Please sign in again.'); return; }
@@ -1794,6 +1794,8 @@ const Assign = {
 
 // ══ Supervisor: the groups students have formed ═══════════════════════════
 const StuGroups = {
+  data: null,
+
   async load() {
     if (!Auth.token) return;
     let r;
@@ -1801,6 +1803,8 @@ const StuGroups = {
     catch { return; }
     if (sessionCheck(r)) return;
     if (!r.success) { el('stugroups-sub').textContent = r.message; return; }
+    // print() reads this later — storing it is what keeps the two in step
+    this.data = r;
 
     const gs = r.groups || [];
     el('stugroups-sub').innerHTML = gs.length

@@ -42,6 +42,16 @@ for (const o of objs) {
   ck('no duplicate methods in ' + o.name, dupes.length === 0, dupes);
 }
 
+// A module that reads this.data must also assign it, or whichever method reads
+// it silently sees nothing. This is exactly how the roster print reported "no
+// groups" while the groups were on screen.
+for (const o of objs) {
+  const body = lines.slice(o.start, o.end + 1).join('\n');
+  const reads = /(?:const\s+\w+\s*=\s*this\.data|this\.data\.|this\.data\s*\|\||!this\.data)/.test(body);
+  const assigns = /this\.data\s*=/.test(body);
+  if (reads) ck(o.name + ' assigns this.data as well as reading it', assigns);
+}
+
 // every method referenced from an onclick/onchange exists on its object
 const handlers = [...new Set([...page.matchAll(/on(?:click|change)="([A-Za-z_]+)\.([A-Za-z_]+)\(/g)]
   .map(m => m[1] + '.' + m[2]))];
