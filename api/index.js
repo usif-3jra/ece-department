@@ -12,6 +12,10 @@ const PWD_SALT          = process.env.PWD_SALT || 'bau-fyp-salt-2025';
 const ADMIN_ID          = 'A20160170';
 const SESSION_TTL       = 8 * 60 * 60 * 1000;
 const MAIL_MAX_RECIPIENTS = 200;   // guard against a runaway paste in the mailer
+
+// Bumped with every change, and compared against the page's own stamp so a
+// half-deployed build announces itself instead of behaving strangely.
+const API_BUILD = 'v04-11-10-2026 R01';
 const MAX_TRIES         = 5;
 const LOCKOUT_MS        = 15 * 60 * 1000;
 const TOKEN_EXPIRY_DAYS = 30;
@@ -291,13 +295,18 @@ async function ensureOrganizerTables(sql) {
     ranking_deadline  TIMESTAMPTZ,
     deadline_policy   TEXT NOT NULL DEFAULT 'open',
     deadline_delegate TEXT NOT NULL DEFAULT '',
-    min_group_size    INT  NOT NULL DEFAULT 2,
+    min_group_size    INT  NOT NULL DEFAULT 1,
     max_group_size    INT  NOT NULL DEFAULT 5,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_cycles_key_idx
     ON org_cycles (academic_year, semester, program, campus)`;
+  // A group may be a single student. Every existing cycle is brought down to 1
+  // rather than only those on the old default, so no programme is left blocking
+  // solo registrations. A coordinator can raise it again from the settings.
+  await sql`ALTER TABLE org_cycles ALTER COLUMN min_group_size SET DEFAULT 1`;
+  await sql`UPDATE org_cycles SET min_group_size = 1 WHERE min_group_size <> 1`;
 
   // expected = counted in the "everyone has responded" gate. A coordinator can
   // clear it for someone on sabbatical so one dormant account cannot block the
@@ -1414,6 +1423,7 @@ module.exports = async function handler(req, res) {
           },
           canManage: canManageCycle(session, sup, cycle),
           isAdmin: isAdminUser(session),
+          build: API_BUILD,
         });
       }
 
@@ -1699,6 +1709,36 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      // The admin may set deadlines on any programme+campus cycle, without
+      // belonging to it. Supervisors keep using orgSetDeadline for their own.
+      case 'orgAdminSetDeadline': {
+        const [sessionToken, cycleId, which, value] = args;
+        const session = await verifySession(sessionToken);
+        if (!session) return ok(sessionGone(sessionToken));
+        if (!isAdminUser(session)) return ok({ success: false, message: 'Only the admin can do this.' });
+        await ensureOrganizerTables(sql);
+
+        if (value && !/(Z|[+-]\d{2}:?\d{2})$/.test(String(value)))
+          return ok({ success: false, message: 'This page is out of date — please refresh (Ctrl+F5) and try again.' });
+        const ts = value ? new Date(value) : null;
+        if (value && isNaN(ts.getTime())) return ok({ success: false, message: 'That date is not valid.' });
+
+        const rows = await sql`SELECT * FROM org_cycles WHERE id = ${Number(cycleId)}`;
+        const cycle = rows[0];
+        if (!cycle) return ok({ success: false, message: 'Cycle not found.' });
+
+        if (which === 'ideas') {
+          await sql`UPDATE org_cycles SET ideas_deadline = ${ts}, updated_at = NOW() WHERE id = ${cycle.id}`;
+        } else if (which === 'ranking') {
+          await sql`UPDATE org_cycles SET ranking_deadline = ${ts}, updated_at = NOW() WHERE id = ${cycle.id}`;
+        } else {
+          return ok({ success: false, message: 'Unknown deadline type.' });
+        }
+        await logAudit(sql, cycle.id, 0, 'admin', session.supervisor_id, session.name || 'Admin',
+          'deadline_set', { which, value: value || null, by: 'admin' });
+        return ok({ success: true });
+      }
+
       case 'orgSetDeadlinePolicy': {
         const [sessionToken, cycleId, policy, delegateId] = args;
         const session = await verifySession(sessionToken);
@@ -1789,8 +1829,11 @@ module.exports = async function handler(req, res) {
               message: `Please enter a valid CGPA for ${name || sid} — a number between 0.00 and ${CGPA_MAX.toFixed(2)}.` });
           members.push({ id: sid, name, email: String((m && m.email) || '').trim(), cgpa, creator: !!m.creator });
         }
-        if (members.length < Number(cycle.min_group_size))
-          return ok({ success: false, message: `A group needs at least ${cycle.min_group_size} students.` });
+        // One student is always a valid group. The configured minimum only
+        // shapes the guidance shown to students — it is deliberately not a
+        // gate here, so a stale stored value can never block a solo sign-up.
+        if (members.length < 1)
+          return ok({ success: false, message: 'A group needs at least one student.' });
         if (members.length > Number(cycle.max_group_size))
           return ok({ success: false, message: `A group can have at most ${cycle.max_group_size} students.` });
 
@@ -1991,6 +2034,10 @@ module.exports = async function handler(req, res) {
 
       // Supervisors can see the groups that have formed, and any idea they
       // proposed, before deciding what to submit themselves.
+      case 'apiBuild': {
+        return ok({ success: true, build: API_BUILD });
+      }
+
       case 'orgGetStudentGroups': {
         const [sessionToken] = args;
         const session = await verifySession(sessionToken);
@@ -2000,7 +2047,7 @@ module.exports = async function handler(req, res) {
         const { cycle } = ctx;
 
         const groups = await sql`SELECT * FROM org_groups WHERE cycle_id = ${cycle.id} ORDER BY group_code`;
-        const members = await sql`SELECT group_id, cgpa FROM org_group_members WHERE cycle_id = ${cycle.id}`;
+        const members = await sql`SELECT * FROM org_group_members WHERE cycle_id = ${cycle.id} ORDER BY id`;
         const sizeBy = new Map(), cgpaBy = new Map();
         members.forEach(m => {
           sizeBy.set(m.group_id, (sizeBy.get(m.group_id) || 0) + 1);
@@ -2020,10 +2067,22 @@ module.exports = async function handler(req, res) {
             size: sizeBy.get(g.id) || 0,
             avgCgpa: avgCgpa(g.id),
             createdAt: g.created_at,
+            // Supervisors see the students in their own programme and campus
+            members: members.filter(m => m.group_id === g.id).map(m => ({
+              name: m.student_name,
+              id: m.student_id,
+              cgpa: m.cgpa == null ? null : Number(m.cgpa),
+              email: m.email || '',
+              isCreator: m.student_id === g.created_by_student_id,
+            })),
             proposedTitle: g.proposed_title || '',
             proposedDesc:  g.proposed_desc || '',
             proposedAt:    g.proposed_at || null,
           })),
+          program: cycle.program,
+          campus: cycle.campus,
+          academicYear: cycle.academic_year,
+          semester: cycle.semester,
           withIdea: groups.filter(g => (g.proposed_title || '').trim()).length,
         });
       }
@@ -2077,8 +2136,10 @@ module.exports = async function handler(req, res) {
 
         const target = found.members.find(m => m.student_id === tid);
         if (!target) return ok({ success: false, message: 'That student is not in your group.' });
-        if (found.members.length - 1 < Number(cycle.min_group_size))
-          return ok({ success: false, message: `A group needs at least ${cycle.min_group_size} students.` });
+        // The last remaining student uses "Delete this group" instead
+        if (found.members.length - 1 < 1)
+          return ok({ success: false,
+            message: 'A group needs at least one student — use "Delete this group" instead.' });
 
         await sql`DELETE FROM org_group_members WHERE cycle_id = ${cycle.id} AND student_id = ${tid}`;
         const me = found.members.find(m => m.student_id === sid);

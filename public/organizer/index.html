@@ -284,6 +284,13 @@
     .cap-help{color:var(--blue);font-size:12px;margin-left:4px;cursor:help;}
     .cap-help:hover{color:#1d4ed8;}
 
+    /* ── Admin deadline rows ── */
+    .admin-cycle{border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:10px;
+      background:rgba(255,255,255,.75);}
+    .admin-cycle-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:11px;}
+    .admin-cycle-name{font-size:13px;font-weight:700;color:var(--navy);margin-right:4px;}
+    .alert-box.ok{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;display:block;}
+
     /* ── Admin directory ── */
     .dir-campus-section{margin-bottom:22px;}
     .dir-campus-banner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
@@ -532,7 +539,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-28-09-2026 R02</span>
+      <span class="topbar-sub">v04-11-10-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -684,7 +691,7 @@
       <!-- ── Admin: who may set deadlines ── -->
       <div class="panel" id="panel-admin" style="display:none;">
         <div class="panel-title">Admin — Deadline Control</div>
-        <div class="panel-sub">Choose who may set deadlines and publish for each programme and campus.</div>
+        <div class="panel-sub">Set the deadlines for any programme and campus, and choose who else may change them.</div>
         <div id="admin-msg" class="alert-box"></div>
         <div id="admin-list"></div>
       </div>
@@ -809,7 +816,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-28-09-2026 R02</span>
+      <span class="topbar-sub">v04-11-10-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1518,7 +1525,7 @@ const Settings = {
   data: null,
 
   // The stamp baked into this page, compared against the running API
-  PAGE_BUILD: 'v04-28-09-2026 R02',
+  PAGE_BUILD: 'v04-11-10-2026 R01',
 
   async load() {
     if (!Auth.token) { Auth.forceSignOut('Please sign in again.'); return; }
@@ -1798,7 +1805,7 @@ const StuGroups = {
     const gs = r.groups || [];
     el('stugroups-sub').innerHTML = gs.length
       ? `${gs.length} group(s) formed so far &middot; <strong>${r.withIdea}</strong> proposed an idea of their own. `
-        + 'Student names stay hidden until the allocation is published.'
+        + 'Students in your programme and campus are listed under each group.'
       : 'No student groups have been formed yet.';
 
     el('stugroups-list').innerHTML = gs.length ? gs.map(g => `
@@ -1817,6 +1824,11 @@ const StuGroups = {
           <div class="dir-table-wrap"><table class="dir-table">
             <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/><col class="c-email"/></colgroup>
             <tr><th>Student name</th><th>ID</th><th class="n">CGPA</th><th>Email</th></tr>
+              ${(!g.members || !g.members.length) && g.size > 0
+                ? `<tr><td colspan="4" style="color:var(--red);font-size:12px;">`
+                  + `This group has ${g.size} student(s) but the server sent no names — `
+                  + `the API is an older build than this page. Redeploy, then refresh.</td></tr>`
+                : ''}
             ${(g.members || []).map(m => `
               <tr>
                 <td>${escHtml(m.name)}${m.isCreator ? ' <span class="owner-tag">CREATOR</span>' : ''}</td>
@@ -1832,6 +1844,77 @@ const StuGroups = {
         </div>
       </div>`).join('')
       : '<div class="empty-note">Groups will appear here as students form them.</div>';
+  },
+
+  // A printable roster for this supervisor's own programme and campus
+  print() {
+    const r = this.data;
+    if (!r || !(r.groups || []).length) {
+      el('stugroups-sub').textContent = 'There are no groups to print yet.';
+      return;
+    }
+    const blocks = r.groups.map(g => `
+      <div class="blk">
+        <div class="hd">${escHtml(g.code)} — ${g.size} student${g.size === 1 ? '' : 's'}${
+          g.avgCgpa != null ? ` — average CGPA ${g.avgCgpa.toFixed(2)}` : ''}</div>
+        <table>
+          <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/></colgroup>
+          <tr><th>Student</th><th>ID</th><th class="n">CGPA</th></tr>
+          ${(g.members || []).map(m => `<tr>
+            <td>${escHtml(m.name)}${m.isCreator ? ' (creator)' : ''}</td>
+            <td>${escHtml(m.id)}</td>
+            <td class="n">${m.cgpa == null ? 'missing' : m.cgpa.toFixed(2)}</td></tr>`).join('')}
+        </table>
+        ${g.proposedTitle ? `<p class="own"><strong>Group's own idea:</strong> ${escHtml(g.proposedTitle)} — ${escHtml(g.proposedDesc)}</p>` : ''}
+      </div>`).join('');
+
+    const total = r.groups.reduce((a, g) => a + g.size, 0);
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<title>Student Groups — ${escHtml(r.program || '')} — ${escHtml(r.campus || '')}</title>
+<style>
+  @page{margin:14mm;} *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;font-size:10pt;line-height:1.45;}
+  header{display:flex;align-items:center;gap:14px;border-bottom:3px solid #0f2040;padding-bottom:12px;margin-bottom:14px;}
+  header img{height:56px;}
+  .uni{font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#64748b;}
+  .fac{font-size:14pt;font-weight:700;color:#0f2040;}
+  .dept{font-size:10pt;color:#334155;}
+  h2{font-size:12pt;color:#0f2040;margin:6px 0 3px;}
+  .meta{font-size:9.5pt;color:#64748b;margin-bottom:12px;}
+  .blk{break-inside:avoid;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:8px;}
+  .hd{font-weight:600;font-size:10pt;margin-bottom:5px;color:#0f2040;}
+  table{width:100%;border-collapse:collapse;font-size:9pt;table-layout:fixed;}
+  col.c-name{width:auto;} col.c-id{width:26mm;} col.c-cgpa{width:18mm;}
+  th{text-align:left;color:#64748b;font-size:8pt;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding:3px 4px;}
+  td{padding:3px 4px;border-bottom:1px solid #f1f5f9;overflow-wrap:anywhere;vertical-align:top;
+     font-variant-numeric:tabular-nums;}
+  td.n,th.n{text-align:center;}
+  .own{font-size:9pt;margin-top:5px;color:#334155;}
+  footer{margin-top:16px;padding-top:8px;border-top:1px solid #cbd5e1;font-size:8.5pt;color:#94a3b8;
+    display:flex;justify-content:space-between;}
+  .noprint{position:fixed;top:12px;right:12px;}
+  .noprint button{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
+    border:none;background:#2563eb;color:#fff;cursor:pointer;}
+  @media print{ .noprint{display:none !important;} }
+</style></head><body>
+<div class="noprint" id="toolbar"><button onclick="this.parentElement.style.display='none';window.print();setTimeout(function(){document.getElementById('toolbar').style.display='block';},600)">Print / Save as PDF</button></div>
+<header>
+  <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="" onerror="this.style.display='none'"/>
+  <div><div class="uni">Beirut Arab University</div><div class="fac">Faculty of Engineering</div>
+  <div class="dept">Electrical and Computer Engineering</div></div>
+</header>
+<h2>Student Groups — ${escHtml(r.program || '')}</h2>
+<div class="meta">${escHtml(r.campus || '')} Campus &nbsp;·&nbsp; FYP1 ${escHtml(r.semester || '')} ${escHtml(r.academicYear || '')}
+  &nbsp;·&nbsp; ${r.groups.length} group(s), ${total} student(s)</div>
+${blocks}
+<footer><span>${r.withIdea} group(s) proposed an idea of their own</span>
+<span>Generated ${new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })}</span></footer>
+</body></html>`;
+
+    openPrintable(html, () => {
+      el('stugroups-sub').textContent =
+        'Could not open the print view — allow pop-ups for this site and try again.';
+    });
   },
 };
 
@@ -2048,77 +2131,6 @@ ${body}
     openPrintable(html, () => setAlert('dir-msg',
       'Could not open the print view — allow pop-ups for this site and try again.', 'warn'));
   },
-
-  // A printable roster for this supervisor's own programme and campus
-  print() {
-    const r = this.data;
-    if (!r || !(r.groups || []).length) {
-      el('stugroups-sub').textContent = 'There are no groups to print yet.';
-      return;
-    }
-    const blocks = r.groups.map(g => `
-      <div class="blk">
-        <div class="hd">${escHtml(g.code)} — ${g.size} student${g.size === 1 ? '' : 's'}${
-          g.avgCgpa != null ? ` — average CGPA ${g.avgCgpa.toFixed(2)}` : ''}</div>
-        <table>
-          <colgroup><col class="c-name"/><col class="c-id"/><col class="c-cgpa"/></colgroup>
-          <tr><th>Student</th><th>ID</th><th class="n">CGPA</th></tr>
-          ${(g.members || []).map(m => `<tr>
-            <td>${escHtml(m.name)}${m.isCreator ? ' (creator)' : ''}</td>
-            <td>${escHtml(m.id)}</td>
-            <td class="n">${m.cgpa == null ? 'missing' : m.cgpa.toFixed(2)}</td></tr>`).join('')}
-        </table>
-        ${g.proposedTitle ? `<p class="own"><strong>Group's own idea:</strong> ${escHtml(g.proposedTitle)} — ${escHtml(g.proposedDesc)}</p>` : ''}
-      </div>`).join('');
-
-    const total = r.groups.reduce((a, g) => a + g.size, 0);
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<title>Student Groups — ${escHtml(r.program || '')} — ${escHtml(r.campus || '')}</title>
-<style>
-  @page{margin:14mm;} *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;font-size:10pt;line-height:1.45;}
-  header{display:flex;align-items:center;gap:14px;border-bottom:3px solid #0f2040;padding-bottom:12px;margin-bottom:14px;}
-  header img{height:56px;}
-  .uni{font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#64748b;}
-  .fac{font-size:14pt;font-weight:700;color:#0f2040;}
-  .dept{font-size:10pt;color:#334155;}
-  h2{font-size:12pt;color:#0f2040;margin:6px 0 3px;}
-  .meta{font-size:9.5pt;color:#64748b;margin-bottom:12px;}
-  .blk{break-inside:avoid;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:8px;}
-  .hd{font-weight:600;font-size:10pt;margin-bottom:5px;color:#0f2040;}
-  table{width:100%;border-collapse:collapse;font-size:9pt;table-layout:fixed;}
-  col.c-name{width:auto;} col.c-id{width:26mm;} col.c-cgpa{width:18mm;}
-  th{text-align:left;color:#64748b;font-size:8pt;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding:3px 4px;}
-  td{padding:3px 4px;border-bottom:1px solid #f1f5f9;overflow-wrap:anywhere;vertical-align:top;
-     font-variant-numeric:tabular-nums;}
-  td.n,th.n{text-align:center;}
-  .own{font-size:9pt;margin-top:5px;color:#334155;}
-  footer{margin-top:16px;padding-top:8px;border-top:1px solid #cbd5e1;font-size:8.5pt;color:#94a3b8;
-    display:flex;justify-content:space-between;}
-  .noprint{position:fixed;top:12px;right:12px;}
-  .noprint button{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;padding:9px 16px;border-radius:9px;
-    border:none;background:#2563eb;color:#fff;cursor:pointer;}
-  @media print{ .noprint{display:none !important;} }
-</style></head><body>
-<div class="noprint" id="toolbar"><button onclick="this.parentElement.style.display='none';window.print();setTimeout(function(){document.getElementById('toolbar').style.display='block';},600)">Print / Save as PDF</button></div>
-<header>
-  <img src="https://usif-3jra.github.io/epme-study-plan/assets/logo_ECE.png" alt="" onerror="this.style.display='none'"/>
-  <div><div class="uni">Beirut Arab University</div><div class="fac">Faculty of Engineering</div>
-  <div class="dept">Electrical and Computer Engineering</div></div>
-</header>
-<h2>Student Groups — ${escHtml(r.program || '')}</h2>
-<div class="meta">${escHtml(r.campus || '')} Campus &nbsp;·&nbsp; FYP1 ${escHtml(r.semester || '')} ${escHtml(r.academicYear || '')}
-  &nbsp;·&nbsp; ${r.groups.length} group(s), ${total} student(s)</div>
-${blocks}
-<footer><span>${r.withIdea} group(s) proposed an idea of their own</span>
-<span>Generated ${new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })}</span></footer>
-</body></html>`;
-
-    openPrintable(html, () => {
-      el('stugroups-sub').textContent =
-        'Could not open the print view — allow pop-ups for this site and try again.';
-    });
-  },
 };
 
 // ══ Live refresh ══════════════════════════════════════════════════════════
@@ -2156,8 +2168,11 @@ const Live = {
 
 // ══ Admin: deadline policy per programme ══════════════════════════════════
 const AdminPanel = {
+  data: null,
+
   async load() {
     const r = await api('orgAdminOverview', Auth.token);
+    if (sessionCheck(r)) return;
     if (!r.success) { setAlert('admin-msg', r.message, 'warn'); return; }
     this.data = r;
     el('admin-list').innerHTML = (r.cycles || []).length ? r.cycles.map(c => {
@@ -2165,23 +2180,56 @@ const AdminPanel = {
       const opts = peers.map(s =>
         `<option value="${escHtml(s.id)}"${c.deadlineDelegate === s.id ? ' selected' : ''}>${escHtml(s.name)}</option>`).join('');
       return `
-        <div class="board-row"><div class="board-head plain" style="flex-wrap:wrap;gap:10px;">
-          <span class="board-name">${escHtml(c.program)} — ${escHtml(c.campus)}
-            <span class="chip">${c.ideaCount} ideas</span>
-            <span class="chip">${c.groupCount} groups</span>
+        <div class="admin-cycle">
+          <div class="admin-cycle-head">
+            <span class="admin-cycle-name">${escHtml(c.program)} — ${escHtml(c.campus)}</span>
             <span class="chip teal">${escHtml(c.phase.replace(/_/g, ' '))}</span>
-          </span>
-          <select id="pol-${c.id}" onchange="AdminPanel.change(${c.id})"
-                  style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
-            <option value="open"${c.deadlinePolicy === 'open' ? ' selected' : ''}>Anyone in the programme</option>
-            <option value="locked"${c.deadlinePolicy === 'locked' ? ' selected' : ''}>Admin only</option>
-            <option value="delegate"${c.deadlinePolicy === 'delegate' ? ' selected' : ''}>One supervisor…</option>
-          </select>
-          <select id="del-${c.id}" onchange="AdminPanel.change(${c.id})"
-                  style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;
-                         ${c.deadlinePolicy === 'delegate' ? '' : 'display:none;'}">${opts}</select>
-        </div></div>`;
+            <span class="chip">${c.ideaCount} idea(s)</span>
+            <span class="chip">${c.groupCount} group(s)</span>
+          </div>
+          <div class="set-grid">
+            <div class="field">
+              <label for="ad-i-${c.id}">Idea submission deadline</label>
+              <input type="datetime-local" id="ad-i-${c.id}" value="${toLocalInput(c.ideasDeadline)}"/>
+              <div class="hint">${c.ideasDeadline ? `Currently ${fmtDate(c.ideasDeadline)}` : 'Not set — the list will never open to students'}</div>
+            </div>
+            <div class="field">
+              <label for="ad-r-${c.id}">Student ranking deadline</label>
+              <input type="datetime-local" id="ad-r-${c.id}" value="${toLocalInput(c.rankingDeadline)}"/>
+              <div class="hint">${c.rankingDeadline ? `Currently ${fmtDate(c.rankingDeadline)}` : 'Not set'}</div>
+            </div>
+            <div class="field">
+              <label for="pol-${c.id}">Who may change them</label>
+              <select id="pol-${c.id}" onchange="AdminPanel.change(${c.id})">
+                <option value="open"${c.deadlinePolicy === 'open' ? ' selected' : ''}>Anyone in the programme</option>
+                <option value="locked"${c.deadlinePolicy === 'locked' ? ' selected' : ''}>Admin only</option>
+                <option value="delegate"${c.deadlinePolicy === 'delegate' ? ' selected' : ''}>One supervisor…</option>
+              </select>
+              <select id="del-${c.id}" onchange="AdminPanel.change(${c.id})" style="margin-top:6px;
+                      ${c.deadlinePolicy === 'delegate' ? '' : 'display:none;'}">${opts}</select>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:10px;padding-top:10px;">
+            <span class="mini-note">Times are in ${escHtml(localZoneName())}</span>
+            <div class="submit-spacer"></div>
+            <button class="btn-primary" onclick="AdminPanel.saveDeadlines(${c.id})">Save deadlines</button>
+          </div>
+        </div>`;
     }).join('') : '<div class="empty-note">No programme cycles exist yet. They are created when a supervisor first opens this page.</div>';
+  },
+
+  // Sends both deadlines for one programme+campus as absolute instants
+  async saveDeadlines(cycleId) {
+    setAlert('admin-msg', '');
+    const a = await api('orgAdminSetDeadline', Auth.token, cycleId, 'ideas',
+      fromLocalInput(el('ad-i-' + cycleId).value));
+    if (sessionCheck(a)) return;
+    if (!a.success) { setAlert('admin-msg', a.message, 'err'); return; }
+    const b = await api('orgAdminSetDeadline', Auth.token, cycleId, 'ranking',
+      fromLocalInput(el('ad-r-' + cycleId).value));
+    if (!b.success) { setAlert('admin-msg', b.message, 'err'); return; }
+    setAlert('admin-msg', 'Deadlines saved.', 'ok');
+    await this.load();
   },
 
   async change(cycleId) {
@@ -2193,8 +2241,9 @@ const AdminPanel = {
       return;
     }
     const r = await api('orgSetDeadlinePolicy', Auth.token, cycleId, policy, delSel.value);
+    if (sessionCheck(r)) return;
     if (!r.success) { setAlert('admin-msg', r.message, 'err'); return; }
-    setAlert('admin-msg', 'Deadline control updated.', 'info');
+    setAlert('admin-msg', 'Deadline control updated.', 'ok');
   },
 };
 
