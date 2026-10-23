@@ -232,6 +232,13 @@
     .cnt.first{background:var(--accent);color:#fff;}
     .cnt.some{background:var(--accent-dim);color:#0b5b56;}
 
+    /* ── Own-idea supervisor picker ── */
+    .own-sup-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+      background:var(--olive-dim);border:1px solid #a7f3d0;border-radius:8px;padding:7px 10px;margin-top:4px;}
+    .own-sup-label{font-size:11.5px;font-weight:600;color:#3d6333;}
+    .own-sup-row select{padding:6px 9px;border:1px solid var(--line);border-radius:7px;
+      font-family:var(--font-body);font-size:12.5px;background:#fff;min-width:230px;}
+
     /* ── Report block ── */
     .report{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-top:14px;background:#fbfcfc;}
     .report h5{font-family:var(--font-body);font-size:13px;font-weight:700;margin-bottom:7px;}
@@ -539,7 +546,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-11-10-2026 R02</span>
+      <span class="topbar-sub">v04-23-10-2026 R01</span>
     </div>
     <span class="topbar-name" id="sup-name"></span>
     <button class="btn-topbar" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -816,7 +823,7 @@
     <div style="flex:1">
       <div class="topbar-univ">Beirut Arab University</div>
       <div class="topbar-title">FYP Projects Organizer</div>
-      <span class="topbar-sub">v04-11-10-2026 R02</span>
+      <span class="topbar-sub">v04-23-10-2026 R01</span>
     </div>
     <span class="topbar-name" id="stu-topname"></span>
     <button class="btn-topbar" onclick="Student.exit()"><i class="fas fa-arrow-right-from-bracket"></i> Exit</button>
@@ -1525,7 +1532,7 @@ const Settings = {
   data: null,
 
   // The stamp baked into this page, compared against the running API
-  PAGE_BUILD: 'v04-11-10-2026 R02',
+  PAGE_BUILD: 'v04-23-10-2026 R01',
 
   async load() {
     if (!Auth.token) { Auth.forceSignOut('Please sign in again.'); return; }
@@ -1720,6 +1727,15 @@ const Assign = {
             + `${disabled ? ' · already assigned' : ''}</option>`;
         })
       ).join('');
+      // A group that proposed its own project can keep it
+      const ownOpt = g.ownTitle
+        ? `<option value="own"${g.ownAssigned ? ' selected' : ''}>`
+          + `★ Own idea — ${escHtml(g.ownTitle)}</option>`
+        : '';
+      const supOpts = ['<option value="">Select the supervisor…</option>'].concat(
+        (r.supervisors || []).map(s =>
+          `<option value="${escHtml(s.id)}"${s.id === g.ownSupervisorId ? ' selected' : ''}>`
+          + `${escHtml(s.name)} (takes ${s.capacity})</option>`)).join('');
       const prefs = g.prefs.length
         ? g.prefs.slice(0, 5).map(p => `<b>${p.rank}.</b> ${escHtml(p.title)}`).join(' &nbsp; ')
         : '<em>this group has not ranked any project</em>';
@@ -1727,9 +1743,15 @@ const Assign = {
         <div class="assign-row ${g.published ? 'pub' : (g.assignedIdeaId ? 'done' : '')}">
           <span class="assign-code">${escHtml(g.code)}</span>
           <span class="assign-size">${g.size} student${g.size === 1 ? '' : 's'}${g.avgCgpa != null ? `<br/><span class="cgpa-chip">${g.avgCgpa.toFixed(2)}</span>` : ''}</span>
-          <select ${locked ? 'disabled' : ''} onchange="Assign.set(${g.id}, this.value)">${opts}</select>
+          <select ${locked ? 'disabled' : ''} onchange="Assign.pick(${g.id}, this.value)">${opts}${ownOpt}</select>
           <span>${g.assignedRank ? `<span class="rank-badge">#${g.assignedRank}</span>` : ''}</span>
           <div class="pref-line">${prefs}</div>
+          <div class="own-sup-row" id="ownsup-${g.id}"
+               style="grid-column:1/-1;${g.ownAssigned ? '' : 'display:none;'}">
+            <span class="own-sup-label">Supervisor for this group's own idea</span>
+            <select ${locked ? 'disabled' : ''} id="ownsupsel-${g.id}"
+                    onchange="Assign.setOwn(${g.id})">${supOpts}</select>
+          </div>
           ${g.warnings.map(w => `<div class="warn-line"><i class="fas fa-triangle-exclamation"></i> ${escHtml(w)}</div>`).join('')}
         </div>`;
     }).join('');
@@ -1741,6 +1763,37 @@ const Assign = {
     } else {
       setAlert('assign-warn', '');
     }
+  },
+
+  // Choosing "own idea" needs a supervisor before anything is saved
+  pick(groupId, value) {
+    const box = el('ownsup-' + groupId);
+    if (value === 'own') {
+      if (box) box.style.display = '';
+      const sel = el('ownsupsel-' + groupId);
+      if (sel && sel.value) { this.setOwn(groupId); return; }
+      setAlert('assign-warn',
+        'Choose which supervisor will take this group\u2019s own idea.', 'warn');
+      if (sel) sel.focus();
+      return;
+    }
+    if (box) box.style.display = 'none';
+    this.set(groupId, value);
+  },
+
+  async setOwn(groupId) {
+    const sel = el('ownsupsel-' + groupId);
+    if (!sel || !sel.value) {
+      setAlert('assign-warn', 'Choose which supervisor will take this group\u2019s own idea.', 'warn');
+      return;
+    }
+    const r = await api('orgSetAssignment', Auth.token, groupId, 'own', sel.value);
+    if (sessionCheck(r)) return;
+    if (!r.success) { setAlert('assign-msg', r.message, 'err'); return; }
+    setAlert('assign-warn', '');
+    el('btn-publish-alloc').disabled = true;
+    el('assign-report').innerHTML = '';
+    await this.load();
   },
 
   async set(groupId, ideaId) {

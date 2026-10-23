@@ -649,6 +649,8 @@ const Reg = {
     [...years].sort().forEach(v => {
       yearSel.innerHTML += `<option value="${v}"${v === p.Year ? ' selected' : ''}>${v}</option>`;
     });
+    this._renderEditSupRows(p);
+
     const container = document.getElementById('edit-student-rows');
     container.innerHTML = '';
     this._studentsCache
@@ -684,6 +686,55 @@ const Reg = {
       .appendChild(this._renderEditStudentRow({ StudentID: '', StudentName: '', Email: '' }, false));
   },
 
+  // The first row is the main supervisor. Only the admin may change it;
+  // everyone on the project may add or remove the co-supervisors below it.
+  _renderEditSupRows(p) {
+    const box = document.getElementById('edit-sup-rows');
+    const note = document.getElementById('edit-sup-note');
+    box.innerHTML = '';
+    const ids = String(p.Supervisors || '').split(',').map(x => x.trim()).filter(Boolean);
+    const isAdmin = !!(Auth.supervisor && Auth.supervisor.isAdmin);
+    this._editPrimary = ids[0] || '';
+    ids.forEach((id, i) => box.appendChild(this._renderEditSupRow(id, i === 0, isAdmin)));
+    if (!ids.length) box.appendChild(this._renderEditSupRow('', true, isAdmin));
+    note.textContent = isAdmin
+      ? 'As admin you can change every supervisor, including the main one.'
+      : 'You can add or remove co-supervisors. Only the admin can change the main supervisor.';
+  },
+
+  _renderEditSupRow(supId, isPrimary, isAdmin) {
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 align-items-center edit-sup-row';
+    const locked = isPrimary && !isAdmin;
+    const list = (this.allSupervisors || []);
+    const opts = ['<option value="">Select supervisor…</option>'].concat(
+      list.map(s => `<option value="${escHtml(s.id)}"${s.id === supId ? ' selected' : ''}>`
+        + `${escHtml(s.name)}${s.program ? ' — ' + escHtml(s.program) : ''}</option>`)).join('');
+    row.innerHTML = `
+      <div class="col-md-3">
+        <span class="badge ${isPrimary ? 'bg-primary' : 'bg-secondary'}">
+          ${isPrimary ? 'Main supervisor' : 'Co-supervisor'}</span>
+      </div>
+      <div class="col-md-7">
+        <select class="form-select form-select-sm edit-sup-select"${locked ? ' disabled' : ''}>${opts}</select>
+      </div>
+      <div class="col-auto">
+        ${isPrimary
+          ? ''
+          : `<button type="button" class="btn btn-outline-danger btn-sm py-0 px-1"
+               onclick="this.closest(\'.edit-sup-row\').remove()" title="Remove co-supervisor">
+               <i class="fas fa-trash"></i></button>`}
+      </div>`;
+    if (locked) row.dataset.locked = '1';
+    return row;
+  },
+
+  addEditSupRow() {
+    const isAdmin = !!(Auth.supervisor && Auth.supervisor.isAdmin);
+    document.getElementById('edit-sup-rows')
+      .appendChild(this._renderEditSupRow('', false, isAdmin));
+  },
+
   async saveEditProject() {
     const id    = document.getElementById('edit-project-id').value;
     const title = document.getElementById('edit-title').value.trim();
@@ -707,12 +758,29 @@ const Reg = {
 
     Spinner.show();
     try {
+    // Supervisors: a disabled select still reports its value, so the locked
+    // main supervisor is included and stays first.
+    const supervisors = [];
+    document.querySelectorAll('#edit-sup-rows .edit-sup-row').forEach(row => {
+      const v = row.querySelector('.edit-sup-select').value;
+      if (v) supervisors.push(v);
+    });
+    if (!supervisors.length) {
+      errEl.textContent = 'A project needs at least one supervisor.';
+      errEl.classList.remove('d-none'); return;
+    }
+    if (new Set(supervisors).size !== supervisors.length) {
+      errEl.textContent = 'The same supervisor is listed more than once.';
+      errEl.classList.remove('d-none'); return;
+    }
+
       const res = await gsrAuth('updateProject', id, {
         title,
         type:                 document.getElementById('edit-type').value,
         semester:             document.getElementById('edit-semester').value,
         year:                 document.getElementById('edit-year').value,
         disableNotifications: !document.getElementById('edit-enableNotif').checked,
+        supervisors,
         students,
       });
       if (!res.success) { errEl.textContent = res.message; errEl.classList.remove('d-none'); return; }

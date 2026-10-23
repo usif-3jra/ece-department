@@ -15,7 +15,7 @@ const MAIL_MAX_RECIPIENTS = 200;   // guard against a runaway paste in the maile
 
 // Bumped with every change, and compared against the page's own stamp so a
 // half-deployed build announces itself instead of behaving strangely.
-const API_BUILD = 'v04-11-10-2026 R02';
+const API_BUILD = 'v04-23-10-2026 R01';
 const MAX_TRIES         = 5;
 const LOCKOUT_MS        = 15 * 60 * 1000;
 const TOKEN_EXPIRY_DAYS = 30;
@@ -418,6 +418,12 @@ async function ensureOrganizerTables(sql) {
     project_id    TEXT NOT NULL DEFAULT '',
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
+  // A group can be assigned its OWN proposed idea, which has no org_ideas row:
+  // idea_id is then NULL and own_idea is set. Postgres allows many NULLs in a
+  // unique index, so several groups keeping their own ideas is fine.
+  await sql`ALTER TABLE org_allocations ALTER COLUMN idea_id DROP NOT NULL`;
+  await sql`ALTER TABLE org_allocations ADD COLUMN IF NOT EXISTS own_idea BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE org_allocations ADD COLUMN IF NOT EXISTS own_supervisor_id TEXT NOT NULL DEFAULT ''`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_alloc_group_idx ON org_allocations (cycle_id, group_id)`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS org_alloc_idea_idx  ON org_allocations (cycle_id, idea_id)`;
 
@@ -658,9 +664,33 @@ async function buildPublishReport(sql, cycle) {
 
   for (const a of pending) {
     const g = groups.find(x => x.id === a.group_id);
-    const iRows = await sql`SELECT * FROM org_ideas WHERE id = ${a.idea_id}`;
-    const idea = iRows[0];
-    if (!g || !idea) { blockers.push(`Allocation ${a.id} refers to a missing group or project.`); continue; }
+    if (!g) { blockers.push(`Allocation ${a.id} refers to a missing group.`); continue; }
+
+    // A group keeping its own proposal has no org_ideas row — the title comes
+    // from the proposal and the supervisor from the assignment.
+    let idea;
+    if (a.own_idea) {
+      if (!(g.proposed_title || '').trim()) {
+        blockers.push(`Group ${g.group_code} is set to keep its own idea, but no idea is recorded.`);
+        continue;
+      }
+      if (!(a.own_supervisor_id || '').trim()) {
+        blockers.push(`Group ${g.group_code} keeps its own idea but no supervisor is attached to it.`);
+        continue;
+      }
+      idea = {
+        title: g.proposed_title,
+        description: g.proposed_desc || '',
+        supervisor_id: a.own_supervisor_id,
+        co_supervisor_id: '',
+        min_students: 1,
+        max_students: 6,
+      };
+    } else {
+      const iRows = await sql`SELECT * FROM org_ideas WHERE id = ${a.idea_id}`;
+      idea = iRows[0];
+      if (!idea) { blockers.push(`Allocation ${a.id} refers to a missing project.`); continue; }
+    }
 
     const members = await sql`SELECT * FROM org_group_members WHERE group_id = ${g.id} ORDER BY id`;
     if (!members.length) { blockers.push(`Group ${g.group_code} has no students.`); continue; }
@@ -2326,6 +2356,10 @@ module.exports = async function handler(req, res) {
           sql`SELECT * FROM org_participants WHERE cycle_id = ${cycle.id}`,
         ]);
         const memberRows = await sql`SELECT group_id, student_id, cgpa FROM org_group_members WHERE cycle_id = ${cycle.id}`;
+        const supRows = await sql`SELECT supervisor_id, name FROM supervisors
+          WHERE program = ${cycle.program} AND campus = ${cycle.campus}
+            AND supervisor_id != ${ADMIN_ID} ORDER BY name`;
+        const supNameBy = new Map(supRows.map(r => [r.supervisor_id, r.name]));
 
         const sizeBy = new Map(), cgpaLists = new Map();
         memberRows.forEach(m => {
@@ -2346,7 +2380,8 @@ module.exports = async function handler(req, res) {
             .map(r => { const i = ideaBy.get(r.idea_id); return i ? { rank: Number(r.rank), ideaId: i.id, title: i.title, supervisor: i.supervisor_name || '' } : null; })
             .filter(Boolean);
           const a = allocBy.get(g.id);
-          const assignedIdea = a ? ideaBy.get(a.idea_id) : null;
+          const ownAssigned = !!(a && a.own_idea);
+          const assignedIdea = (a && !ownAssigned) ? ideaBy.get(a.idea_id) : null;
           const size = sizeBy.get(g.id) || 0;
           const warnings = [];
           if (assignedIdea) {
@@ -2357,8 +2392,14 @@ module.exports = async function handler(req, res) {
             id: g.id, code: g.group_code, size, status: g.status,
             avgCgpa: groupAvg(g.id),
             prefs,
-            assignedIdeaId: a ? a.idea_id : null,
-            assignedTitle: assignedIdea ? assignedIdea.title : '',
+            // The group's own proposal, so it can be offered in the dropdown
+            ownTitle: g.proposed_title || '',
+            ownDesc:  g.proposed_desc || '',
+            ownAssigned,
+            ownSupervisorId: ownAssigned ? (a.own_supervisor_id || '') : '',
+            assignedIdeaId: (a && !ownAssigned) ? a.idea_id : null,
+            assignedTitle: ownAssigned ? (g.proposed_title || 'Own idea')
+                                       : (assignedIdea ? assignedIdea.title : ''),
             assignedRank: a ? Number(a.assigned_rank) : 0,
             published: a ? a.status === 'published' : false,
             warnings,
@@ -2368,6 +2409,11 @@ module.exports = async function handler(req, res) {
         // Supervisor load against declared capacity
         const loadBy = new Map();
         allocs.forEach(a => {
+          if (a.own_idea) {
+            const sid = a.own_supervisor_id || '';
+            if (sid) loadBy.set(sid, (loadBy.get(sid) || 0) + 1);
+            return;
+          }
           const i = ideaBy.get(a.idea_id);
           if (i) loadBy.set(i.supervisor_id, (loadBy.get(i.supervisor_id) || 0) + 1);
         });
@@ -2375,8 +2421,11 @@ module.exports = async function handler(req, res) {
         loadBy.forEach((n, supId) => {
           const cap = capBy.has(supId) ? capBy.get(supId) : 2;
           if (n > cap) {
-            const nm = ideas.find(i => i.supervisor_id === supId);
-            overloaded.push({ supervisor: nm ? nm.supervisor_name : supId, assigned: n, capacity: cap });
+            overloaded.push({
+              supervisor: supNameBy.get(supId)
+                || (ideas.find(i => i.supervisor_id === supId) || {}).supervisor_name || supId,
+              assigned: n, capacity: cap,
+            });
           }
         });
 
@@ -2393,13 +2442,19 @@ module.exports = async function handler(req, res) {
             minStudents: Number(i.min_students), maxStudents: Number(i.max_students),
             taken: allocs.some(a => a.idea_id === i.id),
           })),
-          unassigned: groupRows.filter(g => !g.assignedIdeaId).length,
+          unassigned: groupRows.filter(g => !g.assignedIdeaId && !g.ownAssigned).length,
+          supervisors: supRows.map(r => ({
+            id: r.supervisor_id,
+            name: r.name,
+            capacity: (parts.find(pt => pt.supervisor_id === r.supervisor_id) || {}).max_groups != null
+              ? Number((parts.find(pt => pt.supervisor_id === r.supervisor_id) || {}).max_groups) : 1,
+          })),
           overloaded,
         });
       }
 
       case 'orgSetAssignment': {
-        const [sessionToken, groupId, ideaId] = args;
+        const [sessionToken, groupId, ideaId, ownSupervisorId] = args;
         const session = await verifySession(sessionToken);
         if (!session) return ok(sessionGone(sessionToken));
         const ctx = await orgContext(sql, session);
@@ -2412,6 +2467,31 @@ module.exports = async function handler(req, res) {
 
         const g = await sql`SELECT * FROM org_groups WHERE id = ${Number(groupId)} AND cycle_id = ${cycle.id}`;
         if (!g[0]) return ok({ success: false, message: 'Group not found.' });
+
+        // "own" means the group keeps the project it proposed itself. It has no
+        // org_ideas row, so the supervisor who will take it must be named.
+        if (String(ideaId) === 'own') {
+          if (!(g[0].proposed_title || '').trim())
+            return ok({ success: false, message: 'That group has not proposed an idea of its own.' });
+          const supId = String(ownSupervisorId || '').trim();
+          if (!supId)
+            return ok({ success: false, message: 'Choose which supervisor will take this group’s own idea.' });
+          const supRows = await sql`SELECT supervisor_id, name FROM supervisors
+            WHERE supervisor_id = ${supId} AND program = ${cycle.program} AND campus = ${cycle.campus}`;
+          if (!supRows[0])
+            return ok({ success: false, message: 'Choose a supervisor from this programme and campus.' });
+
+          await sql`INSERT INTO org_allocations
+            (cycle_id, group_id, idea_id, assigned_rank, assigned_by, status, own_idea, own_supervisor_id)
+            VALUES (${cycle.id}, ${Number(groupId)}, NULL, 0, ${sup.supervisor_id}, 'draft', TRUE, ${supId})
+            ON CONFLICT (cycle_id, group_id)
+            DO UPDATE SET idea_id = NULL, assigned_rank = 0, own_idea = TRUE,
+                          own_supervisor_id = ${supId}, assigned_by = ${sup.supervisor_id}, created_at = NOW()`;
+          await logAudit(sql, cycle.id, Number(groupId), 'supervisor', sup.supervisor_id, sup.name,
+            'assignment_set', { group: g[0].group_code, ownIdea: g[0].proposed_title, supervisor: supRows[0].name });
+          return ok({ success: true, assignedRank: 0, ownIdea: true });
+        }
+
         const i = await sql`SELECT * FROM org_ideas WHERE id = ${Number(ideaId)} AND cycle_id = ${cycle.id}`;
         if (!i[0]) return ok({ success: false, message: 'Project idea not found.' });
 
@@ -2430,6 +2510,7 @@ module.exports = async function handler(req, res) {
             VALUES (${cycle.id}, ${Number(groupId)}, ${Number(ideaId)}, ${assignedRank}, ${sup.supervisor_id}, 'draft')
             ON CONFLICT (cycle_id, group_id)
             DO UPDATE SET idea_id = ${Number(ideaId)}, assigned_rank = ${assignedRank},
+                          own_idea = FALSE, own_supervisor_id = '',
                           assigned_by = ${sup.supervisor_id}, created_at = NOW()`;
         } catch (e) {
           // The (cycle_id, idea_id) unique index catches a colleague assigning
@@ -4239,6 +4320,41 @@ module.exports = async function handler(req, res) {
         if (updates.endDate  !== undefined) patch.end_date = updates.endDate;
         if (updates.disableNotifications !== undefined) patch.disable_notifications = !!updates.disableNotifications;
         if (patch.title !== undefined && !patch.title) return ok({ success: false, message: 'Title cannot be empty.' });
+
+        // ── Supervisors ───────────────────────────────────────────────
+        // The admin may set the list freely. A supervisor on the project may
+        // change the co-supervisors but not the primary, so a project can
+        // never be taken over or left without its lead.
+        if (updates.supervisors !== undefined) {
+          const current = (project.supervisors || '').split(',').map(x => x.trim()).filter(Boolean);
+          const wanted  = (updates.supervisors || []).map(x => String(x).trim()).filter(Boolean);
+
+          if (!wanted.length) return ok({ success: false, message: 'A project needs at least one supervisor.' });
+          if (new Set(wanted).size !== wanted.length)
+            return ok({ success: false, message: 'The same supervisor is listed more than once.' });
+
+          const known = await sql`SELECT supervisor_id, name FROM supervisors
+            WHERE supervisor_id = ANY(${wanted})`;
+          if (known.length !== wanted.length) {
+            const found = new Set(known.map(k => k.supervisor_id));
+            const missing = wanted.filter(w => !found.has(w));
+            return ok({ success: false, message: `Unknown supervisor: ${missing.join(', ')}` });
+          }
+
+          if (!isAdminUser(session)) {
+            const primary = current[0] || '';
+            if (primary && wanted[0] !== primary) {
+              const nameRows = await sql`SELECT name FROM supervisors WHERE supervisor_id = ${primary}`;
+              const who = nameRows[0] ? nameRows[0].name : primary;
+              return ok({ success: false,
+                message: `Only the admin can change the main supervisor (${who}). You can add or remove co-supervisors.` });
+            }
+          }
+          patch.supervisors = wanted.join(',');
+          // program_type follows the main supervisor's programme
+          const leadRows = await sql`SELECT program FROM supervisors WHERE supervisor_id = ${wanted[0]}`;
+          if (leadRows[0] && leadRows[0].program) patch.program_type = leadRows[0].program;
+        }
 
         if (updates.students !== undefined) {
           const submitted   = (updates.students || []).map(s => ({ ...s, studentId: String(s.studentId).trim(), studentName: String(s.studentName).trim() }));

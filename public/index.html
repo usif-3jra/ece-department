@@ -107,7 +107,7 @@
             <i class="fas fa-key me-2 text-primary"></i>Change Password
           </a></li>
           <li><hr class="dropdown-divider"/></li>
-          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v04-11-10-2026 R02</span></li>
+          <li><span class="dropdown-item-text" style="font-family:monospace;font-size:10px;color:#94a3b8;">v04-23-10-2026 R01</span></li>
         </ul>
       </div>
       <button class="btn btn-sm btn-danger" onclick="Auth.logout()" title="Logout">
@@ -667,6 +667,16 @@
           <label class="form-check-label" for="edit-enableNotif">Enable Automatic Email Notifications (sent on week 13)</label>
         </div>
 
+        <hr class="mt-3 mb-3"/>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-semibold" style="font-size:14px;">
+            <i class="fas fa-chalkboard-user me-1 text-muted"></i>Supervisors</span>
+          <button type="button" class="btn btn-outline-primary btn-sm" onclick="Reg.addEditSupRow()">
+            <i class="fas fa-user-plus me-1"></i>Add Co-Supervisor
+          </button>
+        </div>
+        <div id="edit-sup-note" class="small text-muted mb-2"></div>
+        <div id="edit-sup-rows"></div>
         <hr class="mt-3 mb-3"/>
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="fw-semibold" style="font-size:14px;"><i class="fas fa-users me-1 text-muted"></i>Students</span>
